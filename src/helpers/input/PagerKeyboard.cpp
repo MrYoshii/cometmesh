@@ -63,7 +63,13 @@ static bool s_bl_ready = false;
 // esp32-hal-ledc.h, not the newer pin-based ledcAttach()). Channel 0: nothing
 // else on this board claims an LEDC channel (the AW9364 display backlight is
 // pulse-driven, not PWM).
-#if defined(HAS_TDECK_PRO)
+#if defined(HAS_TDECK_MAX)
+// Channels 0 and 1 share LEDC timer 0. The Max runs its front-light on channel 0
+// at 12 bits; setting this channel up (1 kHz, 8 bits) on channel 1 re-programmed
+// that shared timer to 8 bits, so every front-light duty above 255 saturated and
+// the slider hit full brightness at about a third. Channel 2 has timer 1 to itself.
+static constexpr uint8_t kKbBacklightPwmChannel = 2;
+#elif defined(HAS_TDECK_PRO)
 static constexpr uint8_t kKbBacklightPwmChannel = 1;   // channel 0 drives the e-paper frontlight
 #else
 static constexpr uint8_t kKbBacklightPwmChannel = 0;

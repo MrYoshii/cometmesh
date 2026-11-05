@@ -5094,6 +5094,9 @@ static uint8_t s_m9_cc_screenshot_up = CC_NAV_THEME;
 static lv_obj_t* s_cc_env_label = nullptr;   // Expansion-Kit local-env line in the control center
 #endif
 static lv_obj_t* s_cc_sys_label = nullptr;   // CPU/RAM/PSRAM/IP line; refreshed live while CC open
+#if defined(HAS_TDECK_MAX)
+static lv_obj_t* s_cc_batt_label = nullptr;  // "76%  3.95V  -120mA": refreshed live while CC open
+#endif
 static void ccBuildSysInfo(char* buf, size_t n);   // fwd-decl; defined with the CC helpers below
 static void closeControlCenter();   // defined in the control-center section below
 static void openControlCenter();    // defined in the control-center section below (early decl for the M9 CTRL key)
@@ -42173,6 +42176,61 @@ static void applyBattColor() {
     c = lv_color_hex(s_theme_high_contrast ? COLOR_TEXT : 0xFFD60A);
   lv_obj_set_style_text_color(g_statusbar.batt_icon, c, LV_PART_MAIN);
 }
+#if defined(HAS_TDECK_MAX)
+// Status-bar battery for the 1-bit panel: a 2 px outline with a solid nub, and a
+// fill that steps in whole pixels (inset 1 px so it never touches the outline).
+// Charging: the fill is drawn with a white bolt knocked out of it. Colour = the
+// label's text colour, so applyBattColor() (power-save amber, map chrome) still
+// applies. user_data: 0..100 = percent, 1000+pct = charging, <0 = unknown.
+static void sbBattDrawCb(lv_event_t* e) {
+  lv_draw_ctx_t* dc = lv_event_get_draw_ctx(e);
+  lv_obj_t* obj = lv_event_get_target(e);
+  if (!dc) return;
+  const int key = (int)(intptr_t)lv_obj_get_user_data(obj);
+  const bool chg = key >= 1000;
+  const int pct = key < 0 ? 0 : LV_CLAMP(0, chg ? key - 1000 : key, 100);
+  const lv_color_t ink = lv_obj_get_style_text_color(obj, LV_PART_MAIN);
+  lv_area_t a;
+  lv_obj_get_coords(obj, &a);
+  lv_area_t body = a;
+  body.x2 -= 3;                                   // 2 px nub + 1 px gap
+  lv_draw_rect_dsc_t od;
+  lv_draw_rect_dsc_init(&od);
+  od.radius = 2;
+  od.bg_opa = LV_OPA_TRANSP;
+  od.border_color = ink;
+  od.border_width = 2;
+  lv_draw_rect(dc, &od, &body);
+  lv_draw_rect_dsc_t fd;
+  lv_draw_rect_dsc_init(&fd);
+  fd.bg_opa = LV_OPA_COVER;
+  fd.bg_color = ink;
+  const lv_coord_t h = lv_area_get_height(&a);
+  const lv_area_t nub = { (lv_coord_t)(body.x2 + 1), (lv_coord_t)(a.y1 + h / 3), a.x2, (lv_coord_t)(a.y2 - h / 3) };
+  lv_draw_rect(dc, &fd, &nub);
+  lv_area_t in = { (lv_coord_t)(body.x1 + 3), (lv_coord_t)(body.y1 + 3), (lv_coord_t)(body.x2 - 3), (lv_coord_t)(body.y2 - 3) };
+  const lv_coord_t iw = lv_area_get_width(&in);
+  lv_coord_t w = (lv_coord_t)((iw * pct + 50) / 100);
+  if (pct > 0 && w < 1) w = 1;
+  if (chg) w = iw;                                // charging: full body, bolt knocked out
+  if (w > 0 && key >= 0) {
+    in.x2 = (lv_coord_t)(in.x1 + w - 1);
+    lv_draw_rect(dc, &fd, &in);
+  }
+  if (chg) {
+    lv_draw_line_dsc_t ld;
+    lv_draw_line_dsc_init(&ld);
+    ld.color = lv_color_white();
+    ld.width = 1;
+    const lv_coord_t cx = (lv_coord_t)((body.x1 + body.x2) / 2), y1 = in.y1, y2 = in.y2;
+    const lv_point_t p1 = { (lv_coord_t)(cx + 2), y1 }, p2 = { (lv_coord_t)(cx - 1), (lv_coord_t)((y1 + y2) / 2) };
+    const lv_point_t p3 = { (lv_coord_t)(cx + 1), (lv_coord_t)((y1 + y2) / 2) }, p4 = { (lv_coord_t)(cx - 2), y2 };
+    lv_draw_line(dc, &ld, &p1, &p2);
+    lv_draw_line(dc, &ld, &p2, &p3);
+    lv_draw_line(dc, &ld, &p3, &p4);
+  }
+}
+#endif
 
 // Immersive map chrome: on the Map tab the status bar, bottom info strip and
 // tab bar all go transparent so the (full-screen) map shows through behind them.
@@ -56754,6 +56812,9 @@ static void closeControlCenter() {
   s_cc_env_label = nullptr;
 #endif
   s_cc_sys_label = nullptr;
+#if defined(HAS_TDECK_MAX)
+  s_cc_batt_label = nullptr;
+#endif
 }
 // Build the control-center system-info line (CPU · RAM% · PSRAM% · IP/no-IP).
 // Shared by openControlCenter (initial paint) and the live refresh tick so the
@@ -57847,6 +57908,23 @@ static bool ccClockStrings(char* clock_s, size_t clock_cap, char* date_s, size_t
   return current;
 }
 #if defined(HAS_TDECK_MAX)
+// "76%  3.95V  -120mA" (charging: "Charging  4.10V  +450mA"). The current is the
+// BQ27220's reading (+ into the pack, - drawn from it), rounded to 10 mA so the
+// live line does not repaint the e-paper for every few milliamps of jitter.
+static void maxCcBattString(char* out, size_t n) {
+  const uint16_t mv = batteryMvSmoothed();
+  const int pct = batteryPercentFromMv(mv);
+  char cur[16] = "";
+  const auto g = board.getGaugeInfo();
+  if (g.valid) {
+    const int ma = (g.current_ma >= 0 ? (g.current_ma + 5) : (g.current_ma - 5)) / 10 * 10;
+    snprintf(cur, sizeof cur, "  %+dmA", ma);
+  }
+  if (batteryIsCharging(mv))
+    snprintf(out, n, "%s  %u.%02uV%s", TR("Charging"), (unsigned)(mv / 1000), (unsigned)((mv % 1000) / 10), cur);
+  else
+    snprintf(out, n, "%d%%  %u.%02uV%s", pct < 0 ? 0 : pct, (unsigned)(mv / 1000), (unsigned)((mv % 1000) / 10), cur);
+}
 #define CC_ROW_LIFT (-34)   // clear the two-line sysinfo footer
 #else
 #define CC_ROW_LIFT (-20)
@@ -57913,7 +57991,7 @@ static void openControlCenter() {
 #elif defined(HAS_TDECK_MAX)
   // 240x320 portrait: use the height. Two full rows of chips plus a two-line
   // system-info footer, instead of a gap under GPS and a footer cut off with "...".
-  const int card_h = 268;
+  const int card_h = 290;   // + the keyboard-light slider
 #else
   // Portrait has headroom on the 320-tall screen; make the card taller so the
   // brightness slider + toggles + sysinfo all get their own rows.
@@ -57956,13 +58034,17 @@ static void openControlCenter() {
   // ---- Battery + Wi-Fi info (right) ----
   const uint16_t mv = batteryMvSmoothed();
   const int pct = batteryPercentFromMv(mv);
-  char batt_s[28];
+  char batt_s[40];
+#if defined(HAS_TDECK_MAX)
+  maxCcBattString(batt_s, sizeof batt_s);
+#else
   if (batteryIsCharging(mv))
     snprintf(batt_s, sizeof batt_s, "%s  %u.%02uV", TR("Charging"),
              (unsigned)(mv / 1000), (unsigned)((mv % 1000) / 10));
   else
     snprintf(batt_s, sizeof batt_s, "%d%%  %u.%02uV",
              pct < 0 ? 0 : pct, (unsigned)(mv / 1000), (unsigned)((mv % 1000) / 10));
+#endif
   char winfo[40] = "Wi-Fi off";
 #if defined(ESP32)
   if (WiFi.status() == WL_CONNECTED)
@@ -58015,6 +58097,9 @@ static void openControlCenter() {
   }
   lv_obj_t* bi = lv_label_create(brow);
   lv_label_set_text(bi, batt_s);
+#if defined(HAS_TDECK_MAX)
+  s_cc_batt_label = bi;
+#endif
   lv_obj_set_style_text_font(bi, &g_font_12, LV_PART_MAIN);
   lv_obj_set_style_text_color(bi, lv_color_hex(COLOR_SUB), LV_PART_MAIN);
   int row_y = 42;   // first content row under the date / battery
@@ -58035,6 +58120,9 @@ static void openControlCenter() {
 #elif defined(HAS_TDISPLAY_P4)
   const int bl_y  = row_y;             // two stacked sliders: Screen / Sound
   const int gps_y = row_y + SC(66);    // GPS line clears both rows
+#elif defined(HAS_CC_BRIGHTNESS) && defined(HAS_TDECK_MAX)
+  const int bl_y  = row_y;             // two thin sliders: front-light, then keyboard light
+  const int gps_y = row_y + 12 + 22;
 #elif defined(HAS_CC_BRIGHTNESS)
   const int bl_y  = row_y;
   const int gps_y = row_y + 12;
@@ -58150,6 +58238,26 @@ static void openControlCenter() {
   navSetTip(bl, TR("Brightness"), nullptr, TR("Enter, then turn the wheel"));
 #else
   navSetTip(bl, TR("Brightness"));
+#endif
+#if defined(HAS_TDECK_MAX)
+  {   // Keyboard light level, right under the front-light (same as Settings > Keyboard).
+    lv_obj_t* kic = lv_label_create(card);
+    lv_label_set_text(kic, UI_ICON_KEYBOARD);
+    lv_obj_set_style_text_font(kic, &ui_icons_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(kic, lv_color_hex(COLOR_SUB), LV_PART_MAIN);
+    lv_obj_align(kic, LV_ALIGN_TOP_LEFT, 0, bl_y + 22 - 5);
+    lv_obj_t* kb = lv_slider_create(card);
+    lv_obj_set_size(kb, card_w - 20 - 22, 6);
+    lv_obj_align(kb, LV_ALIGN_TOP_RIGHT, 0, bl_y + 22);
+    lv_slider_set_range(kb, 1, 100);
+    lv_slider_set_value(kb, s_tdeck_kb_bl_pct, LV_ANIM_OFF);
+    lv_obj_set_style_bg_color(kb, lv_color_hex(COLOR_ACCENT), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(kb, lv_color_hex(COLOR_ACCENT), LV_PART_KNOB);
+    lv_obj_set_style_pad_all(kb, 4, LV_PART_KNOB);
+    lv_obj_add_event_cb(kb, maxKbBlSliderCb, LV_EVENT_VALUE_CHANGED, nullptr);
+    lv_obj_add_event_cb(kb, kbBlSliderReleaseCb, LV_EVENT_RELEASED, nullptr);
+    navSetTip(kb, TR("Keyboard light"));
+  }
 #endif
 #if defined(TLORA_PAGER)
   // Opened afresh (hold S, the bar), focus starts here, not on the power button built
@@ -61765,6 +61873,14 @@ static void buildGlobalStatusBar() {
   lv_label_set_text(g_statusbar.batt_icon, LV_SYMBOL_BATTERY_2);
   lv_obj_set_style_text_color(g_statusbar.batt_icon, lv_color_hex(COLOR_SUB), LV_PART_MAIN);
   lv_obj_set_style_text_font(g_statusbar.batt_icon, sbFixed(&g_font_16), LV_PART_MAIN);
+#if defined(HAS_TDECK_MAX)
+  // Drawn, not a font glyph: the 16 px FontAwesome battery breaks up at one bit
+  // (hairline outline, a detached nub, three loose bars). See sbBattDrawCb.
+  lv_label_set_text(g_statusbar.batt_icon, "");
+  lv_obj_set_size(g_statusbar.batt_icon, 22, 12);
+  lv_obj_set_user_data(g_statusbar.batt_icon, (void*)(intptr_t)-1);
+  lv_obj_add_event_cb(g_statusbar.batt_icon, sbBattDrawCb, LV_EVENT_DRAW_MAIN_END, nullptr);
+#endif
   lv_obj_align(g_statusbar.batt_icon, LV_ALIGN_RIGHT_MID, -2, 0);
 
   g_statusbar.batt_pct = lv_label_create(g_statusbar.root);
@@ -62487,7 +62603,11 @@ static void statusBarPackRight() {
   struct Slot { lv_obj_t* o; lv_coord_t gap; };   // gap: to the neighbour on its right
   const Slot order[] = {
     { g_statusbar.batt_icon,    0 },
+#if defined(HAS_TDECK_MAX)
+    { g_statusbar.batt_pct,     3 },   // breathing room before the drawn battery
+#else
     { g_statusbar.batt_pct,     0 },
+#endif
     { g_statusbar.sig_box,      SBX(8) },
     { g_statusbar.conn_icon,    SBX(7) },
     { g_statusbar.ble_icon,     SBX(7) },
@@ -62500,7 +62620,11 @@ static void statusBarPackRight() {
   for (const Slot& sl : order) {
     lv_obj_t* o = sl.o;
     if (!o || lv_obj_has_flag(o, LV_OBJ_FLAG_HIDDEN)) continue;
-    if (lv_obj_check_type(o, &lv_label_class) && !lv_label_get_text(o)[0]) continue;   // empty: the % while charging
+    if (lv_obj_check_type(o, &lv_label_class) && !lv_label_get_text(o)[0]
+#if defined(HAS_TDECK_MAX)
+        && o != g_statusbar.batt_icon   // the Max's battery is drawn on an empty label
+#endif
+       ) continue;   // empty: the % while charging
     if (!first) x += sl.gap;
     lv_obj_align(o, LV_ALIGN_RIGHT_MID, -x, 0);
     x += lv_obj_get_width(o);
@@ -63159,12 +63283,22 @@ static void updateGlobalStatusBar() {
     s_batt_lvl = charging ? 1000 : pct;
     applyBattColor();
   }
+#if defined(HAS_TDECK_MAX)
+  {
+    const int key = charging ? 1000 + (pct < 0 ? 100 : pct) : pct;
+    if ((int)(intptr_t)lv_obj_get_user_data(g_statusbar.batt_icon) != key) {
+      lv_obj_set_user_data(g_statusbar.batt_icon, (void*)(intptr_t)key);
+      lv_obj_invalidate(g_statusbar.batt_icon);
+    }
+  }
+#else
   static const char* s_last_glyph = nullptr;
   const char* g = charging ? UI_ICON_BATTERY_CHARGING : batteryGlyphForMv(mv);   // outline battery with a bolt
   if (g != s_last_glyph) {
     lv_label_set_text(g_statusbar.batt_icon, g);
     s_last_glyph = g;
   }
+#endif
   // Re-tint the battery amber/normal when idle power-save toggles (the toggle cb routes through
   // here via updateGlobalStatusBar). Only on change, so no per-tick style churn.
   { static int s_last_pwr = -1;
@@ -67902,6 +68036,13 @@ static void refreshStatusLabels() {
       ccBuildSysInfo(cc_sys, sizeof cc_sys);
       setLabelIfChanged(s_cc_sys_label, cc_sys);
     }
+#if defined(HAS_TDECK_MAX)
+    if (s_cc_batt_label) {
+      char b[40];
+      maxCcBattString(b, sizeof b);
+      setLabelIfChanged(s_cc_batt_label, b);
+    }
+#endif
   }
   uint16_t active_tab = 0xFFFF;
   if (g_lv.tabview) active_tab = lv_tabview_get_tab_act(g_lv.tabview);
