@@ -118,11 +118,11 @@ bool TDeckProDisplay::begin() {
 
 #if defined(PIN_TFT_LEDA_CTL) && (PIN_TFT_LEDA_CTL >= 0)
 #if defined(HAS_TDECK_MAX)
-  // 11-bit at 18 kHz. The LEDC divider caps frequency x 2^bits at about 40 MHz
-  // here (12 kHz x 12 bit failed to come up at all). 5 kHz x 12 bit worked but the
-  // flicker was visible at low levels; 18 kHz is well past that and past hearing,
-  // and 2048 steps still leave a very dim bottom end under the gamma curve.
-  ledcSetup(TDECK_PRO_FRONTLIGHT_CHANNEL, 18000, 11);
+  // 11-bit at the panel's original 12 kHz (the LEDC divider caps frequency x 2^bits
+  // at about 40 MHz here; 12 kHz x 12 bit never came up). The flicker seen at low
+  // levels was the LED driver failing to regulate very short pulses, not the PWM
+  // rate, so the bottom of the range is lifted instead (writeBrightness).
+  ledcSetup(TDECK_PRO_FRONTLIGHT_CHANNEL, 12000, 11);
 #else
   ledcSetup(TDECK_PRO_FRONTLIGHT_CHANNEL, 12000, 8);
 #endif
@@ -382,11 +382,15 @@ void TDeckProDisplay::writeBrightness(uint8_t brightness) {
   // Perceived LED brightness is far from linear in duty, so map the 0-255 level
   // through a ~2.2 gamma onto the 11-bit timer: the low end of the slider gets
   // fine, very dim steps (a bedside reading light) instead of one coarse jump.
+  // Below about 1.5% duty the driver shimmers and then drops out (the slider's
+  // left end switched the light off), so the curve starts there: level 1..255 maps
+  // to kMinDuty..2047 along f^2.5.
+  constexpr float kMinDuty = 31.0f;   // ~1.5% of 2047
   uint32_t duty = 0;
   if (brightness) {
-    const float f = (float)brightness / 255.0f;
-    duty = (uint32_t)(2047.0f * f * f * sqrtf(f) + 0.5f);   // f^2.5 ~ gamma 2.2-2.5, no powf
-    if (duty < 1) duty = 1;
+    float f = (float)(brightness > 2 ? brightness - 2 : 0) / 253.0f;   // 1% (level 2) -> 0
+    if (f > 1.0f) f = 1.0f;
+    duty = (uint32_t)(kMinDuty + (2047.0f - kMinDuty) * f * f * sqrtf(f) + 0.5f);
   }
   ledcWrite(TDECK_PRO_FRONTLIGHT_CHANNEL, duty);
 #elif defined(PIN_TFT_LEDA_CTL) && (PIN_TFT_LEDA_CTL >= 0)
