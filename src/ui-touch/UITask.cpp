@@ -82923,8 +82923,9 @@ void UITask::loop() {
   {   // TEST ONLY (Max RAM audit): every 30 s, plus one region dump at 20 s
     static uint32_t s_mt_last = 0; static bool s_mt_dumped = false;
     if (!s_mt_dumped && now > 20000) { s_mt_dumped = true; heap_caps_print_heap_info(MALLOC_CAP_INTERNAL); }
-    if (now - s_mt_last > 30000) { s_mt_last = now;
-      Serial.printf("[MEMTRACE] run int free=%u largest=%u minfree=%u dma largest=%u\n",
+    if (now - s_mt_last > 5000) { s_mt_last = now;
+      Serial.printf("[MEMTRACE] run t=%lus wifi=%d tiles=%d int free=%u largest=%u minfree=%u dma largest=%u\n",
+        (unsigned long)(now / 1000), (int)WiFi.status(), (int)tileFetchPendingLoad(),
         (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
         (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
         (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),

@@ -4,6 +4,12 @@
 
 // TEST ONLY (Max RAM audit): internal-heap checkpoint.
 #include <esp_heap_caps.h>
+#include <esp_rom_sys.h>
+static void memAllocFailed(size_t size, uint32_t caps, const char* fn) {   // TEST ONLY
+  esp_rom_printf("[MEMFAIL] %u bytes caps=0x%x in %s (int free=%u largest=%u)\n", (unsigned)size, (unsigned)caps,
+                 fn ? fn : "?", (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                 (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+}
 static void memTrace(const char* tag) {
   Serial.printf("[MEMTRACE] %-18s int free=%6u largest=%6u dma largest=%6u | psram free=%u\n", tag,
                 (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
@@ -805,6 +811,7 @@ void setup() {
   delay(200);
 #endif
   Serial.println("[BOOT] setup start");
+  heap_caps_register_failed_alloc_callback(memAllocFailed);
   memTrace("setup start");
   Serial.printf("[BOOT] %s on meshcomod %s\n", FIRMWARE_VERSION, FIRMWARE_CORE_VERSION);
   // The SDK ships CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096: every allocation
