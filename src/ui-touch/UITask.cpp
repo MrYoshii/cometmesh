@@ -37950,7 +37950,9 @@ static bool ensureHistFlushTaskRunning() {
 // Queue a missing tile for download. No-op when Wi-Fi is down or the
 // tile was queued recently. Called from renderMapTiles after a SPIFFS
 // miss; the actual fetch happens off-thread.
+static volatile uint16_t s_tq_calls=0, s_tq_nofs=0, s_tq_sd=0, s_tq_wifi=0, s_tq_seen=0, s_tq_task=0;   // TEST ONLY
 static void queueTileForFetch(uint8_t z, int32_t x, int32_t y) {
+  ++s_tq_calls;
   // Boards with a microSD backend fetch whenever SOME cache is mounted, and the
   // destination follows whatever s_tile_fs currently points at: the card in
   // microSD-tile mode (downloads merge into the SD library, #20), or the
@@ -37958,15 +37960,15 @@ static void queueTileForFetch(uint8_t z, int32_t x, int32_t y) {
   // fallback until it returns. Boards without one keep the plain offline guard:
   // no SD packs exist there, so microSD-tile mode can only mean "don't fetch".
 #if CAP_MICROSD
-  if (!s_tiles_fs_ready || !s_tile_fs) return;
+  if (!s_tiles_fs_ready || !s_tile_fs) { ++s_tq_nofs; return; }
 #else
-  if (s_map_style == 0 && s_tiles_from_sd) return;
+  if (s_map_style == 0 && s_tiles_from_sd) { ++s_tq_sd; return; }
 #endif
 #if defined(TLORA_PAGER)
   if (s_pager_sd_removal_pending && s_tile_fs == &SD) return;
 #endif
-  if (WiFi.status() != WL_CONNECTED) return;
-  if (tileFetchSeen(z, x, y)) return;
+  if (WiFi.status() != WL_CONNECTED) { ++s_tq_wifi; return; }
+  if (tileFetchSeen(z, x, y)) { ++s_tq_seen; return; }
   // HONOR the result: ensureTileFetchTaskRunning() creates the QUEUE first and can
   // still fail afterwards on the worker's 8 KB contiguous-DRAM stack. Ignoring it left
   // a queue with no consumer, so every send below incremented s_tile_fetch_pending with
@@ -37975,7 +37977,7 @@ static void queueTileForFetch(uint8_t z, int32_t x, int32_t y) {
   // single failed spawn silently killed the chime for the rest of the boot — the "lost
   // sound until I restart" report (issue #184). No tile is lost by returning here: with
   // no worker the fetch could never have happened anyway.
-  if (!ensureTileFetchTaskRunning()) return;
+  if (!ensureTileFetchTaskRunning()) { ++s_tq_task; return; }
   if (!s_tile_fetch_queue) return;
   TileFetchReq req = {z, x, y};
   // Publish the lifecycle count before the queue item. Otherwise the worker can
@@ -82933,7 +82935,11 @@ void UITask::loop() {
       Serial.printf("[TILETRACE] fs=%d task=%d spawn=%d ok=%u fail=%u iters=%u step=%c wr=%c http=%d openfail=%u\n",
         (int)s_tiles_fs_ready, s_tile_fetch_task != nullptr, (int)s_tile_fetch_spawn_ok,
         (unsigned)s_tile_fetch_ok, (unsigned)s_tile_fetch_failed, (unsigned)s_tile_fetch_iters,
-        s_tile_fetch_step, s_tile_fetch_last_wr, (int)s_tile_fetch_last_code, (unsigned)s_tile_fetch_open_fail); }
+        s_tile_fetch_step, s_tile_fetch_last_wr, (int)s_tile_fetch_last_code, (unsigned)s_tile_fetch_open_fail);
+      Serial.printf("[TILETRACE] queue calls=%u nofs=%u sd=%u wifi=%u seen=%u task=%u style=%d from_sd=%d tile_fs=%s\n",
+        (unsigned)s_tq_calls, (unsigned)s_tq_nofs, (unsigned)s_tq_sd, (unsigned)s_tq_wifi, (unsigned)s_tq_seen,
+        (unsigned)s_tq_task, (int)s_map_style, (int)s_tiles_from_sd,
+        !s_tile_fs ? "null" : (s_tile_fs == &s_tiles_fs ? "lfs" : "other")); }
   }
 #if !defined(HAS_TANMATSU)
   // REMOTE mode: draw/refresh the physical-panel placeholder (first pass via the IP
