@@ -2484,6 +2484,8 @@ static void maxNotifyTaskFn(void* arg) {
 }
 
 static void maxPlayNotifySlot(int slot) {
+  Serial.printf("[MAXAUDIO] play slot=%d tiles=%u playing=%d vol=%u\n", slot, (unsigned)tileFetchPendingLoad(),
+                (int)s_notify_playing, (unsigned)touchPrefsGetSoundVolume());   // TEST BUILD ONLY
   if (tileFetchPendingLoad() > 0) return;
   if (s_notify_playing) return;
   s_notify_slot = slot;
@@ -2665,8 +2667,9 @@ static void tanBeep();   // I2S notification tick; defined far below (with the C
 #endif
 // Play the platform's notification chime. Caller checks the buzzer/sound pref.
 static inline void uiPlaySlot(int slot) {
+  Serial.printf("[MAXAUDIO] uiPlaySlot %d\n", slot);   // TEST BUILD ONLY
 #if CAP_LUA_AUDIO
-  if (luaAudioActive()) return;
+  if (luaAudioActive()) { Serial.println("[MAXAUDIO] skipped: Lua audio active"); return; }
 #endif
 #if defined(HAS_TDECK_GT911)
   tdeckPlayNotifySlot(slot);
@@ -13493,6 +13496,7 @@ static void dndEndPlusCb(lv_event_t* e)    { if (lv_event_get_code(e) == LV_EVEN
 // reason rather than just going quiet, so the page explains itself.
 static bool soundPreviewAllowed(bool announce = true) {
   if (!g_lv.task) return false;
+  Serial.printf("[MAXAUDIO] preview: quiet=%d dnd=%d\n", (int)g_lv.task->isBuzzerQuiet(), (int)dndActive());   // TEST BUILD ONLY
   if (g_lv.task->isBuzzerQuiet()) {
     if (announce) g_lv.task->showAlert(TR("Sound is off"), 1400);
     return false;
