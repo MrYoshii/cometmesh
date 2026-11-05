@@ -35,6 +35,9 @@ public:
 
   void writePixelsRGB565(int x, int y, int w, int h, const uint16_t* pixels);
   static void prepareMapTileRGB565(uint16_t* pixels, int width, int height);
+#if defined(HAS_TDECK_MAX)
+  static bool prepareMapTileLineArt(uint16_t* pixels, int width, int height);
+#endif
   void setDisplayRotation(uint8_t rotation);
   void setBrightness(uint8_t brightness);
 #if defined(HAS_TDECK_MAX)

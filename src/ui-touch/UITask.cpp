@@ -16471,6 +16471,11 @@ static void antSelShowLive() {
 static void antSelConfirmApply() {
   antSelSet(s_ant_pending);
   if (g_lv.task) {
+#if defined(HAS_TDECK_MAX)
+    if (s_ant_pending == ANT_SEL_EXTERNAL && !touchPrefsGetAntExtAlways())
+      g_lv.task->showAlert(TR("External antenna selected\nBack to on-board at reboot"), 1800);
+    else
+#endif
     g_lv.task->showAlert(s_ant_pending == ANT_SEL_EXTERNAL ? TR("External antenna selected")
                        : s_ant_pending == ANT_SEL_AUTO     ? TR("Per-transmit switching on")
                                                            : TR("On-board antenna selected"), 1200);
@@ -18656,7 +18661,7 @@ static void openSoundPickerCb(lv_event_t* e);      // defined with the chooser, 
 static void calibrateBatteryCb(lv_event_t* e);   // defined with the battery helpers below
 // Keyboards whose backlight takes a level, not just on/off: the T-Deck's C3 keyboard
 // and the ThinkNode M9's controller (duty register 0x02, #664).
-#if defined(HAS_TDECK_KEYBOARD) || defined(HAS_M9_KEYBOARD)
+#if defined(HAS_TDECK_KEYBOARD) || defined(HAS_M9_KEYBOARD) || defined(HAS_TDECK_MAX)   // the Max: LEDC PWM on KB_BACKLIGHT
   #define KB_BL_DIMMABLE 1
 #else
   #define KB_BL_DIMMABLE 0
@@ -19867,8 +19872,36 @@ static void p4KbLightPickCb(lv_event_t* e) {
 }
 #endif
 
+#if defined(HAS_TDECK_MAX)
+static void maxKbBlModePickCb(lv_event_t* e) {
+  if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+  const int i = setChoiceIndex(e);
+  if (i < 0 || i > 2) return;
+  s_kb_bl_mode = (uint8_t)i;   // 0 off, 1 with the light, 2 auto
+  touchPrefsSetKbBacklight(s_kb_bl_mode);
+  setChoicePick(lv_obj_get_parent(lv_event_get_current_target(e)), i);
+}
+static void maxKbBlSliderCb(lv_event_t* e) {   // live; does not touch the mode (unlike kbBlSetPct)
+  int pct = lv_slider_get_value(lv_event_get_target(e));
+  if (pct < 1) pct = 1; if (pct > 100) pct = 100;
+  s_tdeck_kb_bl_pct = (uint8_t)pct;
+  noteKbActivity();   // light the keys now so the level is visible while dragging
+}
+#endif
 static void buildKeyboardPage() {
-#if KB_BL_DIMMABLE
+#if defined(HAS_TDECK_MAX)
+  {
+    lv_obj_t* c = setCard("Backlight");
+    const char* modes[] = { TR("Off"), TR("With light"), TR("Auto") };
+    setChoiceRow(c, "Keyboard light", nullptr, modes, 3, s_kb_bl_mode <= 2 ? s_kb_bl_mode : 1, maxKbBlModePickCb);
+    char v[8];
+    snprintf(v, sizeof v, "%d%%", (int)s_tdeck_kb_bl_pct);
+    g_set_modal.kbbl_slider = setSliderRow(c, "Brightness", v, 1, 100, s_tdeck_kb_bl_pct, maxKbBlSliderCb,
+                                           kbBlSliderReleaseCb, nullptr, nullptr, nullptr);
+    setNote(c, "The heart pad below the screen switches the light on and off. With light: the keys light up "
+               "together with the screen. Auto: also briefly after typing while the light is off.");
+  }
+#elif KB_BL_DIMMABLE
   // Keyboard backlight (#84, the M9 since #664): a live slider plus one-tap presets.
   // Hidden on the older T-Deck keyboards, which have no controllable backlight (#382).
 #if defined(HAS_TDECK_KEYBOARD)
@@ -39289,7 +39322,7 @@ static void renderMapTiles() {
   lv_label_set_text(s_map_status_lbl, TR("No tiles (non-ESP32)"));
 #endif
   lv_obj_clear_flag(s_map_status_lbl, LV_OBJ_FLAG_HIDDEN);
-#if defined(TLORA_PAGER)
+#if defined(TLORA_PAGER) || defined(HAS_TDECK_MAX)
   lv_obj_move_foreground(s_map_status_lbl);   // its card covers the crosshair (see its setup)
 #endif
 }
@@ -42294,6 +42327,20 @@ static void makeMapTab(lv_obj_t* tab) {
       "Upload a tile pack to /tiles/<z>/<x>/<y>.jpg "
       "with the host-side generator."));
   lv_obj_center(s_map_status_lbl);
+#if defined(HAS_TDECK_MAX)
+  // 240 px wide: the full-width text ran under the right-hand button column
+  // ("Connect to Wi-Fi..." cut by the buttons and the position marker). Wrap it
+  // in a paper card left of the column, in front of the marker.
+  lv_label_set_long_mode(s_map_status_lbl, LV_LABEL_LONG_WRAP);
+  lv_obj_set_width(s_map_status_lbl, k_map_canvas_w - 44 - 12);
+  lv_obj_set_style_bg_color(s_map_status_lbl, lv_color_white(), LV_PART_MAIN);
+  lv_obj_set_style_bg_opa(s_map_status_lbl, LV_OPA_COVER, LV_PART_MAIN);
+  lv_obj_set_style_radius(s_map_status_lbl, 8, LV_PART_MAIN);
+  lv_obj_set_style_pad_all(s_map_status_lbl, 6, LV_PART_MAIN);
+  lv_obj_set_style_border_color(s_map_status_lbl, lv_color_black(), LV_PART_MAIN);
+  lv_obj_set_style_border_width(s_map_status_lbl, 1, LV_PART_MAIN);
+  lv_obj_align(s_map_status_lbl, LV_ALIGN_LEFT_MID, 6, 0);
+#endif
 #if defined(TLORA_PAGER)
   // The 150 px canvas puts the centre crosshair right inside these lines. Give
   // the text a card of its own (kept in front of the markers when shown) so the
@@ -42316,7 +42363,11 @@ static void makeMapTab(lv_obj_t* tab) {
     lv_obj_set_style_text_color(l, lv_color_hex(0x000000), LV_PART_MAIN);
     lv_obj_set_style_text_font(l, map_info_font, LV_PART_MAIN);
     lv_obj_set_style_bg_color(l, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+#if defined(HAS_TDECK_MAX)
+    lv_obj_set_style_bg_opa(l, LV_OPA_COVER, LV_PART_MAIN);   // 1-bit: a 40% halo is just more grain under the text
+#else
     lv_obj_set_style_bg_opa(l, LV_OPA_40, LV_PART_MAIN);
+#endif
     lv_obj_set_style_pad_hor(l, 4, LV_PART_MAIN);
     lv_obj_set_style_pad_ver(l, 1, LV_PART_MAIN);
     lv_obj_set_style_radius(l, 3, LV_PART_MAIN);
@@ -42371,7 +42422,11 @@ static void makeMapTab(lv_obj_t* tab) {
     lv_obj_set_size(b, 32, 28);
     lv_obj_set_pos(b, k_map_canvas_w - 32 - 4, y);
     styleButton(b);
+#if defined(HAS_TDECK_MAX)
+    lv_obj_set_style_bg_opa(b, LV_OPA_COVER, LV_PART_MAIN);   // solid paper-white: the tiles must not show through
+#else
     lv_obj_set_style_bg_opa(b, LV_OPA_70, LV_PART_MAIN);
+#endif
 #if defined(HAS_THINKNODE_M9)
     // #609: the keypad cursor was too faint over the tiles. Focused, the button fills
     // solid accent so it can't be lost against the map. Fill only: the shared keypad
@@ -42641,8 +42696,14 @@ static void refreshMapInfoLabel() {
 #if defined(ESP32) && defined(MULTI_TRANSPORT_COMPANION)
   const bool wifi_up = (WiFi.status() == WL_CONNECTED);
   if (tileFetchPendingLoad() > 0) {
+#if defined(HAS_TDECK_MAX)
+    // No live count on e-paper: it changes with every tile, and each change is a
+    // panel refresh of this corner (~1/s while a view fills in).
+    snprintf(tail, sizeof(tail), "%s", TR("\xe2\x86\x93 loading map"));
+#else
     snprintf(tail, sizeof(tail), "\xe2\x86\x93 %u downloading",
              (unsigned)tileFetchPendingLoad());
+#endif
   } else if (s_map_last_missing > 0 && !wifi_up) {
     snprintf(tail, sizeof(tail), "Wi-Fi off, gaps");
   } else if (s_map_markers_wanted > s_map_markers_drawn) {
@@ -50255,12 +50316,21 @@ static bool s_max_frontlight_on = false;   // the front-light as the heart pad l
 #endif
 static void updatePagerKbBacklight(unsigned long now) {
   uint8_t kb_bl = 0;
+#if defined(HAS_TDECK_MAX)
+  // The Max's keyboard light belongs to the heart pad: the pad switches the light on
+  // and off, and Settings > Keyboard decides what "on" includes. Off = the keys stay
+  // dark; With light = lit exactly while the front-light is; Auto = that, plus a
+  // short glow after typing while the front-light is off. Level = the brightness
+  // slider (gamma-corrected PWM).
+  if (s_kb_bl_mode != 0 && s_max_frontlight_on) kb_bl = tdeckKbBlLevel();
+  else if (s_kb_bl_mode == 2 && kbBacklightAutoActive(now)) kb_bl = tdeckKbBlLevel();
+  if (g_lv.task && (g_lv.task->isScreenOff() || g_lv.task->isManualLock())) kb_bl = 0;
+  if (s_pin_root && g_lv.task && !g_lv.task->isScreenOff()) kb_bl = tdeckKbBlLevel();   // the PIN screen lights the keys
+#else
   if (s_kb_bl_mode == 1) kb_bl = 255;
   else if (s_kb_bl_mode == 2 && kbBacklightAutoActive(now)) kb_bl = 255;
   if (g_lv.task && (g_lv.task->isScreenOff() || g_lv.task->isManualLock())) kb_bl = 0;
   if (s_pin_root && g_lv.task && !g_lv.task->isScreenOff()) kb_bl = 255;   // the PIN screen lights the keys
-#if defined(HAS_TDECK_MAX)
-  if (s_max_frontlight_on) kb_bl = 255;   // the heart pad's light is the screen's and the keys' together
 #endif
   // 255 is a valid first value (On, or Auto during the initial activity window),
   // so an uint8_t 0xFF sentinel would skip LEDC attachment and leave the light dark.
@@ -57560,7 +57630,11 @@ static void maxFrontlightOn() {
 }
 #endif
 static void applyBrightness(uint8_t pct) {
+#if defined(HAS_TDECK_MAX)
+  if (pct < 1) pct = 1;   // gamma-mapped 12-bit PWM: 1% is a faint glow, not off
+#else
   if (pct < 5) pct = 5;
+#endif
   if (pct > 100) pct = 100;
   s_brightness_pct = pct;
 #if defined(HAS_TDECK_MAX)
@@ -57772,6 +57846,11 @@ static bool ccClockStrings(char* clock_s, size_t clock_cap, char* date_s, size_t
 #endif
   return current;
 }
+#if defined(HAS_TDECK_MAX)
+#define CC_ROW_LIFT (-34)   // clear the two-line sysinfo footer
+#else
+#define CC_ROW_LIFT (-20)
+#endif
 static void openControlCenter() {
 #if defined(TLORA_PAGER)
   const bool cc_fresh = (s_cc_root == nullptr);   // not a rebuild after a chip was toggled
@@ -57831,6 +57910,10 @@ static void openControlCenter() {
   // acquiring text is under the buttons"). Make the dropdown taller so GPS + chips +
   // sysinfo each get their own band — the chip-row math below derives off card_h.
   const int card_h = 320;
+#elif defined(HAS_TDECK_MAX)
+  // 240x320 portrait: use the height. Two full rows of chips plus a two-line
+  // system-info footer, instead of a gap under GPS and a footer cut off with "...".
+  const int card_h = 268;
 #else
   // Portrait has headroom on the 320-tall screen; make the card taller so the
   // brightness slider + toggles + sysinfo all get their own rows.
@@ -58052,7 +58135,11 @@ static void openControlCenter() {
   lv_obj_t* bl = lv_slider_create(card);
   lv_obj_set_size(bl, card_w - 20 - 22, 6);        // thin 6-px bar, room for the glyph on the left
   lv_obj_align(bl, LV_ALIGN_TOP_RIGHT, 0, bl_y);
+#if defined(HAS_TDECK_MAX)
+  lv_slider_set_range(bl, 1, 100);
+#else
   lv_slider_set_range(bl, 5, 100);
+#endif
   lv_slider_set_value(bl, s_brightness_pct, LV_ANIM_OFF);
   lv_obj_set_style_bg_color(bl, lv_color_hex(COLOR_ACCENT), LV_PART_INDICATOR);   // follow the theme accent
   lv_obj_set_style_bg_color(bl, lv_color_hex(COLOR_ACCENT), LV_PART_KNOB);
@@ -58084,9 +58171,16 @@ static void openControlCenter() {
     // ONE line only: LONG_DOT still wraps to a 2nd line (dotting only the
     // overflow) unless the height is clamped — that wrap was bleeding the line
     // through the toggle chips. Clamp to a single line height.
+#if defined(HAS_TDECK_MAX)
+    lv_label_set_long_mode(sysl, LV_LABEL_LONG_WRAP);   // two lines: CPU/RAM/PSRAM, then the IP
+    lv_obj_set_width(sysl, card_w - 20);
+    lv_obj_set_height(sysl, 2 * lv_font_get_line_height(&g_font_12));
+    lv_obj_set_style_text_align(sysl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+#else
     lv_label_set_long_mode(sysl, LV_LABEL_LONG_DOT);
     lv_obj_set_width(sysl, card_w - 20);
     lv_obj_set_height(sysl, lv_font_get_line_height(&g_font_12));
+#endif
     lv_label_set_text(sysl, sys_s);
     lv_obj_set_style_text_font(sysl, &g_font_12, LV_PART_MAIN);   // smallest available font
     lv_obj_set_style_text_color(sysl, lv_color_hex(COLOR_SUB), LV_PART_MAIN);
@@ -58133,7 +58227,7 @@ static void openControlCenter() {
 #endif
 #if !defined(HAS_THINKNODE_M9) && !defined(TLORA_PAGER)
   // Bottom-anchored but lifted clear of the 1-line sysinfo (~16 px) plus a gap.
-  lv_obj_align(row, LV_ALIGN_BOTTOM_MID, 0, -20);
+  lv_obj_align(row, LV_ALIGN_BOTTOM_MID, 0, CC_ROW_LIFT);
 #endif
 #if defined(TLORA_PAGER) || defined(HAS_TDECK_GT911)
   // Cells exactly a fifth of the row: packed from the left, a short last row keeps the
@@ -58171,7 +58265,7 @@ static void openControlCenter() {
 #endif
   if (!g_lv.task || g_lv.task->hasBleCapability()) chip_count++;   // BT
   chip_count++;   // GPS (toggle or info-only, always shown)
-#if CAP_KEYBOARD
+#if CAP_KEYBOARD && !defined(HAS_TDECK_MAX)   // the Max has no Keyboard chip (heart pad)
   chip_count++;
 #endif
 #if defined(HAS_UI_SOUND) || defined(HAS_TANMATSU)
@@ -58192,14 +58286,14 @@ static void openControlCenter() {
     const int per_row = (chip_count + 1) / 2;                 // 6 -> 3 per row, 5 -> 3 then 2
     tw = (card_w - 20 - 5 * (per_row - 1)) / per_row;
     if (tw > 92) tw = 92;
-    int rowh = (card_h - 40) - (gps_y + 38);                 // card bottom (minus margin) up to just below GPS/env (card_h-40 == the old 196 on the 236px V4 card)
+    int rowh = (card_h - 40 + 20 + CC_ROW_LIFT) - (gps_y + 38);                 // card bottom (minus margin) up to just below GPS/env (card_h-40 == the old 196 on the 236px V4 card)
     if (rowh > 116) rowh = 116;
     th = (rowh - 8) / 2;                                      // two rows + an 8px inter-row gap
     if (th > 52) th = 52;
     if (th < 34) th = 34;
     lv_obj_set_style_pad_row(row, 8, LV_PART_MAIN);
     lv_obj_set_height(row, th * 2 + 8);
-    lv_obj_align(row, LV_ALIGN_BOTTOM_MID, 0, -20);           // re-anchor after the resize
+    lv_obj_align(row, LV_ALIGN_BOTTOM_MID, 0, CC_ROW_LIFT);   // re-anchor after the resize
   } else {
     tw = (card_w - 20 - 5 * (chip_count - 1)) / chip_count;   // single row, fit all across
     if (tw > 76) tw = 76;
@@ -58227,7 +58321,7 @@ static void openControlCenter() {
   ccToggle(row, UI_ICON_SUN, TR("Theme"), s_theme_mode != TOUCH_THEME_NIGHT,
            ccThemeCb, tw, th, CAT_THEME, nullptr, CC_NAV_THEME);
 #endif
-#if CAP_KEYBOARD
+#if CAP_KEYBOARD && !defined(HAS_TDECK_MAX)   // the Max: the heart pad below the glass is the switch
   // Keyboard-backlight chip: the keyboard glyph WITH its off/on/auto mode word beneath it,
   // so the mode stays visible at a glance (sub_text stacks a small caption under the icon).
   const char* kb_mode = s_kb_bl_mode == 0 ? "off" : (s_kb_bl_mode == 1 ? "on" : "auto");
@@ -58256,8 +58350,15 @@ static void openControlCenter() {
 #if CAP_ANTENNA_SELECT
   {
     const bool ext = antSelMode() == ANT_SEL_EXTERNAL;
+#if defined(HAS_TDECK_MAX)
+    // A word that fits the square under the icon ("On-board" clipped to "n-boa"); the
+    // tile's fill already says which one is live (filled = external).
+    ccToggle(row, UI_ICON_RADIO_TOWER, TR("Antenna"), ext, ccAntennaCb, tw, th,
+             CAT_RADIO, ext ? TR("ext") : TR("int"));
+#else
     ccToggle(row, UI_ICON_ANTENNA, TR("Antenna"), ext, ccAntennaCb, tw, th,
              CAT_RADIO, ext ? ANT_EXT_NAME : TR("On-board"));
+#endif
   }
 #endif
 #if CC_HAS_SAVER
@@ -67860,7 +67961,15 @@ static void refreshStatusLabels() {
     // eligible tick still picks up the latest tiles (≤400 ms late, fine mid-download).
     static uint32_t s_tile_render_ms = 0;
     const uint32_t nowm = millis();
-    if ((uint32_t)(nowm - s_tile_render_ms) >= 400) {
+#if defined(HAS_TDECK_MAX)
+    // E-paper: every re-render is a ~0.7 s panel refresh, so gather a few tiles
+    // per pass instead of flashing once per tile (the last tile still lands, just
+    // up to 2.5 s later).
+    constexpr uint32_t kTileRenderGapMs = 2500;
+#else
+    constexpr uint32_t kTileRenderGapMs = 400;
+#endif
+    if ((uint32_t)(nowm - s_tile_render_ms) >= kTileRenderGapMs) {
       s_tile_render_ms = nowm;
       s_tile_fetch_dirty = false;
       renderMapTiles();
@@ -78360,7 +78469,7 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
 #if defined(HAS_TDECK_MAX)
     {   // remember the saved level, but boot with the front-light off
       uint8_t pct = (uint8_t)touchPrefsGetBrightness();
-      if (pct < 5) pct = 5;
+      if (pct < 1) pct = 1;
       if (pct > 100) pct = 100;
       s_brightness_pct = pct;
       maxFrontlightOff();   // file-scope helper: uses the global panel, not this function's DisplayDriver* parameter
@@ -83652,6 +83761,10 @@ void UITask::loop() {
       // (The CrowPanel 5.0 reads its GT911 through Wire, whose lock makes the
       // background poll below safe: an 800x480 redraw starves inline polling.)
       pushDiagLine("touch inline (shared I2C)");
+    #elif defined(HAS_TDECK_MAX)
+      // Non-blocking e-paper: nothing polls touch while a long UI pass runs, so a
+      // quick tap fell between two LVGL reads. A small task samples it instead.
+      pushDiagLine(heltecV4CapTouchStartBackgroundPoll(10) ? "touch async @ 100 Hz" : "touch inline (task failed)");
     #elif defined(HAS_TDECK_PRO)
       // The e-paper BUSY callback keeps this inline driver polling while the
       // panel blocks the UI task, so physical releases cannot remain stale.

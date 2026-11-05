@@ -2,7 +2,9 @@
 #include "TDeckProDisplay.h"
 
 #include <Arduino.h>
+#include <esp_heap_caps.h>
 #include <cstring>
+#include <cmath>
 
 TDeckProDisplay::BusyHook TDeckProDisplay::_busy_hook = nullptr;
 // The CST3530 signals each report with a short LOW pulse on INT and goes back to
@@ -51,7 +53,11 @@ bool TDeckProDisplay::begin() {
   _epd.epd2.setBusyCallback(&TDeckProDisplay::busyCallback);
 
 #if defined(PIN_TFT_LEDA_CTL) && (PIN_TFT_LEDA_CTL >= 0)
+#if defined(HAS_TDECK_MAX)
+  ledcSetup(TDECK_PRO_FRONTLIGHT_CHANNEL, 12000, 12);   // 12-bit: room for a much dimmer bottom end
+#else
   ledcSetup(TDECK_PRO_FRONTLIGHT_CHANNEL, 12000, 8);
+#endif
   ledcAttachPin(PIN_TFT_LEDA_CTL, TDECK_PRO_FRONTLIGHT_CHANNEL);
   writeBrightness(0);
 #else
@@ -154,8 +160,75 @@ bool TDeckProDisplay::isDark(uint16_t color) {
 #endif
 }
 
+#if defined(HAS_TDECK_MAX)
+// Max: render OSM raster tiles as line art instead of a full-tile Bayer screen.
+// On the plain screen almost every OSM colour (land, farmland, meadows, buildings)
+// sits between the black and white points, so the whole map turned into grain and
+// streets and labels drowned in it. Here:
+//   - line work = any pixel clearly darker than its brightest 3x3 neighbour (road
+//     casings, rail, borders, river banks, text) or simply dark -> solid black;
+//   - fills fade from white at the light land colours to a light (<= 25%) ordered
+//     screen for the darker or strongly coloured areas (forest, water, motorways);
+//   - everything lighter than the land colours is white.
+// One 8-bit luminance copy of the tile (64 KB for 256x256) lives in PSRAM briefly.
+bool TDeckProDisplay::prepareMapTileLineArt(uint16_t* pixels, int width, int height) {
+  static constexpr uint8_t bayer[8][8] = {
+    { 0, 48, 12, 60,  3, 51, 15, 63 }, {32, 16, 44, 28, 35, 19, 47, 31 },
+    { 8, 56,  4, 52, 11, 59,  7, 55 }, {40, 24, 36, 20, 43, 27, 39, 23 },
+    { 2, 50, 14, 62,  1, 49, 13, 61 }, {34, 18, 46, 30, 33, 17, 45, 29 },
+    {10, 58,  6, 54,  9, 57,  5, 53 }, {42, 26, 38, 22, 41, 25, 37, 21 },
+  };
+  constexpr int kWhite = 226;     // OSM land (#f2efe9) and lighter stay paper-white
+  constexpr int kDark = 110;      // darker than this is ink regardless of context
+  constexpr int kEdge = 36;       // this much darker than a neighbour = a drawn line
+  constexpr int kMaxInk = 16;     // fills never exceed 16/64 ink
+  const size_t n = (size_t)width * (size_t)height;
+  uint8_t* lum = (uint8_t*)heap_caps_malloc(n, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  uint8_t* sat = lum ? (uint8_t*)heap_caps_malloc(n, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) : nullptr;
+  if (!lum || !sat) { heap_caps_free(lum); return false; }
+  for (size_t i = 0; i < n; ++i) {
+    const uint16_t c = pixels[i];
+    const int r = (int)(((c >> 11) & 0x1F) * 255u / 31u);
+    const int g = (int)(((c >> 5) & 0x3F) * 255u / 63u);
+    const int b = (int)((c & 0x1F) * 255u / 31u);
+    int mx = r > g ? r : g; if (b > mx) mx = b;
+    int mn = r < g ? r : g; if (b < mn) mn = b;
+    lum[i] = (uint8_t)((r * 54 + g * 183 + b * 19) >> 8);
+    sat[i] = (uint8_t)(mx - mn);
+  }
+  for (int y = 0; y < height; ++y) {
+    const int y0 = y > 0 ? y - 1 : y, y1 = y + 1 < height ? y + 1 : y;
+    for (int x = 0; x < width; ++x) {
+      const int x0 = x > 0 ? x - 1 : x, x1 = x + 1 < width ? x + 1 : x;
+      const size_t i = (size_t)y * width + x;
+      const int l = lum[i];
+      int nmax = l;
+      for (int yy = y0; yy <= y1; ++yy)
+        for (int xx = x0; xx <= x1; ++xx) {
+          const int v = lum[(size_t)yy * width + xx];
+          if (v > nmax) nmax = v;
+        }
+      bool black = l < kDark || nmax - l >= kEdge;
+      if (!black && l < kWhite) {
+        int frac = (kWhite - l) * kMaxInk / (kWhite - 120);
+        if (frac > kMaxInk) frac = kMaxInk;
+        if (sat[i] > 90 && l < 215) frac = kMaxInk;   // strongly coloured: major roads, motorways
+        black = bayer[y & 7][x & 7] < frac;
+      }
+      pixels[i] = black ? 0x0000u : 0xFFFFu;
+    }
+  }
+  heap_caps_free(sat);
+  heap_caps_free(lum);
+  return true;
+}
+#endif
+
 void TDeckProDisplay::prepareMapTileRGB565(uint16_t* pixels, int width, int height) {
   if (!pixels || width <= 0 || height <= 0) return;
+#if defined(HAS_TDECK_MAX)
+  if (prepareMapTileLineArt(pixels, width, height)) return;   // falls back below if PSRAM is short
+#endif
 
   // A fixed Bayer screen preserves mid-tone map regions without carrying
   // diffusion error across independently decoded tiles. Map tiles are 256 px,
@@ -232,7 +305,18 @@ void TDeckProDisplay::setBrightness(uint8_t brightness) {
 }
 
 void TDeckProDisplay::writeBrightness(uint8_t brightness) {
-#if defined(PIN_TFT_LEDA_CTL) && (PIN_TFT_LEDA_CTL >= 0)
+#if defined(PIN_TFT_LEDA_CTL) && (PIN_TFT_LEDA_CTL >= 0) && defined(HAS_TDECK_MAX)
+  // Perceived LED brightness is far from linear in duty, so map the 0-255 level
+  // through a ~2.2 gamma onto the 12-bit timer: the low end of the slider gets
+  // fine, very dim steps (a bedside reading light) instead of one coarse jump.
+  uint32_t duty = 0;
+  if (brightness) {
+    const float f = (float)brightness / 255.0f;
+    duty = (uint32_t)(4095.0f * f * f * sqrtf(f) + 0.5f);   // f^2.5 ~ gamma 2.2-2.5, no powf
+    if (duty < 1) duty = 1;
+  }
+  ledcWrite(TDECK_PRO_FRONTLIGHT_CHANNEL, duty);
+#elif defined(PIN_TFT_LEDA_CTL) && (PIN_TFT_LEDA_CTL >= 0)
   ledcWrite(TDECK_PRO_FRONTLIGHT_CHANNEL, brightness);
 #else
   (void)brightness;

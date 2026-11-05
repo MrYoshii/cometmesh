@@ -604,13 +604,21 @@ bool touchPrefsSetSigPollMins(uint16_t mins) {
 uint8_t touchPrefsGetBrightness() {
   if (!s_begun) touchPrefsBegin();
   uint8_t v = s_cfg.bright;
+#if defined(HAS_TDECK_MAX)
+  if (v < 1)   v = 1;
+#else
   if (v < 5)   v = 5;
+#endif
   if (v > 100) v = 100;
   return v;
 }
 
 bool touchPrefsSetBrightness(uint8_t pct) {
+#if defined(HAS_TDECK_MAX)
+  if (pct < 1)   pct = 1;   // gamma-mapped front-light: 1-4% are real, very dim steps
+#else
   if (pct < 5)   pct = 5;
+#endif
   if (pct > 100) pct = 100;
   if (!s_begun) touchPrefsBegin();
   s_cfg.bright = pct;
