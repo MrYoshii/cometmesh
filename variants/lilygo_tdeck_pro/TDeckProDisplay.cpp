@@ -682,6 +682,17 @@ bool TDeckProDisplay::readCst3530(int16_t& x, int16_t& y) {
   (void)Wire.endTransmission();
 #endif
 
+  if (fingers) {   // TEST ONLY: every finger frame, raw, before any filtering
+    const size_t ix = (size_t)keys * 5u;
+    const int rx = ix + 7 < received ? (int)(response[ix + 4] | ((uint16_t)(response[ix + 7] & 0x0F) << 8)) : -1;
+    const int ry = ix + 7 < received ? (int)(response[ix + 5] | ((uint16_t)(response[ix + 7] & 0xF0) << 4)) : -1;
+    static uint32_t s_fl = 0;
+    if (millis() - s_fl > 40) {   // ~25 lines/s at most
+      s_fl = millis();
+      Serial.printf("[TOUCH] t=%lu f=%u k=%u x=%d y=%d st=%02X b3=%02X b8=%02X\n", (unsigned long)millis(),
+                    (unsigned)fingers, (unsigned)keys, rx, ry, response[8], response[3], response[8]);
+    }
+  }
   if (fingers == 0 || (response[8] >> 4) == 0) return false;
   const size_t index = (size_t)keys * 5u;
   if (index + 7 >= received) return false;
