@@ -82929,7 +82929,11 @@ void UITask::loop() {
         (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
         (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
         (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
-        (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA)); }
+        (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA));
+      Serial.printf("[TILETRACE] fs=%d task=%d spawn=%d ok=%u fail=%u iters=%u step=%c wr=%c http=%d openfail=%u\n",
+        (int)s_tiles_fs_ready, s_tile_fetch_task != nullptr, (int)s_tile_fetch_spawn_ok,
+        (unsigned)s_tile_fetch_ok, (unsigned)s_tile_fetch_failed, (unsigned)s_tile_fetch_iters,
+        s_tile_fetch_step, s_tile_fetch_last_wr, (int)s_tile_fetch_last_code, (unsigned)s_tile_fetch_open_fail); }
   }
 #if !defined(HAS_TANMATSU)
   // REMOTE mode: draw/refresh the physical-panel placeholder (first pass via the IP
