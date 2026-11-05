@@ -50398,6 +50398,7 @@ static bool s_max_frontlight_on = false;   // the front-light as the heart pad l
 static bool s_max_kb_reading = false;   // heart pad held: screen light on, keys dark
 static bool s_max_sleep_dim = false;    // screen off on USB with the light dimmed (not out)
 static bool s_max_relight_on_wake = false;   // the light was on when the screen went off
+static bool s_max_facedown_dark = false;     // put to sleep face down: no dim charging light
 static void maxFrontlightOff();
 #endif
 static void updatePagerKbBacklight(unsigned long now) {
@@ -51228,6 +51229,14 @@ static void pagerMotionTick(uint32_t now) {
           s_since = 0;
           Serial.printf("[MOTION] face down: quiet\n");
           pagerHapticsClick(1);         // a light tick: noticed
+#if defined(HAS_TDECK_MAX)
+          s_max_facedown_dark = true;   // face down: the light goes fully out (no dim charging light)
+          if (g_lv.task && g_lv.task->isScreenOff() && s_max_sleep_dim) {   // already asleep, dimmed
+            maxFrontlightOff();
+            display.setSleepLight(0);
+            s_max_relight_on_wake = true;
+          }
+#endif
           if (g_lv.task && !g_lv.task->isScreenOff()) g_lv.task->sleepScreen();
           updateGlobalStatusBar();
         }
@@ -80354,6 +80363,7 @@ static inline void touchScreenBacklight(bool on) {
   if (on) {
     maxSleepBannerShow(false);
     s_max_sleep_dim = false;
+    s_max_facedown_dark = false;
     display.turnOn();   // re-applies the user's level when the light was left on (dim charging case)
     if (s_max_relight_on_wake) { s_max_relight_on_wake = false; maxFrontlightOn(); }
   } else {
@@ -80362,7 +80372,8 @@ static inline void touchScreenBacklight(bool on) {
     // while touch is deliberately blocked by the lock.
     maxSleepBannerShow(!(g_lv.task && g_lv.task->isManualLock()));
     if (g_lv.ready) { lv_refr_now(nullptr); display.serviceRefresh(true); }
-    if (s_max_frontlight_on && touchPrefsGetMaxChargeLight() && board.externalPowerPresent() == 1) {
+    if (s_max_frontlight_on && !s_max_facedown_dark && touchPrefsGetMaxChargeLight() &&
+        board.externalPowerPresent() == 1) {
       // On USB the light may stay on, dimmed to a set level (Settings > Display), like the Pager's
       // charging screen. The user's level comes back on wake; unplugging puts it out
       // (maxSleepDimTick).
