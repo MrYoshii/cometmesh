@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "PagerImu.h"
 
-#if defined(TLORA_PAGER) && defined(ESP32)
+#if (defined(TLORA_PAGER) || defined(HAS_TDECK_MAX)) && defined(ESP32)
 
 #include <Arduino.h>
 #include <Wire.h>
@@ -54,7 +54,10 @@ static bool imuStart() {
   s_ready = s_bhy.begin(Wire, PAGER_IMU_ADDR);
   Wire.setClock(was ? was : 100000UL);
   if (s_ready) {
+#if defined(TLORA_PAGER)
     s_bhy.setRemapAxes(SensorBHI260AP::BOTTOM_LAYER_TOP_LEFT_CORNER);
+#endif
+    // (The Max: the hub's own axes, as LilyGo's T-Deck Max example reads them.)
     s_ready = s_bhy.onResultEvent(SensorBHI260AP::ACCEL_PASSTHROUGH, accelCb);
   }
   Serial.printf("[IMU] bhi260ap %s (%lu ms)\n", s_ready ? "ok" : "FAILED",
@@ -89,4 +92,4 @@ void pagerImuIdleTick() {
   s_sample_ms = 0;
 }
 
-#endif  // TLORA_PAGER && ESP32
+#endif  // (TLORA_PAGER || HAS_TDECK_MAX) && ESP32
