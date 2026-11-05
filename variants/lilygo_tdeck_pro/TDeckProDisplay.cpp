@@ -39,7 +39,7 @@ static bool     s_key0_release_long = false;
 // together), so every tap on the tab bar acted as Home. A pad press is therefore
 // only handed to the UI kPadSettleMs after its first report, and dropped (for the
 // whole press) if a finger was seen around it.
-static constexpr uint32_t kPadSettleMs = 80;
+static constexpr uint32_t kPadSettleMs = 150;   // measured: the finger frame can trail the bogus key report by ~75 ms
 static uint32_t s_finger_ms = 0;                  // last report with a finger in it
 static bool     s_key_emit_wait[3] = { false, false, false };
 static bool     s_key_void[3] = { false, false, false };   // this press came with a finger: ignore it
@@ -693,9 +693,11 @@ bool TDeckProDisplay::readCst3530(int16_t& x, int16_t& y) {
                     (unsigned)fingers, (unsigned)keys, rx, ry, response[8], response[3], response[8]);
     }
   }
-  if (fingers == 0 || (response[8] >> 4) == 0) return false;
   const size_t index = (size_t)keys * 5u;
-  if (index + 7 >= received) return false;
+  if (fingers == 0 || index + 8 >= received) return false;
+  // The finger's own state byte (00 = lifted); with a key report in front of it the
+  // first entry's byte belongs to the key, which said nothing about the finger.
+  if ((response[index + 8] >> 4) == 0) return false;
   x = (int16_t)(response[index + 4] | ((uint16_t)(response[index + 7] & 0x0F) << 8));
   y = (int16_t)(response[index + 5] | ((uint16_t)(response[index + 7] & 0xF0) << 4));
   return true;
@@ -734,6 +736,12 @@ bool TDeckProDisplay::getTouchPoint(uint16_t& x, uint16_t& y) {
     raw_y = point.y;
   }
   if (raw_x < 0 || raw_y < 0 || raw_x >= WIDTH || raw_y >= HEIGHT) return false;
+#if defined(HAS_TDECK_MAX)
+  // Measured on the tab bar: taps at y 310-311 switched tabs, taps at y 314-318
+  // (the bottom edge, where a thumb naturally lands) hit no button. Fold the last
+  // rows of the glass onto the bar's buttons.
+  if (raw_y > 310) raw_y = 310;
+#endif
   x = (uint16_t)raw_x;
   y = (uint16_t)raw_y;
   return true;
