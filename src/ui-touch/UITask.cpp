@@ -42204,6 +42204,11 @@ static void applyBattColor() {
                      : s_batt_lvl >= 20 ? COLOR_HUE[HUE_RADIO] : COLOR_STATUS_DANGER_TEXT);
   if (touchSleep::enabled())
     c = lv_color_hex(s_theme_high_contrast ? COLOR_TEXT : 0xFFD60A);
+#if defined(HAS_TDECK_MAX)
+  // One bit: the power-saver amber (and the level hues) threshold to white, and the
+  // battery vanished from the status bar. Always ink here.
+  c = lv_color_black();
+#endif
   lv_obj_set_style_text_color(g_statusbar.batt_icon, c, LV_PART_MAIN);
 }
 #if defined(HAS_TDECK_MAX)
