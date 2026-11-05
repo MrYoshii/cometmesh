@@ -51689,6 +51689,119 @@ static bool lockDateMayWrap(lv_coord_t avail) {
 }
 #endif
 
+#if defined(HAS_TDECK_MAX)
+// ---- T-Deck Max: battery time on the lock clock, and the charging view ----------
+// On battery the lock screen shows "about 18 h 05 min left" under the date. On USB
+// power (charging, or full at ~0 mA) a separate view covers the body: the clock,
+// a big battery, the gauge figures and the unread / mesh line. Both change only
+// with the clock (once a minute) or on plug / unplug, so the e-paper is refreshed
+// no more than the clock already refreshes it.
+static lv_obj_t* s_lock_left     = nullptr;   // "about 18 h 05 min left"
+static lv_obj_t* s_lock_chg      = nullptr;   // the charging view
+static lv_obj_t* s_lock_chg_clk  = nullptr;
+static lv_obj_t* s_lock_chg_date = nullptr;
+static lv_obj_t* s_lock_chg_icon = nullptr;
+static lv_obj_t* s_lock_chg_l1   = nullptr;   // "76 %  ·  4.02 V"
+static lv_obj_t* s_lock_chg_l2   = nullptr;   // "+450 mA  ·  full in 0:47"
+static lv_obj_t* s_lock_chg_l3   = nullptr;   // "2 unread  ·  312 packets heard"
+static int8_t    s_lock_chg_on   = -1;
+// A big battery: 3 px outline, solid nub, inset fill; charging = full fill with a
+// white bolt. user_data: 0..100, 1000+pct = charging.
+static void maxBigBattDrawCb(lv_event_t* e) {
+  lv_draw_ctx_t* dc = lv_event_get_draw_ctx(e);
+  lv_obj_t* obj = lv_event_get_target(e);
+  if (!dc) return;
+  const int key = (int)(intptr_t)lv_obj_get_user_data(obj);
+  const bool chg = key >= 1000;
+  const int pct = LV_CLAMP(0, chg ? key - 1000 : key, 100);
+  lv_area_t a;
+  lv_obj_get_coords(obj, &a);
+  const lv_coord_t h = lv_area_get_height(&a);
+  lv_area_t body = a;
+  body.x2 -= 8;
+  lv_draw_rect_dsc_t od;
+  lv_draw_rect_dsc_init(&od);
+  od.radius = 6; od.bg_opa = LV_OPA_TRANSP; od.border_color = lv_color_black(); od.border_width = 3;
+  lv_draw_rect(dc, &od, &body);
+  lv_draw_rect_dsc_t fd;
+  lv_draw_rect_dsc_init(&fd);
+  fd.bg_opa = LV_OPA_COVER; fd.bg_color = lv_color_black(); fd.radius = 2;
+  const lv_area_t nub = { (lv_coord_t)(body.x2 + 2), (lv_coord_t)(a.y1 + h / 3), a.x2, (lv_coord_t)(a.y2 - h / 3) };
+  lv_draw_rect(dc, &fd, &nub);
+  lv_area_t in = { (lv_coord_t)(body.x1 + 6), (lv_coord_t)(body.y1 + 6), (lv_coord_t)(body.x2 - 6), (lv_coord_t)(body.y2 - 6) };
+  const lv_coord_t iw = lv_area_get_width(&in);
+  lv_coord_t w = chg ? iw : (lv_coord_t)((iw * pct + 50) / 100);
+  if (!chg && pct > 0 && w < 2) w = 2;
+  if (w > 0) { in.x2 = (lv_coord_t)(in.x1 + w - 1); lv_draw_rect(dc, &fd, &in); }
+  if (chg) {
+    lv_draw_line_dsc_t ld;
+    lv_draw_line_dsc_init(&ld);
+    ld.color = lv_color_white(); ld.width = 3; ld.round_start = ld.round_end = 1;
+    const lv_coord_t cx = (lv_coord_t)((body.x1 + body.x2) / 2), y1 = (lv_coord_t)(in.y1 + 3), y2 = (lv_coord_t)(in.y2 - 3);
+    const lv_coord_t ym = (lv_coord_t)((y1 + y2) / 2);
+    const lv_point_t p1 = { (lv_coord_t)(cx + 5), y1 }, p2 = { (lv_coord_t)(cx - 4), (lv_coord_t)(ym + 1) };
+    const lv_point_t p3 = { (lv_coord_t)(cx + 4), (lv_coord_t)(ym - 1) }, p4 = { (lv_coord_t)(cx - 5), y2 };
+    lv_draw_line(dc, &ld, &p1, &p2);
+    lv_draw_line(dc, &ld, &p2, &p3);
+    lv_draw_line(dc, &ld, &p3, &p4);
+  }
+}
+// "about 18 h 05 min left" at the usual draw, or "" (charging, or no figure yet).
+static void maxLockTimeLeft(char* out, size_t n) {
+  out[0] = '\0';
+  if (board.externalPowerPresent() == 1) return;
+  const auto g = board.getGaugeInfo();
+  if (!g.valid) return;
+  uint16_t mins = battUseMinutesLeft(g.remaining_mah);
+  if (mins == 0xFFFF) mins = g.to_empty_min;
+  if (mins == 0xFFFF || mins == 0) return;
+  snprintf(out, n, TR("about %u h %02u min left"), (unsigned)(mins / 60), (unsigned)(mins % 60));
+}
+// Show / hide the charging view; with `fill`, refresh its figures (once a minute).
+static void maxLockChargeUpdate(bool fill) {
+  if (!s_lock_chg) return;
+  const int8_t on = board.externalPowerPresent() == 1 ? 1 : 0;
+  const bool flip = on != s_lock_chg_on;
+  s_lock_chg_on = on;
+  if (flip) {
+    if (on) lv_obj_clear_flag(s_lock_chg, LV_OBJ_FLAG_HIDDEN);
+    else    lv_obj_add_flag(s_lock_chg, LV_OBJ_FLAG_HIDDEN);
+  }
+  if (!on || !(fill || flip)) return;
+  if (s_lock_clock) {
+    lv_label_set_text(s_lock_chg_clk, lv_label_get_text(s_lock_clock));
+    lv_obj_set_style_text_font(s_lock_chg_clk, lv_obj_get_style_text_font(s_lock_clock, LV_PART_MAIN), LV_PART_MAIN);
+  }
+  if (s_lock_date) lv_label_set_text(s_lock_chg_date, lv_label_get_text(s_lock_date));
+  const uint16_t mv = batteryMvSmoothed();
+  const int pct = mv ? LV_MAX(0, batteryPercentFromMv(mv)) : 0;
+  const auto g = board.getGaugeInfo();
+  const bool charging = g.valid ? g.current_ma > 5 : (mv && batteryIsCharging(mv));
+  lv_obj_set_user_data(s_lock_chg_icon, (void*)(intptr_t)(charging ? 1000 + pct : pct));
+  lv_obj_invalidate(s_lock_chg_icon);
+  char b[64];
+  snprintf(b, sizeof b, "%d %%  \xC2\xB7  %u.%02u V", pct, (unsigned)(mv / 1000), (unsigned)((mv % 1000) / 10));
+  lv_label_set_text(s_lock_chg_l1, b);
+  if (const int blk = board.chargeTempBlock())
+    snprintf(b, sizeof b, "%s", blk > 0 ? TR("Charging paused: too hot") : TR("Charging paused: too cold"));
+  else if (!charging)
+    snprintf(b, sizeof b, "%s", board.chargeCareHold() ? TR("Kept at 80% (battery care)") : TR("Fully charged"));
+  else if (g.valid && g.to_full_min != 0xFFFF && g.to_full_min > 0)
+    snprintf(b, sizeof b, TR("+%d mA  \xC2\xB7  full in %u:%02u"), (int)g.current_ma,
+             (unsigned)(g.to_full_min / 60), (unsigned)(g.to_full_min % 60));
+  else if (g.valid)
+    snprintf(b, sizeof b, TR("Charging  \xC2\xB7  +%d mA"), (int)g.current_ma);
+  else
+    snprintf(b, sizeof b, "%s", TR("Charging"));
+  lv_label_set_text(s_lock_chg_l2, b);
+  const int unread = g_lv.task ? g_lv.task->getUnreadTotal() : 0;
+  if (s_lock_heard && lv_label_get_text(s_lock_heard)[0])
+    snprintf(b, sizeof b, TR("%d unread  \xC2\xB7  %s"), unread, lv_label_get_text(s_lock_heard));
+  else
+    snprintf(b, sizeof b, TR("%d unread"), unread);
+  lv_label_set_text(s_lock_chg_l3, b);
+}
+#endif
 static void lockscreenUpdateClock() {
   if (!s_lock_clock) return;
   mesh::RTCClock* rtc = the_mesh.getRTCClock();
@@ -51743,6 +51856,14 @@ static void lockscreenUpdateClock() {
     lv_obj_set_pos(s_lock_body, (lv_coord_t)((mm % 5) * 3 - 6), (lv_coord_t)(((mm / 5) % 3) * 4 - 4));
 #else
   lockscreenUpdateActivity();   // e-paper: the activity line follows the clock, once a minute
+#endif
+#if defined(HAS_TDECK_MAX)
+  if (s_lock_left) {
+    char l[48];
+    maxLockTimeLeft(l, sizeof l);
+    lv_label_set_text(s_lock_left, l);
+  }
+  maxLockChargeUpdate(true);
 #endif
 }
 
@@ -52138,6 +52259,9 @@ static void pagerGaugeNote(char* out, size_t cap) {
 #endif
 static void lockscreenUpdateBattery() {
   if (!s_lock_batt) return;
+#if defined(HAS_TDECK_MAX)
+  maxLockChargeUpdate(false);   // plug / unplug flips the view at once; figures follow the clock
+#endif
   const uint16_t mv = batteryMvSmoothed();
   const bool charging = mv && batteryIsCharging(mv);
 #if defined(TLORA_PAGER)
@@ -52462,6 +52586,14 @@ static void lockscreenShow() {
   lv_obj_set_style_text_align(s_lock_date, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);   // a two-line date
   lv_obj_align(s_lock_date, LV_ALIGN_TOP_MID, 0, y);
   y += date_h + g_cap;
+#if defined(HAS_TDECK_MAX)
+  s_lock_left = lv_label_create(s_lock_body);
+  lv_label_set_text(s_lock_left, "");
+  lv_obj_set_style_text_font(s_lock_left, &g_font_12, LV_PART_MAIN);
+  lv_obj_set_style_text_color(s_lock_left, lv_color_hex(k.sub), LV_PART_MAIN);
+  lv_obj_align(s_lock_left, LV_ALIGN_TOP_MID, 0, (lv_coord_t)(y - g_cap + SC(2)));
+  y += cap_h;
+#endif
 
   const lv_coord_t act_x = (lv_coord_t)((sw - act_w) / 2);
   s_lock_cap = lv_label_create(s_lock_body);
@@ -52501,6 +52633,62 @@ static void lockscreenShow() {
   lv_obj_set_style_pad_row(s_lock_unread, card_gap, LV_PART_MAIN);
   lv_obj_align(s_lock_unread, LV_ALIGN_TOP_MID, 0, y);
 
+#if defined(HAS_TDECK_MAX)
+  {
+    s_lock_chg = lv_obj_create(s_lock_body);
+    lv_obj_remove_style_all(s_lock_chg);
+    lv_obj_clear_flag(s_lock_chg, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_size(s_lock_chg, sw, (lv_coord_t)(sh - row_h - bottom - SC(6)));
+    lv_obj_set_pos(s_lock_chg, 0, 0);
+    lv_obj_set_style_bg_color(s_lock_chg, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(s_lock_chg, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_add_flag(s_lock_chg, LV_OBJ_FLAG_HIDDEN);
+    lv_coord_t cy = SC(22);
+    s_lock_chg_clk = lv_label_create(s_lock_chg);
+    lv_obj_set_style_text_font(s_lock_chg_clk, lockClockFont(), LV_PART_MAIN);
+    lv_obj_set_style_text_color(s_lock_chg_clk, lv_color_black(), LV_PART_MAIN);
+    lv_obj_set_style_text_letter_space(s_lock_chg_clk, -1, LV_PART_MAIN);
+    lv_label_set_text(s_lock_chg_clk, "");
+    lv_obj_align(s_lock_chg_clk, LV_ALIGN_TOP_MID, 0, cy);
+    cy += clk_h + g_date;
+    s_lock_chg_date = lv_label_create(s_lock_chg);
+    lv_obj_set_style_text_font(s_lock_chg_date, &g_font_semi_12, LV_PART_MAIN);
+    lv_obj_set_style_text_color(s_lock_chg_date, lv_color_black(), LV_PART_MAIN);
+    lv_obj_set_style_text_letter_space(s_lock_chg_date, 1, LV_PART_MAIN);
+    lv_obj_set_style_text_align(s_lock_chg_date, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_label_set_text(s_lock_chg_date, "");
+    lv_obj_align(s_lock_chg_date, LV_ALIGN_TOP_MID, 0, cy);
+    cy += date_h + SC(22);
+    s_lock_chg_icon = lv_obj_create(s_lock_chg);
+    lv_obj_remove_style_all(s_lock_chg_icon);
+    lv_obj_clear_flag(s_lock_chg_icon, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_size(s_lock_chg_icon, SC(104), SC(48));
+    lv_obj_align(s_lock_chg_icon, LV_ALIGN_TOP_MID, SC(4), cy);
+    lv_obj_add_event_cb(s_lock_chg_icon, maxBigBattDrawCb, LV_EVENT_DRAW_MAIN_END, nullptr);
+    cy += SC(48) + SC(16);
+    s_lock_chg_l1 = lv_label_create(s_lock_chg);
+    lv_obj_set_style_text_font(s_lock_chg_l1, &g_font_semi_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(s_lock_chg_l1, lv_color_black(), LV_PART_MAIN);
+    lv_label_set_text(s_lock_chg_l1, "");
+    lv_obj_align(s_lock_chg_l1, LV_ALIGN_TOP_MID, 0, cy);
+    cy += lv_font_get_line_height(&g_font_semi_16) + SC(4);
+    s_lock_chg_l2 = lv_label_create(s_lock_chg);
+    lv_obj_set_style_text_font(s_lock_chg_l2, &g_font_14, LV_PART_MAIN);
+    lv_obj_set_style_text_color(s_lock_chg_l2, lv_color_black(), LV_PART_MAIN);
+    lv_label_set_text(s_lock_chg_l2, "");
+    lv_obj_align(s_lock_chg_l2, LV_ALIGN_TOP_MID, 0, cy);
+    // The unread / mesh line sits just above the unlock hint.
+    s_lock_chg_l3 = lv_label_create(s_lock_chg);
+    lv_obj_set_style_text_font(s_lock_chg_l3, &g_font_12, LV_PART_MAIN);
+    lv_obj_set_style_text_color(s_lock_chg_l3, lv_color_black(), LV_PART_MAIN);
+    lv_label_set_long_mode(s_lock_chg_l3, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(s_lock_chg_l3, (lv_coord_t)(sw - 2 * SC(12)));
+    lv_obj_set_style_text_align(s_lock_chg_l3, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_label_set_text(s_lock_chg_l3, "");
+    lv_obj_align(s_lock_chg_l3, LV_ALIGN_BOTTOM_MID, 0, -SC(6));
+    s_lock_chg_on = -1;
+  }
+#endif
   // Bottom: how to unlock, centred; the battery on the right (or top right when
   // the panel is too narrow for both on one line).
   lv_obj_t* hrow = lv_obj_create(s_lock_body);
@@ -52611,6 +52799,11 @@ static void lockscreenHide() {
   s_lock_unread = s_lock_hint = s_lock_batt = s_lock_batt_chg = s_lock_batt_lbl = s_lock_batt_icon = nullptr;
 #if defined(TLORA_PAGER)
   s_lock_batt_gauge = nullptr;
+#endif
+#if defined(HAS_TDECK_MAX)
+  s_lock_left = s_lock_chg = s_lock_chg_clk = s_lock_chg_date = s_lock_chg_icon = nullptr;
+  s_lock_chg_l1 = s_lock_chg_l2 = s_lock_chg_l3 = nullptr;
+  s_lock_chg_on = -1;
 #endif
   if (s_lock_wall) { lv_img_cache_invalidate_src(&s_lock_wall_dsc); lvglPsramFree(s_lock_wall); s_lock_wall = nullptr; }
   s_lock_clock_min = -1;
