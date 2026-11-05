@@ -2611,6 +2611,15 @@ bool touchPrefsGetGlassTiles() { if (!s_begun) touchPrefsBegin(); return s_prefs
 void touchPrefsSetGlassTiles(bool on) { if (!s_begun) touchPrefsBegin(); prefsPutUChar("glass", on ? 1 : 0); }
 bool touchPrefsGetMaxChargeLight() { if (!s_begun) touchPrefsBegin(); return s_prefs.getUChar("max_chglt", 1) != 0; }
 void touchPrefsSetMaxChargeLight(bool on) { if (!s_begun) touchPrefsBegin(); prefsPutUChar("max_chglt", on ? 1 : 0); }
+uint8_t touchPrefsGetMaxChargeLightPct() {
+  if (!s_begun) touchPrefsBegin();
+  const uint8_t v = s_prefs.getUChar("max_chglv", 10);
+  return v < 1 ? 1 : (v > 50 ? 50 : v);
+}
+void touchPrefsSetMaxChargeLightPct(uint8_t pct) {
+  if (!s_begun) touchPrefsBegin();
+  prefsPutUChar("max_chglv", pct < 1 ? 1 : (pct > 50 ? 50 : pct));
+}
 bool touchPrefsGetAntExtAlways() { if (!s_begun) touchPrefsBegin(); return s_prefs.getUChar("ant_ext", 0) == 1; }
 void touchPrefsSetAntExtAlways(bool on) { if (!s_begun) touchPrefsBegin(); prefsPutUChar("ant_ext", on ? 1 : 0); }
 static void prefsPutUInt(const char* key, uint32_t v);   // the re-open dance, below with its siblings

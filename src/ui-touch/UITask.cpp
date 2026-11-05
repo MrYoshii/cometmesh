@@ -18884,6 +18884,22 @@ static void buildDisplayPage() {
                    if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED) return;
                    touchPrefsSetMaxChargeLight(lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED));
                  });
+    {
+      static lv_obj_t* s_chglt_val = nullptr;
+      char v[8];
+      snprintf(v, sizeof v, "%u%%", (unsigned)touchPrefsGetMaxChargeLightPct());
+      setSliderRow(c, "Charging light level", v, 1, 50, touchPrefsGetMaxChargeLightPct(),
+                   [](lv_event_t* e) {   // live label
+                     if (!s_chglt_val) return;
+                     char t[8];
+                     snprintf(t, sizeof t, "%d%%", (int)lv_slider_get_value(lv_event_get_target(e)));
+                     lv_label_set_text(s_chglt_val, t);
+                   },
+                   [](lv_event_t* e) {   // persist once, on release
+                     touchPrefsSetMaxChargeLightPct((uint8_t)lv_slider_get_value(lv_event_get_target(e)));
+                   },
+                   "1%", "50%", &s_chglt_val);
+    }
 #endif
 #if CAP_MOTION_QUIET
     setSwitchRow(c, "Wake when picked up", "Lifting the " BATT_DEV_NAME " off the table turns the screen on (a locked "
@@ -80140,11 +80156,12 @@ static inline void touchScreenBacklight(bool on) {
     maxSleepBannerShow(!(g_lv.task && g_lv.task->isManualLock()));
     if (g_lv.ready) { lv_refr_now(nullptr); display.serviceRefresh(true); }
     if (s_max_frontlight_on && touchPrefsGetMaxChargeLight() && board.externalPowerPresent() == 1) {
-      // On USB the light may stay on, dimmed (Settings > Display), like the Pager's
+      // On USB the light may stay on, dimmed to a set level (Settings > Display), like the Pager's
       // charging screen. The user's level comes back on wake; unplugging puts it out
       // (maxSleepDimTick).
       display.turnOff();
-      const uint8_t dim = s_brightness_pct < 10 ? s_brightness_pct : 10;
+      const uint8_t lv = touchPrefsGetMaxChargeLightPct();
+      const uint8_t dim = s_brightness_pct < lv ? s_brightness_pct : lv;   // never brighter than the light was
       display.setSleepLight((uint8_t)((uint32_t)dim * 255u / 100u));
       s_max_sleep_dim = true;
     } else {

@@ -879,6 +879,8 @@ bool     touchPrefsGetAntExtAlways();
 // T-Deck Max: keep the front-light on, dimmed, while the screen is off on USB power.
 bool     touchPrefsGetMaxChargeLight();
 void     touchPrefsSetMaxChargeLight(bool on);
+uint8_t  touchPrefsGetMaxChargeLightPct();      // 1..50, default 10
+void     touchPrefsSetMaxChargeLightPct(uint8_t pct);
 void     touchPrefsSetAntExtAlways(bool on);
 bool     touchPrefsSetSigPollMins(uint16_t mins);
 
