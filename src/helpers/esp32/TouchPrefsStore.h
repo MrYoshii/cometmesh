@@ -876,6 +876,9 @@ uint16_t touchPrefsGetSigPollMins();
  * confirmed opt-in that makes boot select the external (MMCX) socket. Its own NVS key, NOT the
  * reserved cfg byte p4_antenna, and NOT in the settings backup. */
 bool     touchPrefsGetAntExtAlways();
+// T-Deck Max: keep the front-light on, dimmed, while the screen is off on USB power.
+bool     touchPrefsGetMaxChargeLight();
+void     touchPrefsSetMaxChargeLight(bool on);
 void     touchPrefsSetAntExtAlways(bool on);
 bool     touchPrefsSetSigPollMins(uint16_t mins);
 

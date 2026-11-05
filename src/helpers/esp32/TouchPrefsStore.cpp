@@ -2609,6 +2609,8 @@ bool touchPrefsGetRainbow() { if (!s_begun) touchPrefsBegin(); return s_prefs.ge
 void touchPrefsSetRainbow(bool on) { if (!s_begun) touchPrefsBegin(); prefsPutUChar("col_rb", on ? 1 : 0); }
 bool touchPrefsGetGlassTiles() { if (!s_begun) touchPrefsBegin(); return s_prefs.getUChar("glass", 1) != 0; }
 void touchPrefsSetGlassTiles(bool on) { if (!s_begun) touchPrefsBegin(); prefsPutUChar("glass", on ? 1 : 0); }
+bool touchPrefsGetMaxChargeLight() { if (!s_begun) touchPrefsBegin(); return s_prefs.getUChar("max_chglt", 1) != 0; }
+void touchPrefsSetMaxChargeLight(bool on) { if (!s_begun) touchPrefsBegin(); prefsPutUChar("max_chglt", on ? 1 : 0); }
 bool touchPrefsGetAntExtAlways() { if (!s_begun) touchPrefsBegin(); return s_prefs.getUChar("ant_ext", 0) == 1; }
 void touchPrefsSetAntExtAlways(bool on) { if (!s_begun) touchPrefsBegin(); prefsPutUChar("ant_ext", on ? 1 : 0); }
 static void prefsPutUInt(const char* key, uint32_t v);   // the re-open dance, below with its siblings

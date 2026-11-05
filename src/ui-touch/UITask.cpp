@@ -18877,6 +18877,14 @@ static void buildDisplayPage() {
     setSwitchRow(c, "Message LED", "Flashes on a new message and breathes while any are unread.",
                  touchPrefsGetMsgLed(), msgLedToggleCb);
 #endif
+#if defined(HAS_TDECK_MAX)
+    setSwitchRow(c, "Dim light while charging", "When the screen goes off on USB power, a lit front-light stays on, dimmed, "
+                 "instead of going out.", touchPrefsGetMaxChargeLight(),
+                 [](lv_event_t* e) {
+                   if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED) return;
+                   touchPrefsSetMaxChargeLight(lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED));
+                 });
+#endif
 #if CAP_MOTION_QUIET
     setSwitchRow(c, "Wake when picked up", "Lifting the " BATT_DEV_NAME " off the table turns the screen on (a locked "
                  BATT_DEV_NAME " shows its lock screen). Only after it lay still, so it stays dark in a bag or pocket.",
@@ -50371,6 +50379,9 @@ static void updatePagerTabHold(uint32_t now) {
 // which must NOT act while off) it can't be skipped the same way.
 #if defined(HAS_TDECK_MAX)
 static bool s_max_frontlight_on = false;   // the front-light as the heart pad left it
+static bool s_max_kb_reading = false;   // heart pad held: screen light on, keys dark
+static bool s_max_sleep_dim = false;    // screen off on USB with the light dimmed (not out)
+static void maxFrontlightOff();
 #endif
 static void updatePagerKbBacklight(unsigned long now) {
   uint8_t kb_bl = 0;
@@ -50380,8 +50391,12 @@ static void updatePagerKbBacklight(unsigned long now) {
   // dark; With light = lit exactly while the front-light is; Auto = that, plus a
   // short glow after typing while the front-light is off. Level = the brightness
   // slider (gamma-corrected PWM).
-  if (s_kb_bl_mode != 0 && s_max_frontlight_on) kb_bl = tdeckKbBlLevel();
-  else if (s_kb_bl_mode == 2 && kbBacklightAutoActive(now)) kb_bl = tdeckKbBlLevel();
+  if (s_max_sleep_dim) {   // unplugged while dimmed: put it out (charger read every 2 s, not every loop)
+    static unsigned long s_pwr_chk = 0;
+    if (now - s_pwr_chk >= 2000) { s_pwr_chk = now; if (board.externalPowerPresent() == 0) maxFrontlightOff(); }
+  }
+  if (s_kb_bl_mode != 0 && s_max_frontlight_on && !s_max_kb_reading) kb_bl = tdeckKbBlLevel();
+  else if (s_kb_bl_mode == 2 && !s_max_kb_reading && kbBacklightAutoActive(now)) kb_bl = tdeckKbBlLevel();
   if (g_lv.task && (g_lv.task->isScreenOff() || g_lv.task->isManualLock())) kb_bl = 0;
   if (s_pin_root && g_lv.task && !g_lv.task->isScreenOff()) kb_bl = tdeckKbBlLevel();   // the PIN screen lights the keys
 #else
@@ -57683,6 +57698,8 @@ static uint8_t s_brightness_pct = 100;
 // screen wake never re-lights it.
 static void maxFrontlightOff() {
   s_max_frontlight_on = false;
+  s_max_kb_reading = false;
+  s_max_sleep_dim = false;
   display.setBrightness(0);
 }
 static void maxFrontlightOn() {
@@ -57699,7 +57716,8 @@ static void applyBrightness(uint8_t pct) {
   if (pct > 100) pct = 100;
   s_brightness_pct = pct;
 #if defined(HAS_TDECK_MAX)
-  maxFrontlightOn();
+  // A new level only: the heart pad owns on/off (the slider callback lights it).
+  if (s_max_frontlight_on) maxFrontlightOn();
 #else
   display.setBrightness((uint8_t)((uint32_t)pct * 255u / 100u));
 #endif
@@ -57864,6 +57882,9 @@ static void applyBrightness(uint8_t pct) {
 #if defined(HAS_CC_BRIGHTNESS)
 static void ccBrightnessCb(lv_event_t* e) {
   applyBrightness((uint8_t)lv_slider_get_value(lv_event_get_target(e)));   // live
+#if defined(HAS_TDECK_MAX)
+  maxFrontlightOn();   // dragging the slider means "light, at this level"
+#endif
 }
 static void ccBrightnessReleaseCb(lv_event_t* e) {
   touchPrefsSetBrightness((uint8_t)lv_slider_get_value(lv_event_get_target(e)));  // persist
@@ -80110,15 +80131,26 @@ static inline void touchScreenBacklight(bool on) {
   // power down. The wake's full refresh removes it.
   if (on) {
     maxSleepBannerShow(false);
-    display.turnOn();
+    s_max_sleep_dim = false;
+    display.turnOn();   // re-applies the user's level when the light was left on
   } else {
     // A hard lock already paints an explicit lock frame. Keep the generic
     // "Asleep" banner for unlocked sleeps only; its tap-to-wake hint is false
     // while touch is deliberately blocked by the lock.
     maxSleepBannerShow(!(g_lv.task && g_lv.task->isManualLock()));
     if (g_lv.ready) { lv_refr_now(nullptr); display.serviceRefresh(true); }
-    maxFrontlightOff();
-    display.turnOff();
+    if (s_max_frontlight_on && touchPrefsGetMaxChargeLight() && board.externalPowerPresent() == 1) {
+      // On USB the light may stay on, dimmed (Settings > Display), like the Pager's
+      // charging screen. The user's level comes back on wake; unplugging puts it out
+      // (maxSleepDimTick).
+      display.turnOff();
+      const uint8_t dim = s_brightness_pct < 10 ? s_brightness_pct : 10;
+      display.setSleepLight((uint8_t)((uint32_t)dim * 255u / 100u));
+      s_max_sleep_dim = true;
+    } else {
+      maxFrontlightOff();
+      display.turnOff();
+    }
   }
 #elif defined(HAS_TDECK_PRO_V1_0)
   if (on) display.turnOn();
@@ -83811,20 +83843,31 @@ void UITask::loop() {
   {   // Front pads, left to right: heart = the front-light and the keyboard light
       // together, bubble = Home, send = the chats (Meck's ids 0, 1, 2).
     uint8_t key_id = 0;
+    bool key0_long = false;
+    if (display.takeFrontKey0Release(key0_long)) {
+      // Heart pad, on release. Tap: the light on/off (keys as Settings > Keyboard
+      // says). Hold: a reading light, the screen lit and the keyboard dark.
+      if (key0_long) {
+        if (!s_max_frontlight_on) maxFrontlightOn();
+        s_max_kb_reading = true;
+      } else if (s_max_frontlight_on) {
+        maxFrontlightOff();
+      } else {
+        maxFrontlightOn();
+        s_max_kb_reading = false;
+      }
+      _last_input_ms = millis();
+    }
     if (display.takeFrontKeyPress(key_id)) {
       if (_manual_lock) {
         // Front pads may reveal the retained lock view, but GPIO0 remains the
         // deliberate unlock control. wakeScreen() would clear _manual_lock and
         // leave the lock overlay stranded on screen.
         if (_screen_off) lockscreenReveal();
-        if (key_id == 0) {
-          if (s_max_frontlight_on) maxFrontlightOff(); else maxFrontlightOn();
-        }
-        _last_input_ms = millis();
+        _last_input_ms = millis();   // heart pad: acted on at release (below)
       } else if (key_id == 0) {
         if (_screen_off) wakeScreen();
-        if (s_max_frontlight_on) maxFrontlightOff(); else maxFrontlightOn();
-        _last_input_ms = millis();
+        _last_input_ms = millis();   // heart pad: acted on at release (below)
       } else if (key_id == 1) {   // middle (bubble) pad: Home
         if (_screen_off) wakeScreen(); else maxGoHome();
         _last_input_ms = millis();

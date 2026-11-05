@@ -44,6 +44,10 @@ public:
   // The three capacitive pads below the glass are CST3530 keys. Returns true
   // once per press (edge), with the key id (Meck: 0 = heart, 1 = bubble, 2 = send).
   bool takeFrontKeyPress(uint8_t& key_id);
+  // The heart pad (id 0) on release: true once per release, long = held >= 600 ms.
+  bool takeFrontKey0Release(bool& long_press);
+  // Light the front-light while the panel sleeps (dim charging light); 0 = off.
+  void setSleepLight(uint8_t brightness) { writeBrightness(brightness); }
 #endif
   bool getTouchPoint(uint16_t& x, uint16_t& y);
   void serviceRefresh(bool force = false);

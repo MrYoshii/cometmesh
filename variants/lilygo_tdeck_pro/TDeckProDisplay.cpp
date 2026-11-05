@@ -18,6 +18,19 @@ static void IRAM_ATTR cst3530IntIsr() { s_cst3530_irq_pending = true; }
 static bool    s_key_down[3] = { false, false, false };
 static bool    s_key_press_pending = false;
 static uint8_t s_key_press_id = 0;
+static uint32_t s_key0_down_ms = 0;          // heart pad: press time, for tap vs hold
+static bool    s_key0_release_pending = false;
+static bool    s_key0_release_long = false;
+static void maxKeyEdge(uint8_t kid, bool kdown) {
+  if (kdown && !s_key_down[kid]) {
+    s_key_press_pending = true; s_key_press_id = kid;
+    if (kid == 0) s_key0_down_ms = millis();
+  } else if (!kdown && s_key_down[kid] && kid == 0) {
+    s_key0_release_long = millis() - s_key0_down_ms >= 600;
+    s_key0_release_pending = true;
+  }
+  s_key_down[kid] = kdown;
+}
 #endif
 
 TDeckProDisplay::TDeckProDisplay()
@@ -548,10 +561,11 @@ bool TDeckProDisplay::readCst3530(int16_t& x, int16_t& y) {
   if (keys) {
     const uint8_t kid = response[8] & 0x0F;
     const bool kdown = ((response[8] >> 4) == 1);
-    if (kid < 3) {
-      if (kdown && !s_key_down[kid]) { s_key_press_pending = true; s_key_press_id = kid; }
-      s_key_down[kid] = kdown;
-    }
+    if (kid < 3) maxKeyEdge(kid, kdown);
+  } else {
+    // A report without a key entry: every pad is up (some firmware never sends an
+    // explicit key-up), which is also the heart pad's release.
+    for (uint8_t k = 0; k < 3; ++k) if (s_key_down[k]) maxKeyEdge(k, false);
   }
 #endif
   const uint8_t total = (uint8_t)(fingers + keys);
@@ -574,6 +588,12 @@ bool TDeckProDisplay::readCst3530(int16_t& x, int16_t& y) {
 }
 
 #if defined(HAS_TDECK_MAX)
+bool TDeckProDisplay::takeFrontKey0Release(bool& long_press) {
+  if (!s_key0_release_pending) return false;
+  s_key0_release_pending = false;
+  long_press = s_key0_release_long;
+  return true;
+}
 bool TDeckProDisplay::takeFrontKeyPress(uint8_t& key_id) {
   if (!s_key_press_pending) return false;
   s_key_press_pending = false;
