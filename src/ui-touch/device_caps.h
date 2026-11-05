@@ -583,6 +583,8 @@
   #define EINK_V2 1
 #else
   #define EINK_V2 0
+#endif
+
 // The DRV2605 vibration motor with the Pager's settings (strength, a pattern per
 // message kind, key clicks; variants/lilygo_tlora_pager/PagerHaptics.*), and the
 // BHI260AP motion features on top of CAP_IMU (quiet when face down, wake when picked
