@@ -70,7 +70,9 @@ jobs:
           path: |
             .pio/build/${{ matrix.env }}/firmware-merged.bin
             .pio/build/${{ matrix.env }}/firmware.bin
-          if-no-files-found: error
+            .pio/build/${{ matrix.env }}/firmware.elf
+            .pio/build/${{ matrix.env }}/firmware.map
+          if-no-files-found: warn
 
       - name: Upload build log
         if: always()
