@@ -58513,8 +58513,15 @@ static void openControlCenter() {
   }
 #endif
 #if CC_HAS_SAVER
+#if defined(HAS_TDECK_MAX)
+  // The plain battery outline read as a camera at one bit: a low battery (one bar)
+  // with "saver" under it.
+  ccToggle(row, UI_ICON_BATTERY_LOW, TR("Saver"), touchSleep::enabled(), ccSaverCb, tw, th,
+           CAT_BATTERY, TR("saver"), CC_NAV_SAVER);
+#else
   ccToggle(row, UI_ICON_BATTERY, TR("Saver"), touchSleep::enabled(), ccSaverCb, tw, th,
            CAT_BATTERY, nullptr, CC_NAV_SAVER);
+#endif
 #endif
 #if defined(HAS_THINKNODE_M9) || defined(TLORA_PAGER)
   ccToggle(row, UI_ICON_TIMER, "Timer", s_cc_screenshot_delay_s != 0,
