@@ -34,14 +34,23 @@ static bool     s_key_press_pending = false;
 static uint8_t  s_key_press_id = 0;
 static bool     s_key0_release_pending = false;
 static bool     s_key0_release_long = false;
+// A finger on the glass near the bottom edge also makes the controller report the
+// middle pad (measured: key 1 "down" 25 ms before the finger frame, then both
+// together), so every tap on the tab bar acted as Home. A pad press is therefore
+// only handed to the UI kPadSettleMs after its first report, and dropped (for the
+// whole press) if a finger was seen around it.
+static constexpr uint32_t kPadSettleMs = 80;
+static uint32_t s_finger_ms = 0;                  // last report with a finger in it
+static bool     s_key_emit_wait[3] = { false, false, false };
+static bool     s_key_void[3] = { false, false, false };   // this press came with a finger: ignore it
 static void maxKeyReport(uint8_t kid, bool kdown) {   // from the touch poll, under s_key_mux
   const uint32_t now = millis();
   if (kdown) {
-    if (!s_key_down[kid]) {                 // a fresh press
+    if (!s_key_down[kid]) {                 // a fresh press: decided in maxKeyFinalize
       s_key_down[kid] = true;
       s_key_down_ms[kid] = now;
-      s_key_press_pending = true;
-      s_key_press_id = kid;
+      s_key_emit_wait[kid] = true;
+      s_key_void[kid] = false;
     }
     s_key_up_seen[kid] = false;             // still held: cancels a pending up
   } else if (s_key_down[kid] && !s_key_up_seen[kid]) {
@@ -52,9 +61,21 @@ static void maxKeyReport(uint8_t kid, bool kdown) {   // from the touch poll, un
 static void maxKeyFinalize() {                         // under s_key_mux
   const uint32_t now = millis();
   for (uint8_t k = 0; k < 3; ++k) {
+    // A finger anywhere near this press voids it (the glass bleeds into the pads).
+    if (s_key_down[k] && s_finger_ms && (int32_t)(s_finger_ms - s_key_down_ms[k]) > -150) {
+      s_key_void[k] = true;
+      s_key_emit_wait[k] = false;
+    }
+    if (s_key_emit_wait[k] && now - s_key_down_ms[k] >= kPadSettleMs) {
+      s_key_emit_wait[k] = false;
+      s_key_press_pending = true;
+      s_key_press_id = k;
+    }
     if (!s_key_down[k] || !s_key_up_seen[k] || now - s_key_up_ms[k] < kReleaseMs) continue;
     s_key_down[k] = false;
     s_key_up_seen[k] = false;
+    s_key_emit_wait[k] = false;
+    if (s_key_void[k]) { s_key_void[k] = false; continue; }
     if (k == 0) {
       s_key0_release_long = s_key_up_ms[0] - s_key_down_ms[0] >= 600;
       s_key0_release_pending = true;
@@ -608,6 +629,12 @@ bool TDeckProDisplay::readCst3530(int16_t& x, int16_t& y) {
 #if defined(HAS_TDECK_MAX)
   // Key report (factory cst66xx layout): id in the low nibble of byte 8, state
   // in the high nibble (1 = pressed). Latch the press edge; releases just clear.
+  if (fingers && response[3] != 0xFF) {
+    portENTER_CRITICAL(&s_key_mux);
+    s_finger_ms = millis();
+    if (!s_finger_ms) s_finger_ms = 1;
+    portEXIT_CRITICAL(&s_key_mux);
+  }
   if (keys && response[3] != 0xFF) {   // 0xFF: a garbled read (seen once mid-hold), not a report
     const uint8_t kid = response[8] & 0x0F;
     const bool kdown = ((response[8] >> 4) == 1);
