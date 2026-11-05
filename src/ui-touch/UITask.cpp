@@ -83875,10 +83875,12 @@ void UITask::loop() {
     if (display.takeFrontKey0Release(key0_long)) {
       Serial.printf("[PAD] heart release long=%d light=%d -> ", (int)key0_long, (int)s_max_frontlight_on);   // TEST ONLY
       // Heart pad, on release. Tap: the light on/off (keys as Settings > Keyboard
-      // says). Hold: a reading light, the screen lit and the keyboard dark.
+      // says). Hold: a reading light, the screen lit and the keyboard dark; hold
+      // again and the keyboard light comes back.
       if (key0_long) {
-        if (!s_max_frontlight_on) maxFrontlightOn();
-        s_max_kb_reading = true;
+        // Hold again to bring the keys back (the reading light is a toggle).
+        if (!s_max_frontlight_on) { maxFrontlightOn(); s_max_kb_reading = true; }
+        else s_max_kb_reading = !s_max_kb_reading;
       } else if (s_max_frontlight_on) {
         maxFrontlightOff();
         s_max_relight_on_wake = false;
