@@ -9,7 +9,7 @@ name: pager-dev-build
 
 on:
   push:
-    branches: ['pager-*']
+    branches: ['pager-*', 'max-*']
   workflow_dispatch:
 
 permissions:
@@ -63,7 +63,7 @@ jobs:
           done
 
       - name: Upload firmware
-        if: success() && startsWith(matrix.env, 'tlora_pager')
+        if: success() && (startsWith(matrix.env, 'tlora_pager') || startsWith(matrix.env, 'LilyGo_TDeck_Max'))
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.env }}-${{ github.sha }}

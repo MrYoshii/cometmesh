@@ -56,6 +56,21 @@ void TDeckMaxBoard::begin() {
   Wire.beginTransmission(0x18);
   Serial.printf("[BOOT] T-Deck Max es8311 %s\n", Wire.endTransmission() == 0 ? "ok" : "PROBE FAILED");
 
+  // TEST BUILD ONLY: which chips answer on the shared bus (all rails are up here).
+  {
+    char found[160]; int p = 0; found[0] = 0;
+    for (uint8_t a = 0x08; a < 0x78; ++a) {
+      Wire.beginTransmission(a);
+      if (Wire.endTransmission() == 0 && p < (int)sizeof found - 6) p += snprintf(found + p, sizeof found - p, " 0x%02X", a);
+    }
+    Serial.printf("[I2C] T-Deck Max bus:%s\n", found[0] ? found : " (none)");
+    for (uint8_t a : { (uint8_t)0x6A, (uint8_t)0x6B }) {   // SY6970 / BQ25896: REG14 = part / revision
+      Wire.beginTransmission(a); Wire.write(0x14);
+      if (Wire.endTransmission(false) == 0 && Wire.requestFrom(a, (uint8_t)1) == 1)
+        Serial.printf("[I2C] charger 0x%02X REG14=0x%02X\n", a, Wire.read());
+    }
+  }
+
   if (esp_reset_reason() == ESP_RST_DEEPSLEEP) {
     if (esp_sleep_get_ext1_wakeup_status() & (1ULL << P_LORA_DIO_1))
       startup_reason = BD_STARTUP_RX_PACKET;
