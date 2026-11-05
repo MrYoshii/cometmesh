@@ -118,11 +118,11 @@ bool TDeckProDisplay::begin() {
 
 #if defined(PIN_TFT_LEDA_CTL) && (PIN_TFT_LEDA_CTL >= 0)
 #if defined(HAS_TDECK_MAX)
-  // 12-bit for a much dimmer bottom end. 12 kHz x 12 bit is past what the LEDC
-  // divider can reach ("requested frequency and duty resolution can not be
-  // achieved"): the channel never came up and the screen stayed dark. 5 kHz fits
-  // and is still far above any visible flicker.
-  ledcSetup(TDECK_PRO_FRONTLIGHT_CHANNEL, 5000, 12);
+  // 11-bit at 18 kHz. The LEDC divider caps frequency x 2^bits at about 40 MHz
+  // here (12 kHz x 12 bit failed to come up at all). 5 kHz x 12 bit worked but the
+  // flicker was visible at low levels; 18 kHz is well past that and past hearing,
+  // and 2048 steps still leave a very dim bottom end under the gamma curve.
+  ledcSetup(TDECK_PRO_FRONTLIGHT_CHANNEL, 18000, 11);
 #else
   ledcSetup(TDECK_PRO_FRONTLIGHT_CHANNEL, 12000, 8);
 #endif
@@ -380,12 +380,12 @@ void TDeckProDisplay::setBrightness(uint8_t brightness) {
 void TDeckProDisplay::writeBrightness(uint8_t brightness) {
 #if defined(PIN_TFT_LEDA_CTL) && (PIN_TFT_LEDA_CTL >= 0) && defined(HAS_TDECK_MAX)
   // Perceived LED brightness is far from linear in duty, so map the 0-255 level
-  // through a ~2.2 gamma onto the 12-bit timer: the low end of the slider gets
+  // through a ~2.2 gamma onto the 11-bit timer: the low end of the slider gets
   // fine, very dim steps (a bedside reading light) instead of one coarse jump.
   uint32_t duty = 0;
   if (brightness) {
     const float f = (float)brightness / 255.0f;
-    duty = (uint32_t)(4095.0f * f * f * sqrtf(f) + 0.5f);   // f^2.5 ~ gamma 2.2-2.5, no powf
+    duty = (uint32_t)(2047.0f * f * f * sqrtf(f) + 0.5f);   // f^2.5 ~ gamma 2.2-2.5, no powf
     if (duty < 1) duty = 1;
   }
   ledcWrite(TDECK_PRO_FRONTLIGHT_CHANNEL, duty);
