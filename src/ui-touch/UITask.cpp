@@ -77514,7 +77514,14 @@ void UITask::allocMessageStore() {
   }
 }
 
+static void uiMemTrace(const char* tag) {   // TEST ONLY (Max RAM audit)
+  Serial.printf("[MEMTRACE] ui:%-15s int free=%6u largest=%6u dma largest=%6u\n", tag,
+                (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA));
+}
 void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* node_prefs) {
+  uiMemTrace("begin");
   _display    = display;
   _sensors    = sensors;
   _node_prefs = node_prefs;
@@ -77538,7 +77545,9 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
     // needs it for two reasons: an incoming message dereferences the thread
     // table, and the monitor below relies on the NORMAL append path so a
     // message stays unread until its thread is actually opened.
-    allocMessageStore();
+    uiMemTrace("msgStore<");
+  allocMessageStore();
+  uiMemTrace("msgStore>");
     Serial.println("[BOOT] console: begin"); Serial.flush();
 #if defined(ATTAKY_MESH_SERIES)
     // The terminal stays in the panel's build orientation (portrait,
@@ -77564,7 +77573,9 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
     // which console mode returns before, so without this _screen_timeout_ms
     // stayed at its constructor value and the panel never slept: the console
     // stayed lit indefinitely. Same pref the UI reads.
-    touchPrefsBegin();
+    uiMemTrace("touchPrefs<");
+  touchPrefsBegin();
+  uiMemTrace("touchPrefs>");
 #if defined(HAS_TDECK_KEYBOARD)
     // Settings > Keyboard > "Older keyboard protocol", the escape hatch for a
     // controller the probe gets wrong (#351). The graphical path applies it far
@@ -78061,7 +78072,9 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
   _next_threads_flush_ms = 0;
   _msgs_dirty = false;
   _next_msgs_flush_ms = 0;
+  uiMemTrace("history<");
   loadHistoryFromStorage();
+  uiMemTrace("history>");
 #if defined(TLORA_PAGER)
   // From here on, the loaded ring and its filesystem are one atomic history
   // generation. If no backing store was available, wait for a reboot rather
@@ -78082,8 +78095,12 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
     // Wi-Fi driver has taken the internal heap. On the V4 that left a 4-byte
     // largest block, so the worker could never start and tiles, the update
     // check and the app catalog were all silently dead.
+    uiMemTrace("tileStack<");
     reserveTileFetchStack();
+    uiMemTrace("tileStack>");
+    uiMemTrace("lv_init<");
     lv_init();
+    uiMemTrace("lv_init>");
     initTouchFontFallbacks();
     // NB: re-pointing the LVGL theme's font here does NOT work (tried, verified
     // on device: no effect) and neither does a text_font style on the screen /
@@ -78219,7 +78236,9 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
       }
 #endif  // HAS_TANMATSU
     }
+    uiMemTrace("drawbuf<");
     lv_disp_draw_buf_init(&g_lv.draw_buf, g_draw_buffer, nullptr, g_draw_buf_px);
+    uiMemTrace("drawbuf>");
     g_cap_touch_hw_started = false;
     g_lv.touch_inited      = false;
 
@@ -78344,7 +78363,9 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
       s_brightness_pct = pct;
       maxFrontlightOff();   // file-scope helper: uses the global panel, not this function's DisplayDriver* parameter
     }
+    uiMemTrace("audio<");
     maxAudioPrewarm();      // resident I2S + notify worker, while internal RAM is still unfragmented
+    uiMemTrace("audio>");
 #else
     applyBrightness(touchPrefsGetBrightness());
 #endif
@@ -82899,6 +82920,16 @@ void UITask::loop() {
 #if CAP_USB_FILES
   if (s_usbfiles) s_usbfiles->tick();
 #endif
+  {   // TEST ONLY (Max RAM audit): every 30 s, plus one region dump at 20 s
+    static uint32_t s_mt_last = 0; static bool s_mt_dumped = false;
+    if (!s_mt_dumped && now > 20000) { s_mt_dumped = true; heap_caps_print_heap_info(MALLOC_CAP_INTERNAL); }
+    if (now - s_mt_last > 30000) { s_mt_last = now;
+      Serial.printf("[MEMTRACE] run int free=%u largest=%u minfree=%u dma largest=%u\n",
+        (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+        (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+        (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+        (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA)); }
+  }
 #if !defined(HAS_TANMATSU)
   // REMOTE mode: draw/refresh the physical-panel placeholder (first pass via the IP
   // sentinel, then whenever the IP changes), and clear the bootloop guard once this
