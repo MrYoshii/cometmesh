@@ -47,7 +47,7 @@ public:
   // The heart pad (id 0) on release: true once per release, long = held >= 600 ms.
   bool takeFrontKey0Release(bool& long_press);
   // Light the front-light while the panel sleeps (dim charging light); 0 = off.
-  void setSleepLight(uint8_t brightness) { writeBrightness(brightness); }
+  void setSleepLight(uint8_t brightness) { _sleep_light = brightness; writeBrightness(brightness); }
 #endif
   bool getTouchPoint(uint16_t& x, uint16_t& y);
   void serviceRefresh(bool force = false);
@@ -114,6 +114,7 @@ private:
   void writeBrightness(uint8_t brightness);
 
   static BusyHook _busy_hook;
+  uint8_t _sleep_light = 0;   // the Max's dim charging light while the panel sleeps
   static constexpr int WIDTH = 240;
   static constexpr int HEIGHT = 320;
   static constexpr size_t MONO_BYTES = (size_t)WIDTH * HEIGHT / 8;

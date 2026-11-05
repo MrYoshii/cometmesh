@@ -2213,12 +2213,12 @@ static bool maxAudioInstallRate(int rate) {
   return true;
 }
 static bool maxAudioInstall() { return maxAudioInstallRate(kI2sSampleRate); }
-// The Max's speaker path clips audibly above ~85% of the shared ES8311 volume range
-// (that is already +20 dB of digital gain), so the slider's 100% is mapped to there.
+// The Max's speaker path clips audibly above ~77% of the shared ES8311 volume range
+// (about +16 dB of digital gain), so the slider's 100% is mapped to there.
 static void maxSetVolume(int pct) {
   if (pct < 0) pct = 0;
   if (pct > 100) pct = 100;
-  s_max_codec.setVolumePercent((uint8_t)((pct * 85 + 50) / 100));
+  s_max_codec.setVolumePercent((uint8_t)((pct * 77 + 50) / 100));   // measured: 100% was still clipping, 90% clean
 }
 static void maxAudioUninstall() {
   s_max_codec.setMute(true);
@@ -50397,6 +50397,7 @@ static void updatePagerTabHold(uint32_t now) {
 static bool s_max_frontlight_on = false;   // the front-light as the heart pad left it
 static bool s_max_kb_reading = false;   // heart pad held: screen light on, keys dark
 static bool s_max_sleep_dim = false;    // screen off on USB with the light dimmed (not out)
+static bool s_max_relight_on_wake = false;   // the light was on when the screen went off
 static void maxFrontlightOff();
 #endif
 static void updatePagerKbBacklight(unsigned long now) {
@@ -50409,7 +50410,11 @@ static void updatePagerKbBacklight(unsigned long now) {
   // slider (gamma-corrected PWM).
   if (s_max_sleep_dim) {   // unplugged while dimmed: put it out (charger read every 2 s, not every loop)
     static unsigned long s_pwr_chk = 0;
-    if (now - s_pwr_chk >= 2000) { s_pwr_chk = now; if (board.externalPowerPresent() == 0) maxFrontlightOff(); }
+    if (now - s_pwr_chk >= 2000) { s_pwr_chk = now; if (board.externalPowerPresent() == 0) {
+      maxFrontlightOff();
+      display.setSleepLight(0);       // asleep, setBrightness() does not reach the LED
+      s_max_relight_on_wake = true;   // it was lit: the next wake lights it again
+    } }
   }
   if (s_kb_bl_mode != 0 && s_max_frontlight_on && !s_max_kb_reading) kb_bl = tdeckKbBlLevel();
   else if (s_kb_bl_mode == 2 && !s_max_kb_reading && kbBacklightAutoActive(now)) kb_bl = tdeckKbBlLevel();
@@ -80149,7 +80154,8 @@ static inline void touchScreenBacklight(bool on) {
   if (on) {
     maxSleepBannerShow(false);
     s_max_sleep_dim = false;
-    display.turnOn();   // re-applies the user's level when the light was left on
+    display.turnOn();   // re-applies the user's level when the light was left on (dim charging case)
+    if (s_max_relight_on_wake) { s_max_relight_on_wake = false; maxFrontlightOn(); }
   } else {
     // A hard lock already paints an explicit lock frame. Keep the generic
     // "Asleep" banner for unlocked sleeps only; its tap-to-wake hint is false
@@ -80166,7 +80172,11 @@ static inline void touchScreenBacklight(bool on) {
       display.setSleepLight((uint8_t)((uint32_t)dim * 255u / 100u));
       s_max_sleep_dim = true;
     } else {
+      // The light goes out with the screen, but is remembered: the wake turns it
+      // back on (the heart pad is the off switch, not the screen timeout).
+      const bool was_lit = s_max_frontlight_on;
       maxFrontlightOff();
+      s_max_relight_on_wake = was_lit;
       display.turnOff();
     }
   }
@@ -83871,6 +83881,7 @@ void UITask::loop() {
         s_max_kb_reading = true;
       } else if (s_max_frontlight_on) {
         maxFrontlightOff();
+        s_max_relight_on_wake = false;
       } else {
         maxFrontlightOn();
         s_max_kb_reading = false;

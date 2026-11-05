@@ -2,6 +2,9 @@
 #include "TDeckProDisplay.h"
 
 #include <Arduino.h>
+#if defined(HAS_TDECK_MAX)
+#include "esp32-hal-i2c.h"
+#endif
 #include <esp_heap_caps.h>
 #include <cstring>
 #include <cmath>
@@ -134,6 +137,9 @@ bool TDeckProDisplay::begin() {
 }
 
 void TDeckProDisplay::turnOn() {
+#if defined(HAS_TDECK_MAX)
+  _sleep_light = 0;
+#endif
   _sleeping = false;
   _is_on = true;
   requestRefresh(true);
@@ -154,7 +160,9 @@ void TDeckProDisplay::turnOff() {
 void TDeckProDisplay::refreshWhileAsleep() {
   if (!_sleeping) { serviceRefresh(true); return; }
   const uint8_t light = _brightness;
-  _brightness = 0;                       // every update re-applies it: keep the light off
+  // Every update re-applies _brightness. Asleep that is 0 (light off), or the dim
+  // charging light: the once-a-minute lock clock used to put that out.
+  _brightness = _sleep_light;
   _sleeping = false;
   serviceRefresh(true);
   _epd.powerOff();
@@ -225,7 +233,7 @@ bool TDeckProDisplay::prepareMapTileLineArt(uint16_t* pixels, int width, int hei
   constexpr int kWhite = 226;     // OSM land (#f2efe9) and lighter stay paper-white
   constexpr int kDark = 110;      // darker than this is ink regardless of context
   constexpr int kEdge = 36;       // this much darker than a neighbour = a drawn line
-  constexpr int kMaxInk = 16;     // fills never exceed 16/64 ink
+  constexpr int kMaxInk = 12;     // fills never exceed 12/64 ink (16 read as grain on the device)
   const size_t n = (size_t)width * (size_t)height;
   uint8_t* lum = (uint8_t*)heap_caps_malloc(n, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   uint8_t* sat = lum ? (uint8_t*)heap_caps_malloc(n, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) : nullptr;
@@ -580,10 +588,21 @@ bool TDeckProDisplay::readCst3530(int16_t& x, int16_t& y) {
   const bool pending = s_cst3530_irq_pending;
   if (pending) s_cst3530_irq_pending = false;
   if (!pending && digitalRead(PIN_TOUCH_INT) != LOW) return false;
+#if defined(HAS_TDECK_MAX)
+  // The Max reads touch from its own task (TDeckProTouch.cpp). Through TwoWire that
+  // raced the UI task's I2C traffic: requestFrom() fills Wire's ONE shared receive
+  // buffer, and another task's transfer could overwrite it before readBytes() --
+  // garbage reports (a 0xFF frame was logged) and dropped taps. The HAL calls lock
+  // the bus per transfer and read straight into this buffer.
+  size_t received = 0;
+  if (i2cWrite(0, PIN_TOUCH_ADDR, read_command, sizeof(read_command), 20) != ESP_OK ||
+      i2cRead(0, PIN_TOUCH_ADDR, response, 9, 20, &received) != ESP_OK || received != 9) return false;
+#else
   Wire.beginTransmission((uint8_t)PIN_TOUCH_ADDR);
   Wire.write(read_command, sizeof(read_command));
   if (Wire.endTransmission() != 0 || Wire.requestFrom((int)PIN_TOUCH_ADDR, 9) != 9) return false;
   size_t received = Wire.readBytes(response, 9);
+#endif
   const uint8_t fingers = response[3] & 0x0F;
   const uint8_t keys = (response[3] >> 4) & 0x0F;
 #if defined(HAS_TDECK_MAX)
@@ -616,12 +635,21 @@ bool TDeckProDisplay::readCst3530(int16_t& x, int16_t& y) {
   if (total > 1) {
     size_t extra = (size_t)(total - 1) * 5u;
     if (extra > sizeof(response) - received) extra = sizeof(response) - received;
+#if defined(HAS_TDECK_MAX)
+    size_t got = 0;
+    if (i2cRead(0, PIN_TOUCH_ADDR, response + received, extra, 20, &got) == ESP_OK) received += got;
+#else
     if (Wire.requestFrom((int)PIN_TOUCH_ADDR, (int)extra) == extra)
       received += Wire.readBytes(response + received, extra);
+#endif
   }
+#if defined(HAS_TDECK_MAX)
+  (void)i2cWrite(0, PIN_TOUCH_ADDR, clear_command, sizeof(clear_command), 20);
+#else
   Wire.beginTransmission((uint8_t)PIN_TOUCH_ADDR);
   Wire.write(clear_command, sizeof(clear_command));
   (void)Wire.endTransmission();
+#endif
 
   if (fingers == 0 || (response[8] >> 4) == 0) return false;
   const size_t index = (size_t)keys * 5u;
