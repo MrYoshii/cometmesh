@@ -562,11 +562,12 @@ bool TDeckProDisplay::readCst3530(int16_t& x, int16_t& y) {
     const uint8_t kid = response[8] & 0x0F;
     const bool kdown = ((response[8] >> 4) == 1);
     if (kid < 3) maxKeyEdge(kid, kdown);
-  } else {
-    // A report without a key entry: every pad is up (some firmware never sends an
-    // explicit key-up), which is also the heart pad's release.
-    for (uint8_t k = 0; k < 3; ++k) if (s_key_down[k]) maxKeyEdge(k, false);
   }
+  // A report WITHOUT a key entry says nothing about the pads: the controller
+  // interleaves those with the key reports while a pad is held. Treating them as
+  // "all up" turned one press into a burst of press/release pairs (the keyboard
+  // light flickered and the front-light toggled back off). Only the pad's own
+  // up-report releases it.
 #endif
   const uint8_t total = (uint8_t)(fingers + keys);
   if (total > 1) {
