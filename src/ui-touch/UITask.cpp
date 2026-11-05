@@ -36868,7 +36868,13 @@ static void uiLangFileBootLoad() {
 // but no SSID connected), always ran BOTH passes and tripped the task watchdog
 // -> panic reboot. Returns the AP count (0 on none/failure/timeout); read
 // results with WiFi.SSID(i).
+#if defined(HAS_TDECK_MAX) && !defined(WADA_WEB)
+void maxWifiEnsureStarted();   // main.cpp: a parked (stopped, still loaded) driver cannot scan
+#endif
 static int wifiScanWatchdogSafe(uint32_t cap_ms, uint16_t per_chan_ms = 300) {
+#if defined(HAS_TDECK_MAX) && !defined(WADA_WEB)
+  maxWifiEnsureStarted();
+#endif
   s_swd_status = (uint8_t)WiFi.status();
 #if defined(HAS_TDISPLAY_P4)
   // The P4 facade queues AT+CWLAP on the separate C6 worker. That command has

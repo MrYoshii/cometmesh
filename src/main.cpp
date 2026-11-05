@@ -19,7 +19,27 @@ static void memTrace(const char* tag) {
 }
 #if defined(HAS_TDECK_MAX)
 #include <esp_heap_caps.h>
+#include <esp_wifi.h>
 #include <mbedtls/platform.h>
+// Wi-Fi off parks the driver instead of unloading it (as the Pager keeps its STA):
+// esp_wifi_stop() powers the radio down but keeps esp_wifi_init's ~36 KB of internal
+// RAM. Unloading it and loading it again needs a 20 KB contiguous block, which with
+// Bluetooth running the heap no longer had ("cold start refused"), so Wi-Fi could
+// not be turned back on without a reboot.
+static bool s_max_wifi_parked = false;
+static void maxWifiPark() {
+  WiFi.disconnect(false, false);
+  delay(50);
+  if (esp_wifi_stop() == ESP_OK) s_max_wifi_parked = true;
+  Serial.printf("[wifi] radio off (driver kept, parked=%d)\n", (int)s_max_wifi_parked);
+}
+static void maxWifiUnpark() {
+  if (!s_max_wifi_parked) return;
+  s_max_wifi_parked = false;
+  const esp_err_t e = esp_wifi_start();
+  Serial.printf("[wifi] radio on (unparked: %d)\n", (int)e);
+}
+void maxWifiEnsureStarted() { maxWifiUnpark(); }   // UITask: before a scan on a parked driver
 static void* maxMbedtlsCalloc(size_t n, size_t size) {
   void* p = heap_caps_calloc(n, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   return p ? p : heap_caps_calloc(n, size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
@@ -1922,9 +1942,13 @@ void loop() {
   } else if (wifi_radio_en != wifi_radio_prev) {
     wifi_radio_prev = wifi_radio_en;
     if (!wifi_radio_en) {
+#if defined(HAS_TDECK_MAX)
+      if (WiFi.getMode() != WIFI_OFF) maxWifiPark();
+#else
       WiFi.disconnect(true);
       delay(50);
       WiFi.mode(WIFI_OFF);
+#endif
 #if defined(TLORA_PAGER) && defined(BLE_PIN_CODE)
       s_pager_wifi_ble_deadline_ms = 0;
       wifiConfigSetPagerWifiBlePhase(PagerWifiBlePhase::Idle);
@@ -2011,9 +2035,13 @@ void loop() {
      * so it is safe to add and it closes that leak. */
     if (wifi_started || WiFi.getMode() != WIFI_OFF) {
       if (!wifi_radio_en) {
+#if defined(HAS_TDECK_MAX)
+        if (!s_max_wifi_parked) maxWifiPark();
+#else
         WiFi.disconnect(true);
         delay(50);
         WiFi.mode(WIFI_OFF);
+#endif
       } else {
         WiFi.disconnect(false, false);
         delay(50);
@@ -2029,6 +2057,9 @@ void loop() {
   if (wifi_state_machine_active) {
     if (!wifi_started) {
       const bool wifi_mode_ready = WiFi.mode(WIFI_STA);
+#if defined(HAS_TDECK_MAX)
+      if (wifi_mode_ready) maxWifiUnpark();   // WiFi.mode() sees STA already set and starts nothing
+#endif
       if (!wifi_mode_ready) {
 #if defined(TLORA_PAGER) && defined(BLE_PIN_CODE)
         const bool ble_waiting = s_pager_ble_after_wifi ||
