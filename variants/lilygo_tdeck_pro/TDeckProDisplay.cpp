@@ -384,13 +384,15 @@ void TDeckProDisplay::writeBrightness(uint8_t brightness) {
   // fine, very dim steps (a bedside reading light) instead of one coarse jump.
   // Below about 1.5% duty the driver shimmers and then drops out (the slider's
   // left end switched the light off), so the curve starts there: level 1..255 maps
-  // to kMinDuty..2047 along f^2.5.
+  // to kMinDuty..2047 along f^1.5.
   constexpr float kMinDuty = 31.0f;   // ~1.5% of 2047
   uint32_t duty = 0;
   if (brightness) {
     float f = (float)(brightness > 2 ? brightness - 2 : 0) / 253.0f;   // 1% (level 2) -> 0
     if (f > 1.0f) f = 1.0f;
-    duty = (uint32_t)(kMinDuty + (2047.0f - kMinDuty) * f * f * sqrtf(f) + 0.5f);
+    // f^1.5: the floor already makes the left end dim, and with f^2.5 the first
+    // fifth of the slider barely changed anything.
+    duty = (uint32_t)(kMinDuty + (2047.0f - kMinDuty) * f * sqrtf(f) + 0.5f);
   }
   ledcWrite(TDECK_PRO_FRONTLIGHT_CHANNEL, duty);
 #elif defined(PIN_TFT_LEDA_CTL) && (PIN_TFT_LEDA_CTL >= 0)
