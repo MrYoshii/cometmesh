@@ -57713,6 +57713,7 @@ static uint8_t s_brightness_pct = 100;
 // the glass; put out by the heart pad again or by the idle screen timeout; a
 // screen wake never re-lights it.
 static void maxFrontlightOff() {
+  if (s_max_frontlight_on) Serial.println("[PAD] frontlight OFF");   // TEST ONLY
   s_max_frontlight_on = false;
   s_max_kb_reading = false;
   s_max_sleep_dim = false;
@@ -83862,6 +83863,7 @@ void UITask::loop() {
     uint8_t key_id = 0;
     bool key0_long = false;
     if (display.takeFrontKey0Release(key0_long)) {
+      Serial.printf("[PAD] heart release long=%d light=%d -> ", (int)key0_long, (int)s_max_frontlight_on);   // TEST ONLY
       // Heart pad, on release. Tap: the light on/off (keys as Settings > Keyboard
       // says). Hold: a reading light, the screen lit and the keyboard dark.
       if (key0_long) {
@@ -83873,9 +83875,11 @@ void UITask::loop() {
         maxFrontlightOn();
         s_max_kb_reading = false;
       }
+      Serial.printf("light=%d kbread=%d\n", (int)s_max_frontlight_on, (int)s_max_kb_reading);   // TEST ONLY
       _last_input_ms = millis();
     }
     if (display.takeFrontKeyPress(key_id)) {
+      Serial.printf("[PAD] press id=%u\n", (unsigned)key_id);   // TEST ONLY
       if (_manual_lock) {
         // Front pads may reveal the retained lock view, but GPIO0 remains the
         // deliberate unlock control. wakeScreen() would clear _manual_lock and

@@ -563,6 +563,14 @@ bool TDeckProDisplay::readCst3530(int16_t& x, int16_t& y) {
     const bool kdown = ((response[8] >> 4) == 1);
     if (kid < 3) maxKeyEdge(kid, kdown);
   }
+  {   // TEST ONLY: raw pad reports, to see how the CST3530 reports a held pad
+    static uint8_t s_last3 = 0xFF, s_last8 = 0xFF;
+    if (response[3] != s_last3 || (keys && response[8] != s_last8)) {
+      Serial.printf("[PAD] t=%lu b3=%02X b8=%02X fingers=%u keys=%u down0=%d\n", (unsigned long)millis(),
+                    response[3], response[8], (unsigned)fingers, (unsigned)keys, (int)s_key_down[0]);
+      s_last3 = response[3]; s_last8 = response[8];
+    }
+  }
   // A report WITHOUT a key entry says nothing about the pads: the controller
   // interleaves those with the key reports while a pad is held. Treating them as
   // "all up" turned one press into a burst of press/release pairs (the keyboard
