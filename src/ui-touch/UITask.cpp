@@ -68610,6 +68610,7 @@ static void touchThemeApplyCb(lv_theme_t* /*th*/, lv_obj_t* obj) {
     // A steady cursor: a blinking one is a panel update every half second for as
     // long as a text field has focus (the device log showed exactly that).
     lv_obj_set_style_anim_time(obj, 0, LV_PART_CURSOR);
+    lv_obj_set_style_anim_time(obj, 0, LV_PART_CURSOR | LV_STATE_FOCUSED);   // the stock theme sets it per state
 #endif
   } else if (lv_obj_check_type(obj, &lv_dropdown_class)) {
     lv_obj_set_style_bg_color(obj, lv_color_white(), LV_PART_MAIN);
