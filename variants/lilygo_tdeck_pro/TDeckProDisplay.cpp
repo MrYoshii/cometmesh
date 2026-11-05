@@ -14,22 +14,49 @@ TDeckProDisplay::BusyHook TDeckProDisplay::_busy_hook = nullptr;
 static volatile bool s_cst3530_irq_pending = false;
 static void IRAM_ATTR cst3530IntIsr() { s_cst3530_irq_pending = true; }
 #if defined(HAS_TDECK_MAX)
-// Front capacitive pads (CST3530 keys): press-edge latch for the UI to consume.
-static bool    s_key_down[3] = { false, false, false };
-static bool    s_key_press_pending = false;
-static uint8_t s_key_press_id = 0;
-static uint32_t s_key0_down_ms = 0;          // heart pad: press time, for tap vs hold
-static bool    s_key0_release_pending = false;
-static bool    s_key0_release_long = false;
-static void maxKeyEdge(uint8_t kid, bool kdown) {
-  if (kdown && !s_key_down[kid]) {
-    s_key_press_pending = true; s_key_press_id = kid;
-    if (kid == 0) s_key0_down_ms = millis();
-  } else if (!kdown && s_key_down[kid] && kid == 0) {
-    s_key0_release_long = millis() - s_key0_down_ms >= 600;
-    s_key0_release_pending = true;
+// Front capacitive pads (CST3530 keys). Measured on the Max: a held pad does not
+// report "down" continuously. The controller sends a down, then an up 50-100 ms
+// later, then a fresh down a few ms after that, with quiet gaps of a second or
+// more in between. So a pad only counts as released once no down report has
+// followed an up for kReleaseMs; until then the touch is one press. The UI gets a
+// press edge per real press, and for the heart pad (id 0) one release with its
+// held time (tap vs hold).
+static constexpr uint32_t kReleaseMs = 250;
+static portMUX_TYPE s_key_mux = portMUX_INITIALIZER_UNLOCKED;
+static bool     s_key_down[3]  = { false, false, false };   // logically held (debounced)
+static bool     s_key_up_seen[3] = { false, false, false }; // an up report is waiting out kReleaseMs
+static uint32_t s_key_up_ms[3] = { 0, 0, 0 };
+static uint32_t s_key_down_ms[3] = { 0, 0, 0 };
+static bool     s_key_press_pending = false;
+static uint8_t  s_key_press_id = 0;
+static bool     s_key0_release_pending = false;
+static bool     s_key0_release_long = false;
+static void maxKeyReport(uint8_t kid, bool kdown) {   // from the touch poll, under s_key_mux
+  const uint32_t now = millis();
+  if (kdown) {
+    if (!s_key_down[kid]) {                 // a fresh press
+      s_key_down[kid] = true;
+      s_key_down_ms[kid] = now;
+      s_key_press_pending = true;
+      s_key_press_id = kid;
+    }
+    s_key_up_seen[kid] = false;             // still held: cancels a pending up
+  } else if (s_key_down[kid] && !s_key_up_seen[kid]) {
+    s_key_up_seen[kid] = true;
+    s_key_up_ms[kid] = now;
   }
-  s_key_down[kid] = kdown;
+}
+static void maxKeyFinalize() {                         // under s_key_mux
+  const uint32_t now = millis();
+  for (uint8_t k = 0; k < 3; ++k) {
+    if (!s_key_down[k] || !s_key_up_seen[k] || now - s_key_up_ms[k] < kReleaseMs) continue;
+    s_key_down[k] = false;
+    s_key_up_seen[k] = false;
+    if (k == 0) {
+      s_key0_release_long = s_key_up_ms[0] - s_key_down_ms[0] >= 600;
+      s_key0_release_pending = true;
+    }
+  }
 }
 #endif
 
@@ -67,7 +94,11 @@ bool TDeckProDisplay::begin() {
 
 #if defined(PIN_TFT_LEDA_CTL) && (PIN_TFT_LEDA_CTL >= 0)
 #if defined(HAS_TDECK_MAX)
-  ledcSetup(TDECK_PRO_FRONTLIGHT_CHANNEL, 12000, 12);   // 12-bit: room for a much dimmer bottom end
+  // 12-bit for a much dimmer bottom end. 12 kHz x 12 bit is past what the LEDC
+  // divider can reach ("requested frequency and duty resolution can not be
+  // achieved"): the channel never came up and the screen stayed dark. 5 kHz fits
+  // and is still far above any visible flicker.
+  ledcSetup(TDECK_PRO_FRONTLIGHT_CHANNEL, 5000, 12);
 #else
   ledcSetup(TDECK_PRO_FRONTLIGHT_CHANNEL, 12000, 8);
 #endif
@@ -558,10 +589,14 @@ bool TDeckProDisplay::readCst3530(int16_t& x, int16_t& y) {
 #if defined(HAS_TDECK_MAX)
   // Key report (factory cst66xx layout): id in the low nibble of byte 8, state
   // in the high nibble (1 = pressed). Latch the press edge; releases just clear.
-  if (keys) {
+  if (keys && response[3] != 0xFF) {   // 0xFF: a garbled read (seen once mid-hold), not a report
     const uint8_t kid = response[8] & 0x0F;
     const bool kdown = ((response[8] >> 4) == 1);
-    if (kid < 3) maxKeyEdge(kid, kdown);
+    if (kid < 3) {
+      portENTER_CRITICAL(&s_key_mux);
+      maxKeyReport(kid, kdown);
+      portEXIT_CRITICAL(&s_key_mux);
+    }
   }
   {   // TEST ONLY: raw pad reports, to see how the CST3530 reports a held pad
     static uint8_t s_last3 = 0xFF, s_last8 = 0xFF;
@@ -598,16 +633,22 @@ bool TDeckProDisplay::readCst3530(int16_t& x, int16_t& y) {
 
 #if defined(HAS_TDECK_MAX)
 bool TDeckProDisplay::takeFrontKey0Release(bool& long_press) {
-  if (!s_key0_release_pending) return false;
+  portENTER_CRITICAL(&s_key_mux);
+  maxKeyFinalize();   // releases are decided by time, so the UI loop's poll drives them
+  const bool had = s_key0_release_pending;
   s_key0_release_pending = false;
   long_press = s_key0_release_long;
-  return true;
+  portEXIT_CRITICAL(&s_key_mux);
+  return had;
 }
 bool TDeckProDisplay::takeFrontKeyPress(uint8_t& key_id) {
-  if (!s_key_press_pending) return false;
+  portENTER_CRITICAL(&s_key_mux);
+  maxKeyFinalize();
+  const bool had = s_key_press_pending;
   s_key_press_pending = false;
   key_id = s_key_press_id;
-  return true;
+  portEXIT_CRITICAL(&s_key_mux);
+  return had;
 }
 #endif
 
