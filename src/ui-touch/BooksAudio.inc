@@ -67,6 +67,8 @@ static int bkaTrackAt(double t) {
 
 // Open the track at byte `from`. On success: the client streams the body, and *total is
 // the whole file's size (from Content-Range, or Content-Length for a 200 reply).
+#include <lwip/sockets.h>   // the socket probe in bkaOpen
+
 static bool bkaOpen(HTTPClient& http, WiFiClientSecure& tls, WiFiClient& plain, const BkaTrack& tr,
                     uint32_t from, uint32_t* total, int* code_out) {
   char url[300];
@@ -93,6 +95,11 @@ static bool bkaOpen(HTTPClient& http, WiFiClientSecure& tls, WiFiClient& plain, 
     if (code < 0) {   // no HTTP answer at all: say why (connect, DNS, TLS, memory)
       char err[96] = "";
       if (https) tls.lastError(err, sizeof err);
+      // Is a socket still to be had? (lwIP has CONFIG_LWIP_MAX_SOCKETS of them.)
+      const int probe = lwip_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+      const int probe_errno = errno;
+      if (probe >= 0) lwip_close(probe);
+      Serial.printf("[books] socket probe: %s (fd %d, errno %d)\n", probe >= 0 ? "free" : "NONE LEFT", probe, probe_errno);
       Serial.printf("[books] open %s: %s, tls=\"%s\", wifi status %d rssi %d, internal free=%u largest=%u\n", url,
                     HTTPClient::errorToString(code).c_str(), err, (int)WiFi.status(), (int)WiFi.RSSI(),
                     (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
