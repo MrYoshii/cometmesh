@@ -7,6 +7,11 @@
 // catalogue, the language packs and the USB Files page still come from the
 // wadamesh hosts these defaulted to; those are compatible and only read.
 //
+// Comet's own domain is cometmesh.org; once its server runs, these become
+// firmware.cometmesh.org (updates, app catalogue, language packs, reports),
+// tiles.cometmesh.org and files.cometmesh.org, all reachable over plain HTTP (the
+// device has no TLS to spare for them).
+//
 // What must NOT reach the wadamesh servers from a Comet build is switched off:
 // the update check and the on-device update (they would offer and install
 // wadamesh's own firmware), and the anonymous reports. Set COMET_HAS_UPDATE_SERVER
