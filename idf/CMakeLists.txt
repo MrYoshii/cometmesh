@@ -51,7 +51,11 @@ set(COMET_DEFS
   MULTI_TRANSPORT_COMPANION=1 WADAMESH_FORK_BUILD=1 TCP_PORT=5000 WS_PORT=8765
   BLE_PIN_CODE=123456 ENABLE_PRIVATE_KEY_IMPORT=1 ENABLE_PRIVATE_KEY_EXPORT=1
   ENABLE_ADVERT_ON_BOOT=0
-  COMET_IDF_BUILD=1)
+  COMET_IDF_BUILD=1
+  # AsyncTCP's service task feeds the task watchdog it failed to join, which IDF 5 logs
+  # on every event ("esp_task_wdt_reset(707): task not found"). The web server's task
+  # needs no watchdog of its own.
+  CONFIG_ASYNC_TCP_USE_WDT=0)
 foreach(_d ${COMET_DEFS})
   idf_build_set_property(COMPILE_DEFINITIONS "${_d}" APPEND)
 endforeach()
