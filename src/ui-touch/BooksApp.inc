@@ -785,6 +785,14 @@ static lv_obj_t* booksField(lv_obj_t* body, const char* placeholder, const char*
   return ta;
 }
 
+// Libraries and items again from the server (a library added there since).
+static void booksReloadCb(lv_event_t* e) {
+  if (lv_event_get_code(e) != LV_EVENT_CLICKED || s_bk_job != BkJob::None) return;
+  s_abs_lib_count = s_abs_item_count = 0;
+  s_abs_page = 0;
+  booksShowView(BkView::Server);
+}
+
 static void booksLibCb(lv_event_t* e) {
   if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
   const int i = (int)(intptr_t)lv_event_get_user_data(e);
@@ -852,7 +860,9 @@ static void booksBuildServer() {
   // ---- signed in: library chooser + items ----
   lv_obj_t* out = booksButton(s_bk_body, TR("Sign out"), booksLogoutCb, nullptr, 72, 24);
   lv_obj_align(out, LV_ALIGN_TOP_RIGHT, -6, 38);
-  lv_obj_set_width(s_bk_status, w - 96);
+  lv_obj_t* re = booksButton(s_bk_body, LV_SYMBOL_REFRESH, booksReloadCb, nullptr, 32, 24);
+  lv_obj_align(re, LV_ALIGN_TOP_RIGHT, -84, 38);
+  lv_obj_set_width(s_bk_status, w - 132);
   if (s_abs_lib_count == 0) {
     lv_label_set_text(s_bk_status, TR("Loading libraries\xe2\x80\xa6"));
     booksStartJob(BkJob::Libraries);
@@ -1290,6 +1300,8 @@ static void openBooksPage() {
   if (s_bk_root) return;
   booksLoadIndex();
   booksLoadAbs();
+  s_abs_lib_count = s_abs_item_count = 0;   // fresh from the server on every open
+  s_abs_page = 0;
   appPageBegin("Books", booksClosePage);
   s_bk_root = appPageCreateRoot(COLOR_BG);
   // The reader slims the status bar: size the root for the larger content area.
