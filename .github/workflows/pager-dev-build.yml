@@ -9,7 +9,7 @@ name: pager-dev-build
 
 on:
   push:
-    branches: ['pager-*', 'max-*']
+    branches: ['pager-*']
   workflow_dispatch:
 
 permissions:
@@ -55,17 +55,6 @@ jobs:
           pio run -t mergebin -e "${{ matrix.env }}" 2>&1 | tee build.log
           exit ${PIPESTATUS[0]}
 
-      - name: Internal RAM symbols (TEST ONLY)
-        if: success() && startsWith(matrix.env, 'LilyGo_TDeck_Max')
-        run: |
-          TC=$(ls -d ~/.platformio/packages/toolchain-xtensa-esp32s3/bin)
-          ELF=.pio/build/${{ matrix.env }}/firmware.elf
-          echo "== section sizes"; $TC/xtensa-esp32s3-elf-size -A $ELF | grep -E 'dram|iram|bss|data|noinit|ext_ram'
-          echo "== top internal DRAM symbols (.dram0.bss / .dram0.data)"
-          $TC/xtensa-esp32s3-elf-objdump -t -C $ELF | awk '$4==".dram0.bss" || $4==".dram0.data" {print strtonum("0x"$5), $4, substr($0, index($0,$6))}' | sort -rn | head -80
-          echo "== totals by object file (bss+data)"
-          grep -E '^ \.(bss|data|dram0)[^ ]* +0x3fc' .pio/build/${{ matrix.env }}/firmware.map 2>/dev/null | head -0 || true
-
       - name: Report compiler errors
         if: failure()
         run: |
@@ -74,16 +63,14 @@ jobs:
           done
 
       - name: Upload firmware
-        if: success() && (startsWith(matrix.env, 'tlora_pager') || startsWith(matrix.env, 'LilyGo_TDeck_Max'))
+        if: success() && startsWith(matrix.env, 'tlora_pager')
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.env }}-${{ github.sha }}
           path: |
             .pio/build/${{ matrix.env }}/firmware-merged.bin
             .pio/build/${{ matrix.env }}/firmware.bin
-            .pio/build/${{ matrix.env }}/firmware.elf
-            .pio/build/${{ matrix.env }}/firmware.map
-          if-no-files-found: warn
+          if-no-files-found: error
 
       - name: Upload build log
         if: always()

@@ -2574,8 +2574,6 @@ static void maxAudioPrewarm() {
 }
 
 static void maxPlayNotifySlot(int slot) {
-  Serial.printf("[MAXAUDIO] play slot=%d tiles=%u playing=%d vol=%u\n", slot, (unsigned)tileFetchPendingLoad(),
-                (int)s_notify_playing, (unsigned)touchPrefsGetSoundVolume());   // TEST BUILD ONLY
   if (tileFetchPendingLoad() > 0) return;
   if (s_notify_playing) return;
   s_notify_slot = slot;
@@ -2754,9 +2752,8 @@ static void tanBeep();   // I2S notification tick; defined far below (with the C
 #endif
 // Play the platform's notification chime. Caller checks the buzzer/sound pref.
 static inline void uiPlaySlot(int slot) {
-  Serial.printf("[MAXAUDIO] uiPlaySlot %d\n", slot);   // TEST BUILD ONLY
 #if CAP_LUA_AUDIO
-  if (luaAudioActive()) { Serial.println("[MAXAUDIO] skipped: Lua audio active"); return; }
+  if (luaAudioActive()) return;
 #endif
 #if defined(HAS_TDECK_GT911)
   tdeckPlayNotifySlot(slot);
@@ -13594,7 +13591,6 @@ static void dndEndPlusCb(lv_event_t* e)    { if (lv_event_get_code(e) == LV_EVEN
 // reason rather than just going quiet, so the page explains itself.
 static bool soundPreviewAllowed(bool announce = true) {
   if (!g_lv.task) return false;
-  Serial.printf("[MAXAUDIO] preview: quiet=%d dnd=%d\n", (int)g_lv.task->isBuzzerQuiet(), (int)dndActive());   // TEST BUILD ONLY
   if (g_lv.task->isBuzzerQuiet()) {
     if (announce) g_lv.task->showAlert(TR("Sound is off"), 1400);
     return false;
@@ -38072,9 +38068,7 @@ static bool ensureHistFlushTaskRunning() {
 // Queue a missing tile for download. No-op when Wi-Fi is down or the
 // tile was queued recently. Called from renderMapTiles after a SPIFFS
 // miss; the actual fetch happens off-thread.
-static volatile uint16_t s_tq_calls=0, s_tq_nofs=0, s_tq_sd=0, s_tq_wifi=0, s_tq_seen=0, s_tq_task=0;   // TEST ONLY
 static void queueTileForFetch(uint8_t z, int32_t x, int32_t y) {
-  ++s_tq_calls;
   // Boards with a microSD backend fetch whenever SOME cache is mounted, and the
   // destination follows whatever s_tile_fs currently points at: the card in
   // microSD-tile mode (downloads merge into the SD library, #20), or the
@@ -38082,15 +38076,15 @@ static void queueTileForFetch(uint8_t z, int32_t x, int32_t y) {
   // fallback until it returns. Boards without one keep the plain offline guard:
   // no SD packs exist there, so microSD-tile mode can only mean "don't fetch".
 #if CAP_MICROSD
-  if (!s_tiles_fs_ready || !s_tile_fs) { ++s_tq_nofs; return; }
+  if (!s_tiles_fs_ready || !s_tile_fs) return;
 #else
-  if (s_map_style == 0 && s_tiles_from_sd) { ++s_tq_sd; return; }
+  if (s_map_style == 0 && s_tiles_from_sd) return;
 #endif
 #if defined(TLORA_PAGER)
   if (s_pager_sd_removal_pending && s_tile_fs == &SD) return;
 #endif
-  if (WiFi.status() != WL_CONNECTED) { ++s_tq_wifi; return; }
-  if (tileFetchSeen(z, x, y)) { ++s_tq_seen; return; }
+  if (WiFi.status() != WL_CONNECTED) return;
+  if (tileFetchSeen(z, x, y)) return;
   // HONOR the result: ensureTileFetchTaskRunning() creates the QUEUE first and can
   // still fail afterwards on the worker's 8 KB contiguous-DRAM stack. Ignoring it left
   // a queue with no consumer, so every send below incremented s_tile_fetch_pending with
@@ -38099,7 +38093,7 @@ static void queueTileForFetch(uint8_t z, int32_t x, int32_t y) {
   // single failed spawn silently killed the chime for the rest of the boot — the "lost
   // sound until I restart" report (issue #184). No tile is lost by returning here: with
   // no worker the fetch could never have happened anyway.
-  if (!ensureTileFetchTaskRunning()) { ++s_tq_task; return; }
+  if (!ensureTileFetchTaskRunning()) return;
   if (!s_tile_fetch_queue) return;
   TileFetchReq req = {z, x, y};
   // Publish the lifecycle count before the queue item. Otherwise the worker can
@@ -58008,7 +58002,6 @@ static uint8_t s_brightness_pct = 100;
 // the glass; put out by the heart pad again or by the idle screen timeout; a
 // screen wake never re-lights it.
 static void maxFrontlightOff() {
-  if (s_max_frontlight_on) Serial.println("[PAD] frontlight OFF");   // TEST ONLY
   s_max_frontlight_on = false;
   s_max_kb_reading = false;
   s_max_sleep_dim = false;
@@ -78123,14 +78116,7 @@ void UITask::allocMessageStore() {
   }
 }
 
-static void uiMemTrace(const char* tag) {   // TEST ONLY (Max RAM audit)
-  Serial.printf("[MEMTRACE] ui:%-15s int free=%6u largest=%6u dma largest=%6u\n", tag,
-                (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
-                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
-                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA));
-}
 void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* node_prefs) {
-  uiMemTrace("begin");
   _display    = display;
   _sensors    = sensors;
   _node_prefs = node_prefs;
@@ -78154,9 +78140,7 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
     // needs it for two reasons: an incoming message dereferences the thread
     // table, and the monitor below relies on the NORMAL append path so a
     // message stays unread until its thread is actually opened.
-    uiMemTrace("msgStore<");
-  allocMessageStore();
-  uiMemTrace("msgStore>");
+    allocMessageStore();
     Serial.println("[BOOT] console: begin"); Serial.flush();
 #if defined(ATTAKY_MESH_SERIES)
     // The terminal stays in the panel's build orientation (portrait,
@@ -78182,9 +78166,7 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
     // which console mode returns before, so without this _screen_timeout_ms
     // stayed at its constructor value and the panel never slept: the console
     // stayed lit indefinitely. Same pref the UI reads.
-    uiMemTrace("touchPrefs<");
-  touchPrefsBegin();
-  uiMemTrace("touchPrefs>");
+    touchPrefsBegin();
 #if defined(HAS_TDECK_KEYBOARD)
     // Settings > Keyboard > "Older keyboard protocol", the escape hatch for a
     // controller the probe gets wrong (#351). The graphical path applies it far
@@ -78681,9 +78663,7 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
   _next_threads_flush_ms = 0;
   _msgs_dirty = false;
   _next_msgs_flush_ms = 0;
-  uiMemTrace("history<");
   loadHistoryFromStorage();
-  uiMemTrace("history>");
 #if defined(TLORA_PAGER)
   // From here on, the loaded ring and its filesystem are one atomic history
   // generation. If no backing store was available, wait for a reboot rather
@@ -78704,12 +78684,8 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
     // Wi-Fi driver has taken the internal heap. On the V4 that left a 4-byte
     // largest block, so the worker could never start and tiles, the update
     // check and the app catalog were all silently dead.
-    uiMemTrace("tileStack<");
     reserveTileFetchStack();
-    uiMemTrace("tileStack>");
-    uiMemTrace("lv_init<");
     lv_init();
-    uiMemTrace("lv_init>");
     initTouchFontFallbacks();
     // NB: re-pointing the LVGL theme's font here does NOT work (tried, verified
     // on device: no effect) and neither does a text_font style on the screen /
@@ -78845,9 +78821,7 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
       }
 #endif  // HAS_TANMATSU
     }
-    uiMemTrace("drawbuf<");
     lv_disp_draw_buf_init(&g_lv.draw_buf, g_draw_buffer, nullptr, g_draw_buf_px);
-    uiMemTrace("drawbuf>");
     g_cap_touch_hw_started = false;
     g_lv.touch_inited      = false;
 
@@ -78972,9 +78946,7 @@ void UITask::begin(DisplayDriver* display, SensorManager* sensors, NodePrefs* no
       s_brightness_pct = pct;
       maxFrontlightOff();   // file-scope helper: uses the global panel, not this function's DisplayDriver* parameter
     }
-    uiMemTrace("audio<");
     maxAudioPrewarm();      // resident I2S + notify worker, while internal RAM is still unfragmented
-    uiMemTrace("audio>");
 #else
     applyBrightness(touchPrefsGetBrightness());
 #endif
@@ -83558,25 +83530,6 @@ void UITask::loop() {
 #if CAP_USB_FILES
   if (s_usbfiles) s_usbfiles->tick();
 #endif
-  {   // TEST ONLY (Max RAM audit): every 30 s, plus one region dump at 20 s
-    static uint32_t s_mt_last = 0; static bool s_mt_dumped = false;
-    if (!s_mt_dumped && now > 20000) { s_mt_dumped = true; heap_caps_print_heap_info(MALLOC_CAP_INTERNAL); }
-    if (now - s_mt_last > 5000) { s_mt_last = now;
-      Serial.printf("[MEMTRACE] run t=%lus wifi=%d tiles=%d int free=%u largest=%u minfree=%u dma largest=%u\n",
-        (unsigned long)(now / 1000), (int)WiFi.status(), (int)tileFetchPendingLoad(),
-        (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
-        (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
-        (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
-        (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA));
-      Serial.printf("[TILETRACE] fs=%d task=%d spawn=%d ok=%u fail=%u iters=%u step=%c wr=%c http=%d openfail=%u\n",
-        (int)s_tiles_fs_ready, s_tile_fetch_task != nullptr, (int)s_tile_fetch_spawn_ok,
-        (unsigned)s_tile_fetch_ok, (unsigned)s_tile_fetch_failed, (unsigned)s_tile_fetch_iters,
-        s_tile_fetch_step, s_tile_fetch_last_wr, (int)s_tile_fetch_last_code, (unsigned)s_tile_fetch_open_fail);
-      Serial.printf("[TILETRACE] queue calls=%u nofs=%u sd=%u wifi=%u seen=%u task=%u style=%d from_sd=%d tile_fs=%s\n",
-        (unsigned)s_tq_calls, (unsigned)s_tq_nofs, (unsigned)s_tq_sd, (unsigned)s_tq_wifi, (unsigned)s_tq_seen,
-        (unsigned)s_tq_task, (int)s_map_style, (int)s_tiles_from_sd,
-        !s_tile_fs ? "null" : (s_tile_fs == &s_tiles_fs ? "lfs" : "other")); }
-  }
 #if !defined(HAS_TANMATSU)
   // REMOTE mode: draw/refresh the physical-panel placeholder (first pass via the IP
   // sentinel, then whenever the IP changes), and clear the bootloop guard once this
@@ -84209,7 +84162,6 @@ void UITask::loop() {
       }
     }
     if (display.takeFrontKey0Release(key0_long)) {
-      Serial.printf("[PAD] heart release long=%d light=%d -> ", (int)key0_long, (int)s_max_frontlight_on);   // TEST ONLY
       // Heart pad, on release. Tap: the light on/off (keys as Settings > Keyboard
       // says). Hold: a reading light, the screen lit and the keyboard dark; hold
       // again and the keyboard light comes back.
@@ -84224,11 +84176,9 @@ void UITask::loop() {
         maxFrontlightOn();
         s_max_kb_reading = false;
       }
-      Serial.printf("light=%d kbread=%d\n", (int)s_max_frontlight_on, (int)s_max_kb_reading);   // TEST ONLY
       _last_input_ms = millis();
     }
     if (display.takeFrontKeyPress(key_id)) {
-      Serial.printf("[PAD] press id=%u\n", (unsigned)key_id);   // TEST ONLY
       if (_manual_lock) {
         // Front pads may reveal the retained lock view, but GPIO0 remains the
         // deliberate unlock control. wakeScreen() would clear _manual_lock and

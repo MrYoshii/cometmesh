@@ -2,21 +2,6 @@
 #include <Mesh.h>
 #include "MyMesh.h"
 
-// TEST ONLY (Max RAM audit): internal-heap checkpoint.
-#include <esp_heap_caps.h>
-#include <esp_rom_sys.h>
-static void memAllocFailed(size_t size, uint32_t caps, const char* fn) {   // TEST ONLY
-  esp_rom_printf("[MEMFAIL] %u bytes caps=0x%x in %s (int free=%u largest=%u)\n", (unsigned)size, (unsigned)caps,
-                 fn ? fn : "?", (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
-                 (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
-}
-static void memTrace(const char* tag) {
-  Serial.printf("[MEMTRACE] %-18s int free=%6u largest=%6u dma largest=%6u | psram free=%u\n", tag,
-                (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
-                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
-                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA),
-                (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
-}
 #if defined(HAS_TDECK_MAX)
 #include <esp_heap_caps.h>
 #include <WiFi.h>
@@ -831,8 +816,6 @@ void setup() {
       "                   *                 .\n"
       "\n");
   Serial.println("[BOOT] setup start");
-  heap_caps_register_failed_alloc_callback(memAllocFailed);
-  memTrace("setup start");
   Serial.printf("[BOOT] Comet %s on meshcomod %s\n", FIRMWARE_VERSION, FIRMWARE_CORE_VERSION);
   // The SDK ships CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096: every allocation
   // under 4 KB is forced into internal DRAM even when PSRAM is free. On the V4
@@ -890,7 +873,6 @@ void setup() {
 
   board.begin();
   Serial.println("[BOOT] board ok");
-  memTrace("board ok");
 
 #if defined(HAS_RAK_TAP_V2)
   // Quick PSRAM sanity check — silent crash before SPIFFS could be bad PSRAM config
@@ -1028,7 +1010,6 @@ void setup() {
     halt();
   }
   Serial.println("[BOOT] radio ok");
-  memTrace("radio ok");
 
   fast_rng.begin(radio_driver.getRngSeed());
 
@@ -1558,7 +1539,6 @@ void setup() {
     #endif
   );
   Serial.println("[BOOT] mesh ok");
-  memTrace("mesh ok");
 #if defined(HAS_RAK_TAP_V2)
   Serial.flush();
 #endif
@@ -1574,7 +1554,6 @@ void setup() {
 #if defined(WIFI_SSID) || defined(MULTI_TRANSPORT_COMPANION)
   wifiConfigBegin();
   Serial.println("[BOOT] wifiConfig ok");
-  memTrace("wifiConfig ok");
 
 #if defined(ESP32_PLATFORM) && defined(HAS_TOUCH_UI)
   // Settings > Clock > "Sync clock from system" with Wi-Fi up: restart SNTP from the
@@ -1616,7 +1595,6 @@ void setup() {
   board.setInhibitSleep(true);
   serial_interface.begin(Serial, TCP_PORT, WS_PORT);
   Serial.println("[BOOT] serial_interface ok");
-  memTrace("serial_interface ok");
   serial_interface.setBroadcastResponses(true);  // RX log, channel messages, etc. go to all clients (USB + TCP + WS [+ BLE]), not only last sender
   /* Wi-Fi and NimBLE coexist, but their first allocations are order-sensitive
    * on the Pager. Claim Wi-Fi's DMA/coexistence resources before starting BLE;
@@ -1845,14 +1823,11 @@ void setup() {
 #if defined(HAS_WIO_TRACKER_L2) && defined(WIO_TRACKER_L2_GPS_PROBE)
   wioTrackerL2GpsProbe();   // TEMP DIAGNOSTIC — must precede sensors.begin()'s Serial1.begin()
 #endif
-  memTrace("before sensors");
   sensors.begin();
-  memTrace("after sensors");
 
 #ifdef DISPLAY_CLASS
   ui_task.begin(disp, &sensors, the_mesh.getNodePrefs());  // still want to pass this in as dependency, as prefs might be moved
   Serial.println("[BOOT] ui ready");
-  memTrace("ui ready");
 #if defined(WADA_ORDERED_WIFI_BLE) && defined(MULTI_TRANSPORT_COMPANION)
   pagerLogInternalHeap("after UI init");
 #endif

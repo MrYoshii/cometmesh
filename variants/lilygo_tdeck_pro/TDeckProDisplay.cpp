@@ -446,7 +446,6 @@ void TDeckProDisplay::finishUpdate(bool wait) {
   _epd_busy = false;
   writeBrightness(_brightness);
   _last_refresh_ms = millis();
-  Serial.printf("[EPD] done after %lums\n", (unsigned long)(_last_refresh_ms - _epd_start_ms));   // TEST BUILD ONLY
 }
 
 void TDeckProDisplay::serviceRefresh(bool force) {
@@ -477,21 +476,6 @@ void TDeckProDisplay::serviceRefresh(bool force) {
     return;
   }
 
-  // TEST BUILD ONLY: where the frame changed, and since when.
-  if (_sent_valid) {
-    int y0 = HEIGHT, y1 = -1, x0 = WIDTH, x1 = -1;
-    for (int y = 0; y < HEIGHT; ++y)
-      for (int b = 0; b < WIDTH / 8; ++b) {
-        const size_t i = (size_t)y * (WIDTH / 8) + b;
-        if (_mono[i] == _sent[i]) continue;
-        if (y < y0) y0 = y; if (y > y1) y1 = y;
-        if (b * 8 < x0) x0 = b * 8; if (b * 8 + 7 > x1) x1 = b * 8 + 7;
-      }
-    static uint32_t s_prev = 0;
-    Serial.printf("[EPD] %s changed x%d-%d y%d-%d (+%lums, waited %lums)\n", full ? "full" : "part", x0, x1, y0, y1,
-                  (unsigned long)(now - s_prev), (unsigned long)(now - _first_request_ms));
-    s_prev = now;
-  }
   digitalWrite(P_LORA_NSS, HIGH);
   // (no SD chip-select poke: the SD driver owns that line, and Books writes the card from its own task)
   digitalWrite(PIN_TFT_CS, HIGH);
@@ -666,14 +650,6 @@ bool TDeckProDisplay::readCst3530(int16_t& x, int16_t& y) {
       portEXIT_CRITICAL(&s_key_mux);
     }
   }
-  {   // TEST ONLY: raw pad reports, to see how the CST3530 reports a held pad
-    static uint8_t s_last3 = 0xFF, s_last8 = 0xFF;
-    if (response[3] != s_last3 || (keys && response[8] != s_last8)) {
-      Serial.printf("[PAD] t=%lu b3=%02X b8=%02X fingers=%u keys=%u down0=%d\n", (unsigned long)millis(),
-                    response[3], response[8], (unsigned)fingers, (unsigned)keys, (int)s_key_down[0]);
-      s_last3 = response[3]; s_last8 = response[8];
-    }
-  }
   // A report WITHOUT a key entry says nothing about the pads: the controller
   // interleaves those with the key reports while a pad is held. Treating them as
   // "all up" turned one press into a burst of press/release pairs (the keyboard
@@ -700,17 +676,6 @@ bool TDeckProDisplay::readCst3530(int16_t& x, int16_t& y) {
   (void)Wire.endTransmission();
 #endif
 
-  if (fingers) {   // TEST ONLY: every finger frame, raw, before any filtering
-    const size_t ix = (size_t)keys * 5u;
-    const int rx = ix + 7 < received ? (int)(response[ix + 4] | ((uint16_t)(response[ix + 7] & 0x0F) << 8)) : -1;
-    const int ry = ix + 7 < received ? (int)(response[ix + 5] | ((uint16_t)(response[ix + 7] & 0xF0) << 4)) : -1;
-    static uint32_t s_fl = 0;
-    if (millis() - s_fl > 40) {   // ~25 lines/s at most
-      s_fl = millis();
-      Serial.printf("[TOUCH] t=%lu f=%u k=%u x=%d y=%d st=%02X b3=%02X b8=%02X\n", (unsigned long)millis(),
-                    (unsigned)fingers, (unsigned)keys, rx, ry, response[8], response[3], response[8]);
-    }
-  }
   const size_t index = (size_t)keys * 5u;
   if (fingers == 0 || index + 8 >= received) return false;
   // The finger's own state byte (00 = lifted); with a key report in front of it the
