@@ -38,6 +38,13 @@ static volatile bool  s_bka_reader_alive = false;
 static volatile uint32_t s_bka_fetched = 0;     // bytes the reader has put in (for the 10 s log)
 
 static TaskHandle_t   s_bka_task = nullptr;     // the decoder
+// Both tasks stay between plays, waiting for the next one: a seek used to end them and
+// start them again, and a freshly freed stack only comes back to the heap once the idle
+// task has cleaned up, so the restart failed ("not enough memory") while a second try
+// worked. They end for good (bkaReleaseTasks) once the player is closed and quiet.
+static TaskHandle_t   s_bka_reader_task = nullptr;
+static volatile bool  s_bka_quit = false;
+static volatile bool  s_bka_net_busy = false;   // the reader holds (or opens) a connection
 static volatile bool  s_bka_stop = false;       // ask both tasks to end
 static volatile bool  s_bka_alive = false;      // the decoder is running
 static volatile bool  s_bka_buffering = false;
@@ -47,6 +54,7 @@ static double         s_bka_start_t = 0;        // the task's start position
 static char           s_bka_err[64] = "";
 
 static bool booksAudioRunning()   { return s_bka_alive; }
+static bool booksAudioNetBusy()   { return s_bka_net_busy; }
 static bool booksAudioBuffering() { return s_bka_alive && s_bka_buffering; }
 static double booksAudioPos()     { return s_bka_pos; }
 static bool booksAudioEnded()     { return s_bka_ended; }
@@ -130,7 +138,7 @@ static size_t bkaRingGet(uint8_t* out, size_t n) {
   return have;
 }
 
-static void bkaReaderFn(void*) {
+static void bkaReaderRun() {
   int track = bkaTrackAt(s_bka_start_t);
   double t_in_track = s_bka_start_t - s_bka_tracks[track].start;
   uint32_t resume_at = UINT32_MAX;   // a dropped connection: the exact byte to go on from
@@ -147,6 +155,7 @@ static void bkaReaderFn(void*) {
     uint32_t total = 0;
     int code = 0;
     File lf;
+    s_bka_net_busy = !tr.local;
     if (tr.local) {   // a downloaded track: size known up front, exact offsets
       fs::FS* fs = booksFs();
       lf = fs ? fs->open(tr.url, FILE_READ) : File();
@@ -245,6 +254,7 @@ static void bkaReaderFn(void*) {
       resume_at = UINT32_MAX;
     }
     if (tr.local) lf.close(); else http.end();
+    s_bka_net_busy = false;
     if (s_bka_stop) break;
     if (parked) {   // the ring is full: wait until half of it has played, then ask again
       resume_at = !checked_id3 ? 0 : file_pos + skip;
@@ -262,8 +272,18 @@ static void bkaReaderFn(void*) {
 
 done:
   if (chunk) heap_caps_free(chunk);
+  s_bka_net_busy = false;
   s_bka_eof = true;
   s_bka_reader_alive = false;
+}
+
+static void bkaReaderFn(void*) {
+  for (;;) {
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+    if (s_bka_quit) break;
+    bkaReaderRun();
+  }
+  s_bka_reader_task = nullptr;
   vTaskDelete(nullptr);
 }
 
@@ -278,7 +298,7 @@ static void bkaIdle(LuaAudioSinkSession* sink, BkaWork* w) {
   }
 }
 
-static void bkaTaskFn(void*) {
+static void bkaDecoderRun() {
   BkaWork* w = (BkaWork*)heap_caps_malloc(sizeof(BkaWork), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   LuaAudioSinkSession sink;
   uint32_t sink_rate = 0;
@@ -394,8 +414,27 @@ done:
   s_bka_buffering = false;
   s_bka_sd_busy = false;
   s_bka_alive = false;
+}
+
+static void bkaTaskFn(void*) {
+  for (;;) {
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+    if (s_bka_quit) break;
+    bkaDecoderRun();
+  }
   s_bka_task = nullptr;
   vTaskDelete(nullptr);
+}
+
+// End both tasks (the player is closed and nothing plays): their stacks go back.
+static void bkaReleaseTasks() {
+  if (s_bka_alive || s_bka_reader_alive) return;
+  if (!s_bka_task && !s_bka_reader_task) return;
+  s_bka_quit = true;
+  if (s_bka_task) xTaskNotifyGive(s_bka_task);
+  if (s_bka_reader_task) xTaskNotifyGive(s_bka_reader_task);
+  for (int i = 0; i < 100 && (s_bka_task || s_bka_reader_task); ++i) vTaskDelay(pdMS_TO_TICKS(5));
+  s_bka_quit = false;
 }
 
 static void booksAudioStop() {
@@ -432,24 +471,20 @@ static bool booksAudioPlayFrom(double t) {
   // The reader: TLS and the HTTP client want a deep stack (internal RAM, only while
   // playing), on core 0 with Wi-Fi. The decoder: a small stack (minimp3's scratch is in
   // PSRAM), on core 1 above the UI so a panel refresh cannot starve the codec.
+  // Started once, then woken for each play (see s_bka_reader_task).
+  if (!s_bka_reader_task)
+    xTaskCreatePinnedToCore(bkaReaderFn, "bkaread", 12288, nullptr, 4, &s_bka_reader_task, 0);
+  if (!s_bka_task) xTaskCreatePinnedToCore(bkaTaskFn, "bkaudio", 6144, nullptr, 6, &s_bka_task, 1);
+  if (!s_bka_reader_task || !s_bka_task) {
+    s_bka_alive = false;
+    s_bka_sd_busy = false;
+    __atomic_store_n(&s_lua_audio_active, false, __ATOMIC_RELEASE);
+    snprintf(s_bka_err, sizeof s_bka_err, "Not enough memory to play");
+    return false;
+  }
   s_bka_reader_alive = true;
-  if (xTaskCreatePinnedToCore(bkaReaderFn, "bkaread", 12288, nullptr, 4, nullptr, 0) != pdPASS) {
-    s_bka_reader_alive = false;
-    s_bka_alive = false;
-    s_bka_sd_busy = false;
-    __atomic_store_n(&s_lua_audio_active, false, __ATOMIC_RELEASE);
-    snprintf(s_bka_err, sizeof s_bka_err, "Not enough memory to play");
-    return false;
-  }
-  if (xTaskCreatePinnedToCore(bkaTaskFn, "bkaudio", 6144, nullptr, 6, &s_bka_task, 1) != pdPASS) {
-    s_bka_stop = true;
-    for (int i = 0; i < 600 && s_bka_reader_alive; ++i) vTaskDelay(pdMS_TO_TICKS(10));
-    s_bka_alive = false;
-    s_bka_sd_busy = false;
-    __atomic_store_n(&s_lua_audio_active, false, __ATOMIC_RELEASE);
-    snprintf(s_bka_err, sizeof s_bka_err, "Not enough memory to play");
-    return false;
-  }
+  xTaskNotifyGive(s_bka_reader_task);
+  xTaskNotifyGive(s_bka_task);
   return true;
 }
 

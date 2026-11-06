@@ -151,6 +151,8 @@ static bool        booksAudioBuffering();
 static double      booksAudioPos();
 static bool        booksAudioEnded();
 static const char* booksAudioError();               // "" while fine
+static bool        booksAudioNetBusy();             // the stream holds a connection right now
+static void        bkaReleaseTasks();               // end the idle playback tasks (stacks back)
 struct BkAbsItem;
 static void        booksStartAudiobook(const BkAbsItem& it);
 static void        booksOpenPlayer();
@@ -1002,7 +1004,9 @@ static char s_bkd_item[48] = "";
 // status check and with it the open file); the file is closed and the worker goes on
 // from what the card holds, the way it resumes a dropped connection.
 enum BkdFile : uint8_t { BkdIdle, BkdOpenReq, BkdOpen, BkdSkip, BkdCloseReq, BkdClosed, BkdFailed, BkdRetry };
-static const size_t kBkdRing = 256 * 1024;
+static const size_t kBkdRing = 512 * 1024;
+static volatile uint32_t s_bkd_card_bytes = 0;   // written to the card since the last log
+static volatile uint32_t s_bkd_tick_max = 0;     // the slowest pump tick since then (ms)
 static uint8_t* s_bkd_ring = nullptr;
 static volatile size_t s_bkd_head = 0, s_bkd_tail = 0;
 static volatile uint8_t s_bkd_fstate = BkdIdle;
@@ -1069,6 +1073,7 @@ static bool bkaOpen(HTTPClient& http, WiFiClientSecure& tls, WiFiClient& plain, 
                     uint32_t from, uint32_t* total, int* code_out);   // BooksAudio.inc
 static void bkdTaskFn(void*) {
   uint8_t* buf = (uint8_t*)heap_caps_malloc(4096, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  uint32_t log_at = millis(), net_bytes = 0;   // the 10 s download log
   if (!s_bkd_ring) s_bkd_ring = (uint8_t*)heap_caps_malloc(kBkdRing, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   const int n = s_bkd_tracks;
   bool ok = buf && s_bkd_ring;
@@ -1105,25 +1110,58 @@ static void bkdTaskFn(void*) {
         append = false;
         continue;
       }
-      WiFiClient* stream = http.getStreamPtr();
-      uint32_t pos = have, idle_since = millis();
+      uint32_t pos = have;
       s_bk_dl_total = total; s_bk_dl_got = pos;
       bool put_failed = false;
-      while (!s_bkd_cancel) {
-        if (total && pos >= total) break;
-        const int avail = stream ? stream->available() : 0;
-        if (avail <= 0) {
-          if (!stream || !stream->connected()) break;
-          if (millis() - idle_since > 30000) break;
-          vTaskDelay(pdMS_TO_TICKS(5));
-          continue;
+      // One request at a time. A connection held open on a full ring came back at a
+      // trickle (as with streaming): let go when the ring fills and ask again, from the
+      // exact byte, once the card has taken half of it. A link that only trickles is
+      // dropped too; the next attempt goes on from what the card holds.
+      for (;;) {
+        WiFiClient* stream = http.getStreamPtr();
+        bool parked = false;
+        uint32_t idle_since = millis(), win_start = millis(), win_bytes = 0;
+        while (!s_bkd_cancel) {
+          if (total && pos >= total) break;
+          if (kBkdRing - (s_bkd_head - s_bkd_tail) < 4096) { parked = true; break; }
+          const uint32_t now = millis();
+          if (now - log_at >= 10000) {
+            const uint32_t dt = now - log_at;
+            Serial.printf("[bkd] net %u KB/s, card %u KB/s (slowest tick %u ms), ring %u KB, int free %u\n",
+                          (unsigned)(net_bytes / dt), (unsigned)(s_bkd_card_bytes / dt), (unsigned)s_bkd_tick_max,
+                          (unsigned)((s_bkd_head - s_bkd_tail) / 1024),
+                          (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+            log_at = now; net_bytes = 0; s_bkd_card_bytes = 0; s_bkd_tick_max = 0;
+          }
+          if (now - win_start >= 5000) {
+            if (win_bytes < 16 * 1024) {
+              Serial.printf("[bkd] link slow (%u B in 5 s): reconnecting\n", (unsigned)win_bytes);
+              break;
+            }
+            win_start = now; win_bytes = 0;
+          }
+          const int avail = stream ? stream->available() : 0;
+          if (avail <= 0) {
+            if (!stream || !stream->connected()) break;
+            if (now - idle_since > 15000) break;
+            vTaskDelay(pdMS_TO_TICKS(5));
+            continue;
+          }
+          const int r = stream->read(buf, avail < 4096 ? avail : 4096);
+          if (r <= 0) continue;
+          if (!bkdPut(buf, (size_t)r)) { put_failed = true; break; }
+          pos += (uint32_t)r;
+          net_bytes += (uint32_t)r; win_bytes += (uint32_t)r;
+          s_bk_dl_got = pos;
+          idle_since = millis();
         }
-        const int r = stream->read(buf, avail < 4096 ? avail : 4096);
-        if (r <= 0) continue;
-        if (!bkdPut(buf, (size_t)r)) { put_failed = true; break; }
-        pos += (uint32_t)r;
-        s_bk_dl_got = pos;
-        idle_since = millis();
+        if (!parked || s_bkd_cancel || s_bkd_fstate != BkdOpen) break;
+        http.end();
+        while (!s_bkd_cancel && s_bkd_fstate == BkdOpen && s_bkd_head - s_bkd_tail > kBkdRing / 2)
+          vTaskDelay(pdMS_TO_TICKS(50));
+        if (s_bkd_cancel || s_bkd_fstate != BkdOpen) break;
+        uint32_t t2 = 0;
+        if (!bkaOpen(http, tls, plain, s_bka_tracks[i], pos, &t2, &code) || code != 206) break;
       }
       http.end();
       if (s_bkd_fstate == BkdRetry) {   // the card failed a write: go on from what it holds
@@ -1143,7 +1181,10 @@ static void bkdTaskFn(void*) {
       }
       append = true;
       if (complete) track_ok = true;
-      else Serial.printf("[books] download track %d: broke off at %u of %u, retrying\n", i + 1, (unsigned)pos, (unsigned)total);
+      else {
+        Serial.printf("[books] download track %d: broke off at %u of %u, retrying\n", i + 1, (unsigned)pos, (unsigned)total);
+        if (pos > have + 64 * 1024) attempt = -1;   // it got on: only attempts in a row without progress count
+      }
     }
     if (!ok) break;
     if (!track_ok) {
@@ -1231,6 +1272,8 @@ static void booksDownloadPump(lv_timer_t*) {
     return;
   }
   if (st != BkdOpen && st != BkdCloseReq) return;
+  const uint32_t t_tick = millis();
+  struct TickTimer { uint32_t t0; ~TickTimer() { const uint32_t d = millis() - t0; if (d > s_bkd_tick_max) s_bkd_tick_max = d; } } tick_timer{t_tick};
   // Up to 32 KB a tick: well above the link's rate, short enough to keep the UI going.
   size_t budget = 32 * 1024;
   while (budget && s_bkd_head != s_bkd_tail) {
@@ -1266,6 +1309,7 @@ static void booksDownloadPump(lv_timer_t*) {
     // failed write later costs at most that much again.
     if ((s_bkd_fwritten + n) / (256u * 1024u) != s_bkd_fwritten / (256u * 1024u)) s_bkd_file.flush();
     s_bkd_fwritten += n;
+    s_bkd_card_bytes += n;
     if (s_bkd_write_fails && s_bkd_fwritten >= 1024u * 1024u) s_bkd_write_fails = 0;   // going well again
     __sync_synchronize();
     s_bkd_tail += n;
@@ -2460,7 +2504,12 @@ static void booksAudioTimerCb(lv_timer_t*) {
   const bool running = booksAudioRunning();
   if (running && !booksAudioBuffering()) s_bka_listened_ms += dt;
   if (running) s_bka_time = booksAudioPos();
-  if (running && now - s_bka_last_sync_ms >= 60000u) booksAudioSyncSoon(false);
+  // The minute sync waits (up to 3 min) for the stream to let go of its connection:
+  // two TLS sessions at once left Wi-Fi too little internal RAM and both crawled.
+  if (running && now - s_bka_last_sync_ms >= 60000u &&
+      (!booksAudioNetBusy() || now - s_bka_last_sync_ms >= 180000u))
+    booksAudioSyncSoon(false);
+  if (!running && !s_bk_root) bkaReleaseTasks();   // closed and quiet: the stacks go back
   if (s_bkd_done) {   // an offline download finished (or stopped)
     s_bkd_done = false;
     if (s_bkd_file) s_bkd_file.close();
