@@ -14,7 +14,7 @@ BOARD="${1:-tdeck_max}"; shift || true
 [ -d "$HERE/deps/idf/arduino-esp32" ] || "$HERE/fetch-deps.sh"
 
 TAG="${COMET_FW_TAG:-dev-$(git -C "$ROOT" rev-parse --short=7 HEAD 2>/dev/null || echo local)}"
-BUILD="$ROOT/build/idf-$BOARD"
+BUILD="$ROOT/build/idf-$BOARD${COMET_BUILD_SUFFIX:-}"
 export IDF_COMPONENT_MANAGER=0
 idf.py -C "$HERE" -B "$BUILD" \
   -DCOMET_BOARD="$BOARD" -DCOMET_FW_TAG="$TAG" -DSDKCONFIG="$BUILD/sdkconfig" \

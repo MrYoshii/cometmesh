@@ -24,6 +24,11 @@ endif()
 include("${COMET_BOARD_DIR}/board.cmake")
 
 set(SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.defaults;${COMET_BOARD_DIR}/sdkconfig.defaults")
+# Test builds: COMET_SDKCONFIG_EXTRA=<file> layers one more fragment on top (build.sh
+# gives such a build its own directory through COMET_BUILD_SUFFIX).
+if(DEFINED ENV{COMET_SDKCONFIG_EXTRA})
+  list(APPEND SDKCONFIG_DEFAULTS "$ENV{COMET_SDKCONFIG_EXTRA}")
+endif()
 set(EXTRA_COMPONENT_DIRS "${CMAKE_CURRENT_LIST_DIR}/deps/idf")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
