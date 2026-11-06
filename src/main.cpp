@@ -19,6 +19,7 @@ static void memTrace(const char* tag) {
 }
 #if defined(HAS_TDECK_MAX)
 #include <esp_heap_caps.h>
+#include <WiFi.h>
 #include <esp_wifi.h>
 #include <mbedtls/platform.h>
 // Wi-Fi off parks the driver instead of unloading it (as the Pager keeps its STA):
