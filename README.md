@@ -5,7 +5,7 @@
 <p align="center"><b>One radio, every mesh.</b> &middot; open source &middot; GPL-3.0</p>
 
 <p align="center">
-  <img alt="status: early development" src="https://img.shields.io/badge/status-early%20development-orange">
+  <img alt="status: early development" src="https://img.shields.io/badge/status-early%20development-2bff88">
   <img alt="license: GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-blue">
   <img alt="ESP32-S3" src="https://img.shields.io/badge/MCU-ESP32--S3-lightgrey">
 </p>
