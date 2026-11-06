@@ -27983,15 +27983,8 @@ static bool sdBeginTracked() {
 }
 #else
 static bool sdBeginTracked(SPIClass* spi, uint32_t hz, bool* begin_ok_out = nullptr) {
-  const uint32_t t0 = millis();   // TEST BUILD ONLY: SD mount trace
   const bool begin_ok = spi && SD.begin(PIN_SD_CS, *spi, hz, "/sd", 6);
   const bool card_ready = begin_ok && SD.cardType() != CARD_NONE;
-  Serial.printf("[SDT] begin %luHz -> %s, type=%d size=%lluMB, %lums, int free=%u blk=%u, task=%s\n",
-                (unsigned long)hz, begin_ok ? "ok" : "FAILED", (int)SD.cardType(),
-                begin_ok ? (unsigned long long)(SD.cardSize() >> 20) : 0ULL, (unsigned long)(millis() - t0),
-                (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
-                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
-                pcTaskGetName(nullptr));
   if (begin_ok_out) *begin_ok_out = begin_ok;
   sdMountDiagAttempt(hz, begin_ok, card_ready);
   return card_ready;
@@ -85189,14 +85182,11 @@ void UITask::loop() {
         // card (FAT32, exFAT, blank) since f_mkfs hardware-inits + overwrites it.
         SD.end();                                          // drop any existing mount
         uint8_t pdrv = sdcard_init(PIN_SD_CS, spi, 4000000);
-        Serial.printf("[SDT] format: sdcard_init -> pdrv %u\n", (unsigned)pdrv);   // TEST BUILD ONLY
         if (pdrv != 0xFF) {
           char drv[3] = { (char)('0' + pdrv), ':', 0 };
           void* work = malloc(4096);                       // f_mkfs scratch (>= FF_MAX_SS)
           if (work) {
-            const int mkfs_rc = f_mkfs(drv, MC_FM_FAT32, 0, work, 4096);
-            Serial.printf("[SDT] format: f_mkfs(%s, FAT32) -> %d\n", drv, mkfs_rc);   // TEST BUILD ONLY
-            if (mkfs_rc == 0 /*FR_OK*/) {
+            if (f_mkfs(drv, MC_FM_FAT32, 0, work, 4096) == 0 /*FR_OK*/) {
               sdWriteFatLabel(pdrv, "MESHCOMOD");
               mkfs_ok = true;
               ok = true;
