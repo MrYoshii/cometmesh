@@ -1335,6 +1335,9 @@ static void booksAudioDownloadStart() {
     booksAudioPause();
     if (g_lv.task) g_lv.task->showAlert(TR("Paused while it downloads"), 1600);
   }
+  // The idle playback tasks hold 18 KB of internal RAM: give it to the download (and
+  // to Wi-Fi, which crawled with ~11 KB left). Play starts them again.
+  bkaReleaseTasks();
   bkAudioDirFor(s_bka_item, s_bkd_dir, sizeof s_bkd_dir);
   bkCopy(s_bkd_item, sizeof s_bkd_item, s_bka_item);
   s_bkd_tracks = s_bka_track_count;
