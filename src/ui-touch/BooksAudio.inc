@@ -29,6 +29,7 @@ static uint8_t*       s_bka_ring = nullptr;     // PSRAM, kept once allocated
 static volatile size_t s_bka_head = 0, s_bka_tail = 0;   // written / read, ever-growing
 static volatile bool  s_bka_eof = false;        // the reader has put in everything
 static volatile bool  s_bka_reader_alive = false;
+static volatile uint32_t s_bka_fetched = 0;     // bytes the reader has put in (for the 10 s log)
 
 static TaskHandle_t   s_bka_task = nullptr;     // the decoder
 static volatile bool  s_bka_stop = false;       // ask both tasks to end
@@ -104,6 +105,7 @@ static bool bkaRingPut(const uint8_t* data, size_t n) {
     if (room > first) memcpy(s_bka_ring, data + first, room - first);
     __sync_synchronize();
     s_bka_head += room;
+    s_bka_fetched += (uint32_t)room;
     data += room; n -= room;
   }
   return true;
@@ -251,12 +253,26 @@ static void bkaTaskFn(void*) {
   size_t in_start = 0, in_count = 0, out_n = 0;
   uint64_t samples_out = 0;
   bool primed = false;                 // enough buffered to start (or start again)
+  // Playback health, logged every 10 s while it plays: how fast the reader fetches
+  // against what the book needs, how often the ring ran dry, and the longest wait on
+  // the codec (a long one means something held the CPU or the flash cache).
+  uint32_t log_at = millis(), underruns = 0, slow_writes = 0, max_write_ms = 0, max_dec_ms = 0;
+  uint32_t kbps = 0;
   if (!w) { snprintf(s_bka_err, sizeof s_bka_err, "Not enough memory to play"); s_bka_stop = true; goto done; }
   s_wada_mp3_scratch = &w->scratch;
   mp3dec_init(&w->decoder);
   s_bka_pos = s_bka_start_t;
 
   while (!s_bka_stop) {
+    if (millis() - log_at >= 10000) {
+      const uint32_t dt = millis() - log_at;
+      Serial.printf("[bka] fetch %u KB/s (book %u kbit/s), ring %u KB, underruns %u, slow writes %u (max %u ms), decode max %u ms, int free %u\n",
+                    (unsigned)(s_bka_fetched / (dt ? dt : 1)), (unsigned)kbps, (unsigned)(bkaRingUsed() / 1024),
+                    (unsigned)underruns, (unsigned)slow_writes, (unsigned)max_write_ms, (unsigned)max_dec_ms,
+                    (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+      s_bka_fetched = 0; log_at = millis();
+      underruns = slow_writes = max_write_ms = max_dec_ms = 0;
+    }
     if (in_count < sizeof w->input / 2) {   // top up from the ring
       if (in_start) { memmove(w->input, w->input + in_start, in_count); in_start = 0; }
       in_count += bkaRingGet(w->input + in_count, sizeof w->input - in_count);
@@ -267,13 +283,16 @@ static void bkaTaskFn(void*) {
       else { s_bka_buffering = true; bkaIdle(&sink, w); continue; }
     }
     if (in_count < 2048 && !eof) {
-      if (in_count == 0) primed = false;   // ran dry: buffer up again
+      if (in_count == 0) { primed = false; ++underruns; }   // ran dry: buffer up again
       bkaIdle(&sink, w);
       continue;
     }
     if (!in_count) break;   // everything played
     mp3dec_frame_info_t info = {};
+    const uint32_t t_dec = millis();
     const int samples = mp3dec_decode_frame(&w->decoder, w->input + in_start, (int)in_count, w->pcm, &info);
+    if (millis() - t_dec > max_dec_ms) max_dec_ms = millis() - t_dec;
+    if (info.bitrate_kbps > 0) kbps = (uint32_t)info.bitrate_kbps;
     if (info.frame_bytes <= 0) {
       if (eof) break;
       const size_t keep = in_count > 4 ? 4 : in_count;   // no frame in it: keep the tail, read on
@@ -300,7 +319,13 @@ static void bkaTaskFn(void*) {
       v = (int32_t)((float)v * sink.gain);
       w->out[out_n++] = (int16_t)(v > 32767 ? 32767 : v < -32768 ? -32768 : v);
       if (out_n == sizeof w->out / sizeof w->out[0]) {
+        const uint32_t t_w = millis();
         if (!luaAudioSinkWrite(&sink, w->out, out_n)) { snprintf(s_bka_err, sizeof s_bka_err, "Audio output failed"); s_bka_stop = true; break; }
+        // 512 frames are ~12 ms of sound at 44.1 kHz: a write blocks for about that
+        // when it keeps pace; much longer means the codec's DMA ran dry first.
+        const uint32_t wt = millis() - t_w;
+        if (wt > max_write_ms) max_write_ms = wt;
+        if (wt > 40) ++slow_writes;
         out_n = 0;
       }
     }

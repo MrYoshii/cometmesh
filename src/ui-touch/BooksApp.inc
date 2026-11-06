@@ -653,9 +653,10 @@ class BkBufStream : public Stream {
   size_t n_ = 0, i_ = 0, total_ = 0;
 };
 
-// GET a server path and parse its reply through a filter. Returns the HTTP status (or
+// A request to the server whose JSON reply is parsed through a filter as it arrives. Returns the HTTP status (or
 // a negative error); a parse error comes back as HTTPC_ERROR_CONNECTION_LOST.
-static int bkGetJson(const char* path, JsonDocument& filter, JsonDocument& doc) {
+static int bkReqJson(const char* method, const char* path, const char* payload,
+                     JsonDocument& filter, JsonDocument& doc) {
   for (int attempt = 0; attempt < 2; ++attempt) {
     char url[200];
     bkUrl(url, sizeof url, path);
@@ -671,7 +672,8 @@ static int bkGetJson(const char* path, JsonDocument& filter, JsonDocument& doc) 
     else if (!http.begin(plain, url)) return HTTPC_ERROR_CONNECTION_REFUSED;
     http.addHeader("Accept-Encoding", "identity");
     if (s_abs_token[0]) http.addHeader("Authorization", String("Bearer ") + s_abs_token);
-    const int code = http.GET();
+    if (payload) http.addHeader("Content-Type", "application/json");
+    const int code = http.sendRequest(method, (uint8_t*)(payload ? payload : ""), payload ? strlen(payload) : 0);
     if (code == 401 && attempt == 0) { http.end(); if (bkRefresh()) continue; return 401; }
     if (code != 200) { http.end(); return code; }
     BkBufStream in(http.getStreamPtr());
@@ -683,87 +685,78 @@ static int bkGetJson(const char* path, JsonDocument& filter, JsonDocument& doc) 
   return 401;
 }
 
-// An audiobook from the server: its audio files (in order), chapters and length from
-// the library item, read with a filter (a long book's item runs to megabytes), and the
-// listening position from the user's media progress. Its tracks stream straight from
-// the item's files; MP3 only for now.
+// An audiobook: a playback session from the server (direct play: the files as they are,
+// so the device decodes them itself, MP3 for now). The reply carries the whole library
+// item and runs to megabytes for a long book, so it is read as it arrives through a
+// filter that keeps only what the player needs; a reply that breaks off is asked again.
 static void bkJobOpenSession() {
   char path[120];
-  snprintf(path, sizeof path, "/api/items/%s", s_bk_job_arg);
+  snprintf(path, sizeof path, "/api/items/%s/play", s_bk_job_arg);
+  static const char kBody[] =
+      "{\"deviceInfo\":{\"clientName\":\"wadamesh\",\"deviceId\":\"wadamesh-max\"},"
+      "\"forceDirectPlay\":true,\"forceTranscode\":false,\"mediaPlayer\":\"wadamesh\","
+      "\"supportedMimeTypes\":[\"audio/mpeg\"]}";
   JsonDocument filter(&s_bk_json_alloc);
-  JsonObject fm = filter["media"].to<JsonObject>();
-  fm["duration"] = true;
-  fm["metadata"]["title"] = true;
-  fm["metadata"]["authorName"] = true;
-  JsonObject fc = fm["chapters"][0].to<JsonObject>();
+  filter["id"] = true;
+  filter["displayTitle"] = true;
+  filter["displayAuthor"] = true;
+  filter["duration"] = true;
+  filter["currentTime"] = true;
+  JsonObject fc = filter["chapters"][0].to<JsonObject>();
   fc["start"] = true; fc["end"] = true; fc["title"] = true;
-  JsonObject fa = fm["audioFiles"][0].to<JsonObject>();
-  fa["index"] = true; fa["ino"] = true; fa["duration"] = true; fa["mimeType"] = true;
-  fa["codec"] = true; fa["exclude"] = true; fa["invalid"] = true;
-  fa["metadata"]["ext"] = true;
+  JsonObject ft = filter["audioTracks"][0].to<JsonObject>();
+  ft["startOffset"] = true; ft["duration"] = true; ft["contentUrl"] = true;
+  ft["mimeType"] = true; ft["codec"] = true;
   JsonDocument doc(&s_bk_json_alloc);
-  const int code = bkGetJson(path, filter, doc);
+  int code = 0;
+  for (int attempt = 0; attempt < 3; ++attempt) {
+    doc.clear();
+    code = bkReqJson("POST", path, kBody, filter, doc);
+    if (code != HTTPC_ERROR_CONNECTION_LOST && code != HTTPC_ERROR_READ_TIMEOUT) break;
+    vTaskDelay(pdMS_TO_TICKS(800));
+  }
   if (code != 200) { bkJobMsgForCode(code); return; }
   if (!s_bka_tracks) s_bka_tracks = (BkaTrack*)psAlloc(sizeof(BkaTrack) * kBkaMaxTracks);
   if (!s_bka_chapters) s_bka_chapters = (BkaChapter*)psAlloc(sizeof(BkaChapter) * kBkaMaxChapters);
   if (!s_bka_tracks || !s_bka_chapters) { snprintf(s_bk_job_msg, sizeof s_bk_job_msg, "Not enough memory"); return; }
-  JsonObject media = doc["media"];
-  // The files in playing order (their index), skipping excluded and broken ones.
-  struct Pick { int index; JsonObject f; };
-  static Pick picks[kBkaMaxTracks];
-  int np = 0;
+  int tracks = 0;
   char codec[16] = "";
-  for (JsonObject f : media["audioFiles"].as<JsonArray>()) {
-    if ((f["exclude"] | false) || (f["invalid"] | false)) continue;
-    if (np >= kBkaMaxTracks) break;
-    const char* mime = f["mimeType"] | "";
-    const char* cdc = f["codec"] | "";
-    const char* ext = f["metadata"]["ext"] | "";
+  for (JsonObject t : doc["audioTracks"].as<JsonArray>()) {
+    if (tracks >= kBkaMaxTracks) break;
+    const char* mime = t["mimeType"] | "";
+    const char* cdc = t["codec"] | "";
     const bool mp3 = strcasecmp(mime, "audio/mpeg") == 0 || strcasecmp(mime, "audio/mp3") == 0 ||
-                     strcasecmp(cdc, "mp3") == 0 || strcasecmp(ext, ".mp3") == 0;
-    if (!mp3) { bkCopy(codec, sizeof codec, cdc[0] ? cdc : (ext[0] ? ext + (ext[0] == '.') : mime)); break; }
-    picks[np++] = { f["index"] | np, f };
+                     strcasecmp(cdc, "mp3") == 0;
+    if (!mp3) { bkCopy(codec, sizeof codec, cdc[0] ? cdc : mime); break; }
+    BkaTrack& o = s_bka_tracks[tracks++];
+    bkCopy(o.url, sizeof o.url, t["contentUrl"] | "");
+    o.start = t["startOffset"] | 0.0;
+    o.dur = t["duration"] | 0.0;
+    o.size = 0;
+    o.local = false;
   }
-  if (codec[0] || np == 0) {
+  if (codec[0] || tracks == 0) {
     snprintf(s_bk_job_msg, sizeof s_bk_job_msg, "%s audio is not supported yet: MP3 only", codec[0] ? codec : "This");
     if (codec[0]) for (char* c = s_bk_job_msg; *c && *c != ' '; ++c) if (*c >= 'a' && *c <= 'z') *c -= 32;
     return;
   }
-  for (int i = 1; i < np; ++i)
-    for (int j = i; j > 0 && picks[j].index < picks[j - 1].index; --j) { Pick t = picks[j]; picks[j] = picks[j - 1]; picks[j - 1] = t; }
-  double at = 0;
-  for (int i = 0; i < np; ++i) {
-    BkaTrack& o = s_bka_tracks[i];
-    snprintf(o.url, sizeof o.url, "/api/items/%s/file/%s", s_bk_job_arg, (const char*)(picks[i].f["ino"] | ""));
-    o.start = at;
-    o.dur = picks[i].f["duration"] | 0.0;
-    o.size = 0;
-    o.local = false;
-    at += o.dur;
-  }
-  s_bka_track_count = np;
+  s_bka_track_count = tracks;
   s_bka_chapter_count = 0;
-  for (JsonObject c : media["chapters"].as<JsonArray>()) {
+  for (JsonObject c : doc["chapters"].as<JsonArray>()) {
     if (s_bka_chapter_count >= kBkaMaxChapters) break;
     BkaChapter& o = s_bka_chapters[s_bka_chapter_count++];
     o.start = c["start"] | 0.0;
     o.end = c["end"] | 0.0;
     bkCopy(o.title, sizeof o.title, c["title"] | "");
   }
-  s_bka_session[0] = 0;   // no server session: progress goes to /api/me/progress
+  bkCopy(s_bka_session, sizeof s_bka_session, doc["id"] | "");
   bkCopy(s_bka_item, sizeof s_bka_item, s_bk_job_arg);
-  bkCopy(s_bka_title, sizeof s_bka_title, media["metadata"]["title"] | s_bk_job_arg2);
-  bkCopy(s_bka_author, sizeof s_bka_author, media["metadata"]["authorName"] | "");
-  s_bka_duration = media["duration"] | at;
-  if (s_bka_duration <= 0) s_bka_duration = at;
-  // Where this user is in it.
-  s_bka_time = 0;
-  snprintf(path, sizeof path, "/api/me/progress/%s", s_bk_job_arg);
-  JsonDocument pf(&s_bk_json_alloc);
-  pf["currentTime"] = true; pf["isFinished"] = true;
-  JsonDocument pd(&s_bk_json_alloc);
-  if (bkGetJson(path, pf, pd) == 200 && !(pd["isFinished"] | false)) s_bka_time = pd["currentTime"] | 0.0;
-  if (s_bka_time >= s_bka_duration - 1) s_bka_time = 0;
+  bkCopy(s_bka_title, sizeof s_bka_title, doc["displayTitle"] | s_bk_job_arg2);
+  bkCopy(s_bka_author, sizeof s_bka_author, doc["displayAuthor"] | "");
+  s_bka_duration = doc["duration"] | 0.0;
+  if (s_bka_duration <= 0) s_bka_duration = s_bka_tracks[tracks - 1].start + s_bka_tracks[tracks - 1].dur;
+  s_bka_time = doc["currentTime"] | 0.0;
+  if (s_bka_time >= s_bka_duration - 1) s_bka_time = 0;   // finished before: from the start
   s_bk_job_ok = true;
 }
 
