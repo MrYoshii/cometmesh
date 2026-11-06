@@ -30558,10 +30558,10 @@ static void readerFetchTaskFn(void*) {
                                      text_mode ? &txt_size : nullptr, text_mode ? &txt_at : nullptr);
       source_ok = local_result == ReaderLocalResult::Ok;
     } else {
+      WiFiClientSecure scli; WiFiClient pcli; bool began;   // before the HTTPClient: ~HTTPClient may stop() its client
       HTTPClient httpc;
       httpc.setReuse(false); httpc.setConnectTimeout(9000); httpc.setTimeout(15000);
       httpc.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS); httpc.setUserAgent("wadamesh-reader");
-      WiFiClientSecure scli; WiFiClient pcli; bool began;
       if (https) { scli.setInsecure(); began = httpc.begin(scli, url); }
       else       {                       began = httpc.begin(pcli, url); }
       if (began) { httpc.addHeader("Accept-Encoding", "identity"); code = httpc.GET(); }

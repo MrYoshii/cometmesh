@@ -41,6 +41,21 @@
 // during the burst the guard exists to cover, which panics and loses the
 // unflushed chat history rebootDevice() was written to save).
 inline std::atomic<int>& _wdtHeavyDepth() { static std::atomic<int> d{0}; return d; }
+#if ESP_IDF_VERSION_MAJOR >= 5
+// IDF 5: Arduino's disableCore0WDT() takes IDLE0 off the watchdog but leaves the
+// watchdog's idle hook in place, which then logs "esp_task_wdt_reset(707): task not
+// found" on every idle pass of the burst. Reconfiguring the watchdog without idle
+// checks removes hook and subscription together; the same call puts both back.
+inline void _wdtIdleCore0(bool watched) {
+  const esp_task_wdt_config_t cfg = {
+      .timeout_ms = CONFIG_ESP_TASK_WDT_TIMEOUT_S * 1000,
+      .idle_core_mask = watched ? 1u : 0u,
+      .trigger_panic = true};
+  esp_task_wdt_reconfigure(&cfg);
+}
+#define disableCore0WDT() _wdtIdleCore0(false)
+#define enableCore0WDT() _wdtIdleCore0(true)
+#endif
 inline void wdtHeavyBegin() {
   if (_wdtHeavyDepth().fetch_add(1, std::memory_order_acq_rel) == 0) disableCore0WDT();
 }

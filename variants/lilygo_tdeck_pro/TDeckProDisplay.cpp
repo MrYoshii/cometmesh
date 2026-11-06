@@ -140,7 +140,14 @@ bool TDeckProDisplay::begin() {
 
   Wire.begin(PIN_BOARD_SDA, PIN_BOARD_SCL, 400000);
   resetTouch();
-  _touch_is_cst3530 = probeCst3530();
+  // The controller may still be starting up after its reset (on the Max an XL9555 line
+  // pulsed in board.begin()): a probe in that window gets a NACK and the touch would be
+  // reported missing for the whole session. Ask a few times before deciding.
+  _touch_is_cst3530 = false;
+  for (int attempt = 0; attempt < 5 && !_touch_is_cst3530; ++attempt) {
+    if (attempt) delay(20);
+    _touch_is_cst3530 = probeCst3530();
+  }
   if (_touch_is_cst3530) {
     pinMode(PIN_TOUCH_INT, INPUT_PULLUP);
     _touch_ready = initCst3530();

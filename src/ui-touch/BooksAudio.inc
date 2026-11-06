@@ -169,7 +169,7 @@ static void bkaReaderRun() {
     uint32_t from = 0;
     if (resume_at != UINT32_MAX) from = resume_at;
     else if (t_in_track > 0.5 && tr.size && tr.dur > 0) from = (uint32_t)((double)tr.size * (t_in_track / tr.dur));
-    HTTPClient http; WiFiClientSecure tls; WiFiClient plain;
+    WiFiClientSecure tls; WiFiClient plain; HTTPClient http;   // clients first (see bkHttp)
     uint32_t total = 0;
     int code = 0;
     File lf;

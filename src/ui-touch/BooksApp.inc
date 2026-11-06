@@ -345,6 +345,11 @@ static int bkHttp(const char* method, const char* url, const char* payload, bool
                   const char* extra_header, uint8_t** body, size_t* len, File* sink) {
   if (body) *body = nullptr;
   if (len) *len = 0;
+  // The clients before the HTTPClient: locals die in reverse order, and ~HTTPClient calls
+  // stop() on its client when the server had already closed the link (HTTPClient::end()
+  // leaves _client set then). Declared after it, the client is gone by then: a write into
+  // freed heap (seen as a crash in malloc after an Audiobookshelf login over plain HTTP).
+  WiFiClientSecure tls; WiFiClient plain;
   HTTPClient http;
   http.setReuse(false);
   http.setConnectTimeout(9000);
@@ -352,7 +357,6 @@ static int bkHttp(const char* method, const char* url, const char* payload, bool
   http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
   http.setUserAgent("comet-books");
   http.useHTTP10(true);   // no chunked replies: the body is read straight off the stream
-  WiFiClientSecure tls; WiFiClient plain;
   const bool https = strncasecmp(url, "https://", 8) == 0;
   bool began;
   if (https) { tls.setInsecure(); began = http.begin(tls, url); }
@@ -662,13 +666,13 @@ static int bkReqJson(const char* method, const char* path, const char* payload,
   for (int attempt = 0; attempt < 2; ++attempt) {
     char url[200];
     bkUrl(url, sizeof url, path);
+    WiFiClientSecure tls; WiFiClient plain;   // before the HTTPClient (see bkHttp)
     HTTPClient http;
     http.setReuse(false);
     http.setConnectTimeout(9000);
     http.setTimeout(20000);
     http.useHTTP10(true);
     http.setUserAgent("comet-books");
-    WiFiClientSecure tls; WiFiClient plain;
     const bool https = strncasecmp(url, "https://", 8) == 0;
     if (https) { tls.setInsecure(); if (!http.begin(tls, url)) return HTTPC_ERROR_CONNECTION_REFUSED; }
     else if (!http.begin(plain, url)) return HTTPC_ERROR_CONNECTION_REFUSED;
@@ -1335,7 +1339,7 @@ static void bkdTaskFn(void*) {
       if (st != BkdOpen) { ok = false; break; }        // the UI side said why
       // Fetched the way the player streams (a Range request, which the server and any
       // proxy in front of it answer at once), continuing a .part where it stopped.
-      HTTPClient http; WiFiClientSecure tls; WiFiClient plain;
+      WiFiClientSecure tls; WiFiClient plain; HTTPClient http;   // clients first (see bkHttp)
       uint32_t total = 0;
       int code = 0;
       if (!bkaOpen(http, tls, plain, s_bka_tracks[i], have, &total, &code)) {
