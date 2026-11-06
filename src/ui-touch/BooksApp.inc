@@ -1127,10 +1127,14 @@ static void bkdTaskFn(void*) {
           const uint32_t now = millis();
           if (now - log_at >= 10000) {
             const uint32_t dt = now - log_at;
-            Serial.printf("[bkd] net %u KB/s, card %u KB/s (slowest tick %u ms), ring %u KB, int free %u\n",
+            Serial.printf("[bkd] net %u KB/s, card %u KB/s (slowest tick %u ms), ring %u KB, int free %u "
+                          "(largest %u, low %u), stack left %u\n",
                           (unsigned)(net_bytes / dt), (unsigned)(s_bkd_card_bytes / dt), (unsigned)s_bkd_tick_max,
                           (unsigned)((s_bkd_head - s_bkd_tail) / 1024),
-                          (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+                          (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+                          (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+                          (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+                          (unsigned)uxTaskGetStackHighWaterMark(nullptr));
             log_at = now; net_bytes = 0; s_bkd_card_bytes = 0; s_bkd_tick_max = 0;
           }
           if (now - win_start >= 5000) {

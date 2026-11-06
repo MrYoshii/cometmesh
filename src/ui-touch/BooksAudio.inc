@@ -323,11 +323,14 @@ static void bkaDecoderRun() {
     if (millis() - log_at >= 10000) {
       const uint32_t dt = millis() - log_at;
       Serial.printf("[bka] fetch %u KB/s (book %u kbit/s), ring %u KB, underruns %u, slow writes %u (max %u ms), "
-                    "decode max %u ms, dry %u (longest gap %u.%u ms), int free %u\n",
+                    "decode max %u ms, dry %u (longest gap %u.%u ms), int free %u (largest %u), stack left %u/%u\n",
                     (unsigned)(s_bka_fetched / (dt ? dt : 1)), (unsigned)kbps, (unsigned)(bkaRingUsed() / 1024),
                     (unsigned)underruns, (unsigned)slow_writes, (unsigned)max_write_ms, (unsigned)max_dec_ms,
                     (unsigned)dry, (unsigned)(max_gap_us / 1000), (unsigned)(max_gap_us % 1000 / 100),
-                    (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+                    (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+                    (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+                    (unsigned)(s_bka_reader_task ? uxTaskGetStackHighWaterMark(s_bka_reader_task) : 0),
+                    (unsigned)uxTaskGetStackHighWaterMark(nullptr));
       s_bka_fetched = 0; log_at = millis();
       underruns = slow_writes = max_write_ms = max_dec_ms = 0;
       dry = max_gap_us = 0;
