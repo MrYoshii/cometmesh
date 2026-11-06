@@ -51901,7 +51901,18 @@ static void lockscreenUpdateClock() {
 #endif
 #if defined(HAS_TDECK_MAX)
   if (s_lock_left) {
-    char l[48];
+    char l[112];
+#if defined(CAP_BOOKS) && CAP_LUA_AUDIO
+    // An audiobook playing: what and where, in place of the battery estimate.
+    if (s_bka_item[0] && booksAudioRunning()) {
+      char t[16];
+      const unsigned p = (unsigned)booksAudioPos();
+      if (p >= 3600) snprintf(t, sizeof t, "%u:%02u:%02u", p / 3600, (p / 60) % 60, p % 60);
+      else snprintf(t, sizeof t, "%u:%02u", p / 60, p % 60);
+      snprintf(l, sizeof l, LV_SYMBOL_AUDIO " %.40s%s \xc2\xb7 %s", s_bka_title,
+               strlen(s_bka_title) > 40 ? "\xe2\x80\xa6" : "", t);
+    } else
+#endif
     maxLockTimeLeft(l, sizeof l);
     lv_label_set_text(s_lock_left, l);
   }
@@ -55282,7 +55293,7 @@ static void handleHwKey(int key) {
 #if defined(CAP_BOOKS)
   // The Books reader turns pages from the keyboard (not while locked or dark: those
   // keys wake and unlock, below).
-  if (booksReaderOpen() && !(g_lv.task && (g_lv.task->isManualLock() || g_lv.task->isScreenOff())) &&
+  if (booksWantsKeys() && !(g_lv.task && (g_lv.task->isManualLock() || g_lv.task->isScreenOff())) &&
       booksReaderKey(key)) {
     if (g_lv.task) g_lv.task->noteUserInput();
     return;

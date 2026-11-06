@@ -140,6 +140,8 @@ static lv_obj_t*   s_bka_play_lbl = nullptr;
 static lv_timer_t* s_bka_timer = nullptr;       // runs while a session is loaded, page open or not
 static volatile bool s_bka_sd_busy = false;     // the engine is reading a track from the card
 static lv_obj_t*   s_bka_dl_lbl = nullptr;      // the player's download button label
+static lv_obj_t*   s_bka_vol_lbl = nullptr;     // the player's volume readout
+static void        booksVolumeStep(int d);
 
 // The playback engine (BooksAudio.inc, after the shared audio sink it uses).
 static bool        booksAudioPlayFrom(double t);   // (re)start at t seconds into the book
@@ -925,8 +927,11 @@ static char s_bkd_msg[64] = "";
 static char s_bkd_dir[40] = "";
 static char s_bkd_item[48] = "";
 
+static bool bkaOpen(HTTPClient& http, WiFiClientSecure& tls, WiFiClient& plain, const BkaTrack& tr,
+                    uint32_t from, uint32_t* total, int* code_out);   // BooksAudio.inc
 static void bkdTaskFn(void*) {
-  fs::FS* fs = booksFs();
+  uint8_t* buf = (uint8_t*)heap_caps_malloc(4096, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  fs::FS* fs = buf ? booksFs() : nullptr;
   const int n = s_bkd_tracks;
   bool ok = fs != nullptr;
   if (!ok) snprintf(s_bkd_msg, sizeof s_bkd_msg, "Insert an SD card to download");
@@ -943,19 +948,58 @@ static void bkdTaskFn(void*) {
     }
     char part[72];
     snprintf(part, sizeof part, "%s.part", path);
-    File f = fs->open(part, FILE_WRITE);
-    if (!f) { snprintf(s_bkd_msg, sizeof s_bkd_msg, "Cannot write to the SD card"); ok = false; break; }
-    const int code = bkAuthed("GET", s_bka_tracks[i].url, nullptr, nullptr, nullptr, &f);
-    f.flush();
-    const uint32_t got = s_bk_dl_got;
-    f.close();
-    if (code != 200 || !got) {
-      fs->remove(part);
-      if (code == HTTPC_ERROR_STREAM_WRITE) snprintf(s_bkd_msg, sizeof s_bkd_msg, "The SD card is full");
-      else snprintf(s_bkd_msg, sizeof s_bkd_msg, "Track %d failed (%d)", i + 1, code);
+    // Fetched the way the player streams (a Range request, which the server and any
+    // proxy in front of it answer at once), into a .part that a retry continues.
+    uint32_t have = 0;
+    if (fs->exists(part)) { File e = fs->open(part, FILE_READ); if (e) { have = (uint32_t)e.size(); e.close(); } }
+    bool track_ok = false;
+    for (int attempt = 0; attempt < 6 && !s_bkd_cancel && !track_ok; ++attempt) {
+      if (attempt) vTaskDelay(pdMS_TO_TICKS(1500 * attempt));
+      HTTPClient http; WiFiClientSecure tls; WiFiClient plain;
+      uint32_t total = 0;
+      int code = 0;
+      if (!bkaOpen(http, tls, plain, s_bka_tracks[i], have, &total, &code)) {
+        if (code == 401) bkRefresh();
+        snprintf(s_bkd_msg, sizeof s_bkd_msg, "Track %d failed (%d)", i + 1, code);
+        Serial.printf("[books] download track %d: open failed %d (from %u)\n", i + 1, code, (unsigned)have);
+        continue;
+      }
+      if (code == 200 && have) have = 0;   // the range was ignored: from the start
+      File f = fs->open(part, have ? FILE_APPEND : FILE_WRITE);
+      if (!f) { http.end(); snprintf(s_bkd_msg, sizeof s_bkd_msg, "Cannot write to the SD card"); attempt = 99; break; }
+      WiFiClient* stream = http.getStreamPtr();
+      uint32_t pos = have, idle_since = millis();
+      s_bk_dl_total = total; s_bk_dl_got = pos;
+      bool write_failed = false;
+      while (!s_bkd_cancel) {
+        if (total && pos >= total) break;
+        const int avail = stream ? stream->available() : 0;
+        if (avail <= 0) {
+          if (!stream || !stream->connected()) break;
+          if (millis() - idle_since > 30000) break;
+          vTaskDelay(pdMS_TO_TICKS(5));
+          continue;
+        }
+        const int n = stream->read(buf, avail < 4096 ? avail : 4096);
+        if (n <= 0) continue;
+        if (f.write(buf, (size_t)n) != (size_t)n) { write_failed = true; break; }
+        pos += (uint32_t)n;
+        s_bk_dl_got = pos;
+        idle_since = millis();
+      }
+      f.close();
+      http.end();
+      if (write_failed) { snprintf(s_bkd_msg, sizeof s_bkd_msg, "The SD card is full"); attempt = 99; break; }
+      have = pos;
+      if ((total && pos >= total) || (!total && pos > 0)) track_ok = true;
+      else Serial.printf("[books] download track %d: broke off at %u of %u, retrying\n", i + 1, (unsigned)pos, (unsigned)total);
+    }
+    if (!track_ok) {
+      if (!s_bkd_msg[0]) snprintf(s_bkd_msg, sizeof s_bkd_msg, "Track %d failed", i + 1);
       ok = false;
       break;
     }
+    s_bkd_msg[0] = 0;
     fs->rename(part, path);
   }
   if (ok && s_bkd_cancel) { snprintf(s_bkd_msg, sizeof s_bkd_msg, "Download stopped"); ok = false; }
@@ -982,6 +1026,7 @@ static void bkdTaskFn(void*) {
     else { snprintf(s_bkd_msg, sizeof s_bkd_msg, "Cannot write to the SD card"); ok = false; }
   }
   if (ok) snprintf(s_bkd_msg, sizeof s_bkd_msg, "On the SD card: plays offline");
+  if (buf) heap_caps_free(buf);
   s_bkd_ok = ok;
   s_bkd_done = true;
   s_bkd_active = false;
@@ -989,11 +1034,17 @@ static void bkdTaskFn(void*) {
   vTaskDelete(nullptr);
 }
 
+static void booksAudioPause();
 static void booksAudioDownloadStart() {
   if (s_bkd_active || !s_bka_item[0] || s_bka_local) return;
   if (!booksFs()) { if (g_lv.task) g_lv.task->showAlert(TR("Insert an SD card to download"), 1800); return; }
   if (WiFi.status() != WL_CONNECTED) { if (g_lv.task) g_lv.task->showAlert(TR("Connect to Wi-Fi first"), 1600); return; }
   if (s_bk_job == BkJob::Download) { if (g_lv.task) g_lv.task->showAlert(TR("A book is still downloading"), 1600); return; }
+  // One connection at a time: a stream beside the download starved both.
+  if (booksAudioRunning()) {
+    booksAudioPause();
+    if (g_lv.task) g_lv.task->showAlert(TR("Paused while it downloads"), 1600);
+  }
   bkAudioDirFor(s_bka_item, s_bkd_dir, sizeof s_bkd_dir);
   bkCopy(s_bkd_item, sizeof s_bkd_item, s_bka_item);
   s_bkd_tracks = s_bka_track_count;
@@ -1092,9 +1143,12 @@ static void booksClosePage() {
   s_bk_body = s_bk_status = s_bk_user_ta = s_bk_pass_ta = s_bk_server_ta = nullptr;
   s_bk_text_lbl = s_bk_foot = s_bk_menu = nullptr;
   s_bka_lbl_time = s_bka_lbl_chapter = s_bka_lbl_state = s_bka_bar = s_bka_play_lbl = s_bka_dl_lbl = nullptr;
+  s_bka_vol_lbl = nullptr;
 }
 
 static bool booksReaderOpen() { return s_bk_root && s_bk_view == BkView::Reader && s_bk_text_lbl; }
+// The keyboard goes to Books while a book or the player is up.
+static bool booksWantsKeys() { return booksReaderOpen() || (s_bk_root && s_bk_view == BkView::Player); }
 
 // Back from the reader goes to the shelf; from the shelf or the server tab it closes Books.
 static bool booksBackStep() {
@@ -1845,7 +1899,15 @@ static void booksPageTapCb(lv_event_t* e) {
 
 // Keyboard: n / j / Enter / right / down turn forward; b / p / k / Backspace /
 // left / up turn back; + and - change the size; m opens the menu.
+static void booksPlayerBtnCb(lv_event_t* e);
 static bool booksReaderKey(int key) {
+  if (s_bk_root && s_bk_view == BkView::Player) {   // the player: volume and seeking
+    switch (key) {
+      case '+': case '=': booksVolumeStep(10); return true;
+      case '-': booksVolumeStep(-10); return true;
+      default: return false;
+    }
+  }
   if (!booksReaderOpen()) return false;
   switch (key) {
     // Not Space: holding it locks the screen, and its press would turn a page first.
@@ -2056,6 +2118,20 @@ static void booksPlayerBtnCb(lv_event_t* e) {
   booksPlayerRefresh();
 }
 
+// Volume, right in the player: the system volume (as in the quick panel), applied live.
+static void booksVolumeStep(int d) {
+  int v = (int)touchPrefsGetSoundVolume() + d;
+  if (v < 0) v = 0;
+  if (v > 100) v = 100;
+  touchPrefsSetSoundVolume((uint8_t)v);
+  if (booksAudioRunning()) maxSetVolume(v);
+  if (s_bka_vol_lbl) lv_label_set_text_fmt(s_bka_vol_lbl, "%d%%", v);
+}
+static void booksVolumeBtnCb(lv_event_t* e) {
+  if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+  booksVolumeStep((int)(intptr_t)lv_event_get_user_data(e));
+}
+
 // Download for offline / stop the download; on a card copy it only says so.
 static void booksDownloadBtnCb(lv_event_t* e) {
   if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
@@ -2090,6 +2166,16 @@ static void booksBuildPlayer() {
   lv_obj_set_style_bg_color(s_bka_bar, lv_color_hex(COLOR_TEXT), LV_PART_INDICATOR);
   s_bka_lbl_time = booksLabel(s_bk_body, "", &g_font_16, COLOR_TEXT);
   lv_obj_set_pos(s_bka_lbl_time, 10, 146);
+  // Volume on the time row's right: [-] 60% [+]
+  lv_obj_t* vp = booksButton(s_bk_body, "+", booksVolumeBtnCb, (void*)(intptr_t)10, 30, 26);
+  lv_obj_set_pos(vp, w - 36, 144);
+  s_bka_vol_lbl = booksLabel(s_bk_body, "", &g_font_12, COLOR_TEXT);
+  lv_obj_set_width(s_bka_vol_lbl, 36);
+  lv_obj_set_style_text_align(s_bka_vol_lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+  lv_obj_set_pos(s_bka_vol_lbl, w - 76, 150);
+  lv_label_set_text_fmt(s_bka_vol_lbl, "%d%%", (int)touchPrefsGetSoundVolume());
+  lv_obj_t* vm = booksButton(s_bk_body, "-", booksVolumeBtnCb, (void*)(intptr_t)-10, 30, 26);
+  lv_obj_set_pos(vm, w - 110, 144);
   s_bka_lbl_state = booksLabel(s_bk_body, "", &g_font_12, COLOR_SUB);
   lv_label_set_long_mode(s_bka_lbl_state, LV_LABEL_LONG_DOT);
   lv_obj_set_width(s_bka_lbl_state, w - 20);
@@ -2194,6 +2280,7 @@ static void booksShowView(BkView v) {
   s_bk_status = s_bk_user_ta = s_bk_pass_ta = s_bk_server_ta = nullptr;
   s_bk_text_lbl = s_bk_foot = nullptr;
   s_bka_lbl_time = s_bka_lbl_chapter = s_bka_lbl_state = s_bka_bar = s_bka_play_lbl = s_bka_dl_lbl = nullptr;
+  s_bka_vol_lbl = nullptr;
   s_bk_view = v;
   // The bar first: the reader slims it, the shelf has the tall "< Books" row.
   if (v == BkView::Reader) appPageBeginSlim(s_bk_page_title, booksClosePage);
