@@ -1,0 +1,84 @@
+name: idf
+
+# Comet on ESP-IDF 5.5 (idf/): the new framework base. Started by hand only
+# (Actions -> idf -> Run workflow), so nothing builds on a push by itself.
+# Artifacts per board:
+#   comet.bin              app, flash at 0x10000 (keeps settings)
+#   ota_data_initial.bin   flash at 0xe000 with it, so the device boots that slot
+#   bootloader.bin, partition-table.bin, flash_args   for a first install
+
+on:
+  workflow_dispatch:
+    inputs:
+      boards:
+        description: 'Which boards'
+        type: choice
+        default: tdeck_max
+        options: [tdeck_max]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: espressif/idf:v5.5.1
+    strategy:
+      fail-fast: false
+      matrix:
+        board: ${{ fromJSON(format('["{0}"]', inputs.boards)) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dependencies
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          idf/fetch-deps.sh
+
+      - name: Build
+        shell: bash
+        run: |
+          . "$IDF_PATH/export.sh" > /dev/null
+          unset WIFI_SSID WIFI_PWD
+          export COMET_FW_TAG="dev-${GITHUB_SHA::7}"
+          idf/build.sh "${{ matrix.board }}" build 2>&1 | tee build.log
+          exit ${PIPESTATUS[0]}
+
+      - name: Size
+        if: success()
+        shell: bash
+        run: |
+          . "$IDF_PATH/export.sh" > /dev/null
+          idf/build.sh "${{ matrix.board }}" size | tee -a build.log
+
+      - name: Report compiler errors
+        if: failure()
+        shell: bash
+        run: |
+          grep -E "(error|Error)[: ]" build.log | head -40 | while IFS= read -r l; do
+            echo "::error::${l//%/%25}"
+          done
+
+      - name: Collect
+        if: success()
+        shell: bash
+        run: |
+          B="build/idf-${{ matrix.board }}"
+          mkdir -p out
+          cp "$B/comet.bin" "$B/ota_data_initial.bin" "$B/bootloader/bootloader.bin" \
+             "$B/partition_table/partition-table.bin" "$B/flash_args" "$B/comet.elf" out/
+
+      - name: Upload firmware
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: comet-idf-${{ matrix.board }}-${{ github.sha }}
+          path: out/
+          if-no-files-found: error
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: log-idf-${{ matrix.board }}-${{ github.sha }}
+          path: build.log

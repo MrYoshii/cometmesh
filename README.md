@@ -51,7 +51,8 @@ More boards will follow once the multi-mesh core is in place.
 - **Multi-mesh**: MeshCore and Meshtastic on one radio, with a selector for the
   active mesh
 - **Modem (T-Deck Max)**: SMS, voice calls and mobile data on the A7682E
-- **Own framework build**: Wi-Fi, network and TLS buffers in PSRAM for far more
+- **New framework base** (in progress, [idf/](idf/)): ESP-IDF 5.5 with
+  arduino-esp32 3.3, with network and TLS buffers sized and placed for far more
   free internal RAM and faster transfers
 - **USB mass storage**: the SD card as a drive on your computer
 - **More boards**
@@ -77,6 +78,12 @@ libraries:
 ```bash
 pio run -e LilyGo_TDeck_Max_companion_radio_touch
 pio run -e tlora_pager_sx1262_companion_radio_touch
+```
+
+The ESP-IDF 5.5 build that will replace it lives in [idf/](idf/README.md):
+
+```bash
+idf/fetch-deps.sh && idf/build.sh tdeck_max
 ```
 
 ## Credits
