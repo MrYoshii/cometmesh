@@ -1,0 +1,4 @@
+# Test fragment: no L2->L3 copy, 32 KB TCP windows (fits two idle sockets in 64 RX buffers).
+CONFIG_LWIP_L2_TO_L3_COPY=n
+CONFIG_LWIP_TCP_WND_DEFAULT=32768
+CONFIG_LWIP_TCP_SND_BUF_DEFAULT=32768

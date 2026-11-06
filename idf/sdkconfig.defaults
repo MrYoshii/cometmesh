@@ -70,6 +70,13 @@ CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL=y
 CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y
 
 # ---- Wi-Fi and TCP: sized for downloads (2.0.17: 5760-byte windows, ~130 KB/s) ----
+# Wi-Fi hands every received frame to lwIP in its own RX buffer and gets it back only once
+# the app has read the data. A socket nobody reads (a parked audiobook stream, a stalled
+# download) then sits on a full window of them: at 64 KB that is about 45 buffers, the Wi-Fi
+# driver runs out, and nothing at all is received any more, DNS included, while the link
+# still shows connected. Copying each frame into a heap pbuf (in PSRAM) returns the Wi-Fi
+# buffer at once, so big windows are safe.
+CONFIG_LWIP_L2_TO_L3_COPY=y
 CONFIG_LWIP_TCP_WND_DEFAULT=65535
 CONFIG_LWIP_TCP_SND_BUF_DEFAULT=65535
 CONFIG_LWIP_TCP_RECVMBOX_SIZE=64
