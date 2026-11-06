@@ -31011,6 +31011,7 @@ static void openReaderPage(const char* initial_url = nullptr) {
 }
 #endif  // Reader
 
+#include "Mp3Info.h"     // Books: the length of copied MP3s
 #include "BooksApp.inc"   // Apps > Books: the T-Deck Max e-reader (EPUB/TXT + Audiobookshelf)
 
 // Back on an app page (the bar's chevron, Esc/Back keys): normally closes the page, but
@@ -83073,6 +83074,7 @@ static bool sdRuntimeLifecycleBusy() {
 #if defined(CAP_BOOKS)
   busy = busy || s_bk_sd_busy || s_bk_dl_busy;   // an open book, the shelf index, a download
   busy = busy || s_bka_sd_busy || s_bkd_active;  // an audiobook playing from / downloading to the card
+  busy = busy || s_bki_active;                    // a copied audiobook folder being imported
 #endif
 #if defined(HAS_TDECK_GT911) || defined(TLORA_PAGER) || defined(HAS_TDECK_MAX)
   busy = busy || s_notify_playing;

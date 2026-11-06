@@ -113,7 +113,7 @@ static float s_bk_job_progress = 0.f;
 static TaskHandle_t s_bk_task = nullptr;
 
 // ---- audiobooks: the session (BkJob::OpenSession fills it; BooksAudio.inc plays it) ----
-struct BkaTrack   { char url[176]; double start; double dur; uint32_t size; bool local; };   // url: server path, or a card path when local
+struct BkaTrack   { char url[256]; double start; double dur; uint32_t size; bool local; };   // url: server path, or a card path when local
 struct BkaChapter { double start; double end; char title[56]; };
 static const int kBkaMaxTracks = 400;
 static const int kBkaMaxChapters = 400;
@@ -838,12 +838,16 @@ static void booksShowView(BkView v);
 // ---- audiobooks on the card: /books/audio/<id hash>/ holds the MP3 tracks, book.json
 // (what the player needs: tracks, chapters, durations) and pos.json (where it was, and
 // whether the server has heard about it yet). ----
-struct BkAudioBook { char dir[40]; char item[48]; char title[80]; char author[48]; };
+// dir: a downloaded book's /books/audio/<hash>, or a folder copied there by hand (USB
+// Files, the card in a PC), whose name can be long. importing: such a folder whose
+// book.json is still being made (booksImportStep).
+static const size_t kBkDirMax = 160;
+struct BkAudioBook { char dir[kBkDirMax]; char item[48]; char title[80]; char author[48]; bool importing; };
 static const int kBkMaxAudio = 30;
 static BkAudioBook* s_bk_aud = nullptr;   // PSRAM [kBkMaxAudio]
 static int s_bk_aud_count = 0;
 static bool s_bka_local = false;          // the loaded book plays from the card
-static char s_bka_dir[40] = "";           // its folder there
+static char s_bka_dir[kBkDirMax] = "";    // its folder there
 static bool s_bka_dirty = false;          // listened offline, not reported yet
 
 static void bkAudioDirFor(const char* item, char* out, size_t cap) {
@@ -852,7 +856,18 @@ static void bkAudioDirFor(const char* item, char* out, size_t cap) {
   snprintf(out, cap, "/books/audio/%08lx", (unsigned long)h);
 }
 
-// Every downloaded audiobook on the card (read when the shelf is built).
+// A book copied onto the card by hand gets an id of its own: never sent to a server.
+static bool bkIsLocalId(const char* id) { return strncmp(id, "local:", 6) == 0; }
+
+static bool bkIsMp3(const char* name) {
+  const char* dot = strrchr(name, '.');
+  return name[0] != '.' && dot && strcasecmp(dot, ".mp3") == 0;   // not macOS "._x.mp3"
+}
+
+static void booksImportQueue(const char* dir);   // below
+
+// Every audiobook on the card (read when the shelf is built): downloaded ones, and
+// folders of MP3s copied to /books/audio, which are imported the first time they show up.
 static void booksScanAudio() {
   s_bk_aud_count = 0;
   fs::FS* fs = booksFs();
@@ -863,20 +878,44 @@ static void booksScanAudio() {
   s_bk_sd_busy = true;
   File root = fs->open("/books/audio");
   // FAT lists the book folders; a flat store (SPIFFS on the host) lists their files.
-  auto adopt = [&](const char* name) {   // name: the folder under /books/audio
+  // mp3_seen: a flat entry that is itself an MP3 (FAT folders are looked into instead).
+  auto adopt = [&](const char* name, bool mp3_seen) {   // name: the folder under /books/audio
     if (s_bk_aud_count >= kBkMaxAudio || !name[0]) return;
-    char dir[40];
-    snprintf(dir, sizeof dir, "/books/audio/%s", name);
+    char dir[kBkDirMax];
+    if (snprintf(dir, sizeof dir, "/books/audio/%s", name) >= (int)sizeof dir) return;
     for (int k = 0; k < s_bk_aud_count; ++k) if (strcmp(s_bk_aud[k].dir, dir) == 0) return;
-    char path[80];
+    char path[kBkDirMax + 16];
     snprintf(path, sizeof path, "%s/book.json", dir);
     File m = fs->open(path, FILE_READ);
-    if (!m) return;
+    if (!m) {
+      // No manifest: a folder of MP3s copied here is a book to import.
+      bool mp3 = mp3_seen;
+      if (!mp3) {
+        File d = fs->open(dir);
+        if (d && d.isDirectory()) {
+          int looked = 0;
+          for (File e = d.openNextFile(); e && !mp3 && looked < 64; e = d.openNextFile(), ++looked) {
+            mp3 = !e.isDirectory() && bkIsMp3(e.name());
+            e.close();
+          }
+        }
+        if (d) d.close();
+      }
+      if (!mp3) return;
+      BkAudioBook& b = s_bk_aud[s_bk_aud_count++];
+      memset(&b, 0, sizeof b);
+      bkCopy(b.dir, sizeof b.dir, dir);
+      bkCopy(b.title, sizeof b.title, name);
+      b.importing = true;
+      booksImportQueue(dir);
+      return;
+    }
     JsonDocument filter(&s_bk_json_alloc);
     filter["id"] = true; filter["title"] = true; filter["author"] = true;
     JsonDocument doc(&s_bk_json_alloc);
     if (!deserializeJson(doc, m, DeserializationOption::Filter(filter))) {
       BkAudioBook& b = s_bk_aud[s_bk_aud_count++];
+      memset(&b, 0, sizeof b);
       bkCopy(b.dir, sizeof b.dir, dir);
       bkCopy(b.item, sizeof b.item, doc["id"] | "");
       bkCopy(b.title, sizeof b.title, doc["title"] | name);
@@ -889,20 +928,189 @@ static void booksScanAudio() {
       const char* full = d.path();
       if (d.isDirectory()) {
         const char* name = strrchr(d.name(), '/');
-        adopt(name ? name + 1 : d.name());
-      } else if (full && strstr(full, "/books/audio/") && strstr(full, "/book.json")) {
-        char name[24];
+        adopt(name ? name + 1 : d.name(), false);
+      } else if (full && strstr(full, "/books/audio/")) {
+        char name[kBkDirMax];
         const char* a = strstr(full, "/books/audio/") + 13;
         const char* b = strchr(a, '/');
         const size_t n = b && (size_t)(b - a) < sizeof name ? (size_t)(b - a) : 0;
         memcpy(name, a, n); name[n] = 0;
-        adopt(name);
+        if (n) adopt(name, bkIsMp3(b + 1));
       }
       d.close();
     }
   }
   if (root) root.close();
   s_bk_sd_busy = was_busy;
+}
+
+// ---- importing a folder of MP3s copied to /books/audio: list it, read each file's
+// length from its first frame (Mp3Info.h), write the book.json a download would have
+// left. On the UI task (the card is written there), a slice per timer tick. ----
+static const size_t kBkiName = 128;
+static volatile bool s_bki_active = false;          // holds the card (sdRuntimeLifecycleBusy)
+static lv_timer_t* s_bki_timer = nullptr;
+static char s_bki_dir[kBkDirMax] = "";
+static char (*s_bki_names)[kBkiName] = nullptr;     // PSRAM [kBkaMaxTracks]
+static double* s_bki_durs = nullptr;                // PSRAM [kBkaMaxTracks]
+static uint8_t* s_bki_head = nullptr;               // internal, while importing
+static int s_bki_n = 0, s_bki_i = 0;
+static uint8_t s_bki_phase = 0;                     // 0 list, 1 lengths, 2 manifest
+
+// Names in reading order: digit runs compare as numbers ("2" before "10").
+static int bkNaturalCmp(const char* a, const char* b) {
+  while (*a && *b) {
+    if (isdigit((unsigned char)*a) && isdigit((unsigned char)*b)) {
+      while (*a == '0') ++a;
+      while (*b == '0') ++b;
+      size_t la = 0, lb = 0;
+      while (isdigit((unsigned char)a[la])) ++la;
+      while (isdigit((unsigned char)b[lb])) ++lb;
+      if (la != lb) return la < lb ? -1 : 1;
+      const int c = strncmp(a, b, la);
+      if (c) return c;
+      a += la; b += lb;
+      continue;
+    }
+    const int ca = tolower((unsigned char)*a), cb = tolower((unsigned char)*b);
+    if (ca != cb) return ca < cb ? -1 : 1;
+    ++a; ++b;
+  }
+  return *a ? 1 : *b ? -1 : 0;
+}
+
+static void booksImportStep(lv_timer_t*);
+static void booksImportQueue(const char* dir) {
+  if (s_bki_active) return;   // one at a time: the next one is found by the rescan after it
+  if (!s_bki_names) s_bki_names = (char(*)[kBkiName])psAlloc(kBkiName * kBkaMaxTracks);
+  if (!s_bki_durs) s_bki_durs = (double*)psAlloc(sizeof(double) * kBkaMaxTracks);
+  if (!s_bki_head) s_bki_head = (uint8_t*)heap_caps_malloc(4096, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  if (!s_bki_names || !s_bki_durs || !s_bki_head) return;
+  bkCopy(s_bki_dir, sizeof s_bki_dir, dir);
+  s_bki_n = s_bki_i = 0;
+  s_bki_phase = 0;
+  s_bki_active = true;
+  if (!s_bki_timer) s_bki_timer = lv_timer_create(booksImportStep, 40, nullptr);
+}
+
+static void booksImportEnd(bool ok) {
+  if (s_bki_timer) { lv_timer_del(s_bki_timer); s_bki_timer = nullptr; }
+  if (s_bki_head) { heap_caps_free(s_bki_head); s_bki_head = nullptr; }
+  s_bki_active = false;
+  Serial.printf("[books] import %s: %s (%d files)\n", s_bki_dir, ok ? "done" : "failed", s_bki_n);
+  if (!ok && g_lv.task) g_lv.task->showAlert(TR("This audiobook folder could not be read"), 1800);
+  if (s_bk_root && s_bk_view == BkView::Shelf) booksShowView(BkView::Shelf);   // rescan: the next one, if any
+}
+
+static bool booksImportWrite(fs::FS* fs) {
+  const char* name = strrchr(s_bki_dir, '/');
+  name = name ? name + 1 : s_bki_dir;
+  // "Author - Title" is how such folders are usually named; otherwise all of it is the title.
+  char author[48] = "", title[80];
+  const char* sep = strstr(name, " - ");
+  if (sep && sep > name && (size_t)(sep - name) < sizeof author) {
+    memcpy(author, name, sep - name); author[sep - name] = 0;
+    bkCopy(title, sizeof title, sep + 3);
+  } else {
+    bkCopy(title, sizeof title, name);
+  }
+  uint32_t h = 2166136261u;
+  for (const char* p = s_bki_dir; *p; ++p) { h ^= (uint8_t)*p; h *= 16777619u; }
+  char id[24];
+  snprintf(id, sizeof id, "local:%08lx", (unsigned long)h);
+  JsonDocument doc(&s_bk_json_alloc);
+  doc["id"] = id; doc["title"] = title; doc["author"] = author;
+  JsonArray ta = doc["tracks"].to<JsonArray>();
+  JsonArray ca = doc["chapters"].to<JsonArray>();
+  double t = 0;
+  for (int i = 0; i < s_bki_n; ++i) {
+    JsonObject o = ta.add<JsonObject>();
+    o["f"] = s_bki_names[i]; o["start"] = t; o["dur"] = s_bki_durs[i];
+    char chap[kBkiName];
+    bkCopy(chap, sizeof chap, s_bki_names[i]);
+    char* dot = strrchr(chap, '.');
+    if (dot) *dot = 0;
+    JsonObject c = ca.add<JsonObject>();
+    c["s"] = t; c["e"] = t + s_bki_durs[i]; c["t"] = chap;
+    t += s_bki_durs[i];
+  }
+  doc["duration"] = t;
+  const size_t len = measureJson(doc);
+  char* js = (char*)bkAlloc(len + 1);
+  if (!js) return false;
+  serializeJson(doc, js, len + 1);
+  char path[kBkDirMax + 16];
+  snprintf(path, sizeof path, "%s/book.json", s_bki_dir);
+  File f = fs->open(path, FILE_WRITE);
+  bool ok = (bool)f;
+  // Through internal RAM: the card driver short-writes buffers in PSRAM.
+  for (size_t at = 0; ok && at < len; at += 4096) {
+    const size_t n = len - at < 4096 ? len - at : 4096;
+    memcpy(s_bki_head, js + at, n);
+    ok = f.write(s_bki_head, n) == n;
+  }
+  if (f) f.close();
+  bkFree(js);
+  if (!ok) fs->remove(path);
+  return ok;
+}
+
+static void booksImportStep(lv_timer_t*) {
+  fs::FS* fs = booksFs();
+  if (!fs) { booksImportEnd(false); return; }
+  if (s_bki_phase == 0) {   // the MP3s in the folder, in reading order
+    File d = fs->open(s_bki_dir);
+    const bool folder = d && d.isDirectory();
+    if (!folder && d) d.close();
+    File walk = folder ? d : fs->open("/books/audio");   // a flat store lists every file there
+    const size_t dl = strlen(s_bki_dir);
+    if (walk) {
+      for (File e = walk.openNextFile(); e && s_bki_n < kBkaMaxTracks; e = walk.openNextFile()) {
+        const char* nm = nullptr;
+        if (folder) {
+          const char* base = strrchr(e.name(), '/');
+          nm = base ? base + 1 : e.name();
+        } else if (e.path() && strncmp(e.path(), s_bki_dir, dl) == 0 && e.path()[dl] == '/') {
+          nm = e.path() + dl + 1;
+        }
+        if (nm && !e.isDirectory() && bkIsMp3(nm) && strlen(nm) < kBkiName && !strchr(nm, '/'))
+          bkCopy(s_bki_names[s_bki_n++], kBkiName, nm);
+        e.close();
+      }
+      walk.close();
+    }
+    if (!s_bki_n) { booksImportEnd(false); return; }
+    qsort(s_bki_names, s_bki_n, kBkiName, [](const void* a, const void* b) {
+      return bkNaturalCmp((const char*)a, (const char*)b);
+    });
+    s_bki_phase = 1;
+    return;
+  }
+  if (s_bki_phase == 1) {   // each file's length, as many as fit in ~60 ms
+    const uint32_t t0 = millis();
+    while (s_bki_i < s_bki_n && millis() - t0 < 60) {
+      char path[kBkDirMax + kBkiName + 2];
+      snprintf(path, sizeof path, "%s/%s", s_bki_dir, s_bki_names[s_bki_i]);
+      File f = fs->open(path, FILE_READ);
+      double dur = 0;
+      if (f) {
+        const uint32_t size = (uint32_t)f.size();
+        const size_t got = f.read(s_bki_head, 10);
+        const uint32_t tag = Mp3Info::id3v2Size(s_bki_head, got);
+        if (tag < size && (tag == 0 || f.seek(tag))) {
+          const size_t n = f.read(s_bki_head, 4096);
+          dur = Mp3Info::duration(s_bki_head, n, size - tag);
+        }
+        if (dur <= 0) dur = size * 8.0 / 128000.0;   // no frame found: a guess at 128 kbit/s
+        f.close();
+      }
+      s_bki_durs[s_bki_i++] = dur;
+    }
+    if (s_bki_i < s_bki_n) return;
+    s_bki_phase = 2;
+    return;
+  }
+  booksImportEnd(booksImportWrite(fs));
 }
 
 static int booksFindAudio(const char* item) {
@@ -914,7 +1122,7 @@ static void booksSaveAudioPos() {
   if (!s_bka_local || !s_bka_dir[0]) return;
   fs::FS* fs = booksFs();
   if (!fs) return;
-  char path[64];
+  char path[kBkDirMax + 16];
   snprintf(path, sizeof path, "%s/pos.json", s_bka_dir);
   const bool was_busy = s_bk_sd_busy;
   s_bk_sd_busy = true;
@@ -933,7 +1141,8 @@ static bool booksLoadLocalAudio(int idx) {
   if (!s_bka_chapters) s_bka_chapters = (BkaChapter*)psAlloc(sizeof(BkaChapter) * kBkaMaxChapters);
   if (!s_bka_tracks || !s_bka_chapters) return false;
   const BkAudioBook& b = s_bk_aud[idx];
-  char path[80];
+  if (b.importing) return false;
+  char path[kBkDirMax + 16];
   snprintf(path, sizeof path, "%s/book.json", b.dir);
   const bool was_busy = s_bk_sd_busy;
   s_bk_sd_busy = true;
@@ -1375,19 +1584,21 @@ static void booksDeleteAudioConfirmed() {
   // and go again until the folder is empty.
   for (int round = 0; round < 32; ++round) {
     File d = fs->open(s_bk_aud[i].dir);
-    char names[64][16];
+    // Copied folders have long file names: the batch lives in PSRAM.
+    static char (*names)[128] = nullptr;
+    if (!names) names = (char(*)[128])psAlloc(64 * 128);
     int k = 0;
-    if (d && d.isDirectory()) {
+    if (names && d && d.isDirectory()) {
       for (File e = d.openNextFile(); e && k < 64; e = d.openNextFile()) {
         const char* nm = strrchr(e.name(), '/');
-        bkCopy(names[k++], sizeof names[0], nm ? nm + 1 : e.name());
+        bkCopy(names[k++], 128, nm ? nm + 1 : e.name());
         e.close();
       }
     }
     if (d) d.close();
     if (!k) break;
     for (int j = 0; j < k; ++j) {
-      char path[64];
+      char path[kBkDirMax + 130];
       snprintf(path, sizeof path, "%s/%s", s_bk_aud[i].dir, names[j]);
       fs->remove(path);
     }
@@ -1401,6 +1612,11 @@ static void booksOpenLocalAudio(int i);
 static void booksAudioRowCb(lv_event_t* e) {
   const int i = (int)(intptr_t)lv_event_get_user_data(e);
   if (i < 0 || i >= s_bk_aud_count) return;
+  if (s_bk_aud[i].importing) {
+    if (lv_event_get_code(e) == LV_EVENT_SHORT_CLICKED && g_lv.task)
+      g_lv.task->showAlert(TR("Still reading the folder, a moment"), 1600);
+    return;
+  }
   if (lv_event_get_code(e) == LV_EVENT_LONG_PRESSED) {
     s_bk_aud_delete = i;
     static char msg[160];
@@ -1419,7 +1635,7 @@ static void booksOpenLocalAudio(int i) {
   if (!booksLoadLocalAudio(i)) { if (g_lv.task) g_lv.task->showAlert(TR("This audiobook could not be read"), 1800); return; }
   s_bka_listened_ms = 0;
   s_bka_last_sync_ms = millis();
-  if (WiFi.status() == WL_CONNECTED && s_abs_token[0] && s_bk_job == BkJob::None) {
+  if (!bkIsLocalId(s_bka_item) && WiFi.status() == WL_CONNECTED && s_abs_token[0] && s_bk_job == BkJob::None) {
     bkCopy(s_bk_job_arg, sizeof s_bk_job_arg, s_bka_item);
     if (s_bka_dirty) { s_bka_job_time = s_bka_time; booksStartJob(BkJob::AudioProgress); }   // offline listening first
     else booksStartJob(BkJob::AudioPull);
@@ -1604,7 +1820,8 @@ static void booksAudioRowCb(lv_event_t* e);
 static void booksAudioRows(lv_obj_t* list) {
   for (int i = 0; i < s_bk_aud_count; ++i) {
     if (s_bka_item[0] && strcmp(s_bka_item, s_bk_aud[i].item) == 0) continue;
-    booksRow(list, s_bk_aud[i].title, s_bk_aud[i].author, LV_SYMBOL_AUDIO, booksAudioRowCb, i);
+    booksRow(list, s_bk_aud[i].title, s_bk_aud[i].importing ? TR("Importing\xe2\x80\xa6") : s_bk_aud[i].author,
+             LV_SYMBOL_AUDIO, booksAudioRowCb, i);
   }
 }
 
@@ -2317,7 +2534,7 @@ static double booksAudioNow() { return booksAudioRunning() ? booksAudioPos() : s
 static void booksAudioSyncSoon(bool close) {
   if (s_bka_local || !s_bka_session[0]) {   // the user's media progress (card copy: also kept there)
     s_bka_time = booksAudioNow();
-    if (WiFi.status() != WL_CONNECTED || s_bk_job != BkJob::None || !s_abs_token[0]) {
+    if (bkIsLocalId(s_bka_item) || WiFi.status() != WL_CONNECTED || s_bk_job != BkJob::None || !s_abs_token[0]) {
       s_bka_dirty = true;
       booksSaveAudioPos();
       return;
