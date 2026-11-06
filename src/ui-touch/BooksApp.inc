@@ -29,6 +29,7 @@ static const int  kBkMaxItems    = 50;     // one page of a server library
 static const int  kBkMaxLibs     = 12;
 static const size_t kBkTxtChunk  = 24 * 1024;
 static const size_t kBkJsonCap   = 768 * 1024;
+static size_t s_bk_body_cap = kBkJsonCap;   // reply limit; a download raises it for its one request
 
 struct BkBook {
   char file[96];        // "/books/Title-1a2b3c.epub"
@@ -328,8 +329,9 @@ static int bkHttp(const char* method, const char* url, const char* payload, bool
   size_t cap = 0, got = 0;
   uint8_t chunk[1024];
   if (!sink) {
+    if (size > 0 && (size_t)size + 1 > s_bk_body_cap) { http.end(); return HTTPC_ERROR_TOO_LESS_RAM; }
     cap = size > 0 ? (size_t)size + 1 : 64 * 1024;
-    if (cap > kBkJsonCap) cap = kBkJsonCap;
+    if (cap > s_bk_body_cap) cap = s_bk_body_cap;
     buf = (uint8_t*)bkAlloc(cap);
     if (!buf) { http.end(); return HTTPC_ERROR_TOO_LESS_RAM; }
   }
@@ -349,8 +351,8 @@ static int bkHttp(const char* method, const char* url, const char* payload, bool
       if (sink->write(chunk, (size_t)n) != (size_t)n) { http.end(); return HTTPC_ERROR_STREAM_WRITE; }
     } else {
       if (got + (size_t)n + 1 > cap) {
-        if (cap >= kBkJsonCap) break;
-        size_t ncap = cap * 2 > kBkJsonCap ? kBkJsonCap : cap * 2;
+        if (cap >= s_bk_body_cap) break;
+        size_t ncap = cap * 2 > s_bk_body_cap ? s_bk_body_cap : cap * 2;
         uint8_t* nb = (uint8_t*)heap_caps_realloc(buf, ncap, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
         if (!nb) break;
         buf = nb; cap = ncap;
@@ -521,46 +523,34 @@ static void bkJobItems() {
   bkFree(body);
 }
 
+// The book comes down into PSRAM and the UI task writes it to the card (booksSaveStep):
+// the card shares its SPI bus with the e-paper panel, whose refresh in the UI task
+// drives the card's chip select, so a write from this core-0 worker failed mid-file.
+static uint8_t* s_bk_dl_buf = nullptr;
+static size_t   s_bk_dl_len = 0;
+
 static void bkJobDownload() {
-  // A readable file name for the card: the title, then a short hash of the item id.
-  uint32_t h = 2166136261u;
-  for (const char* p = s_bk_job_arg; *p; ++p) { h ^= (uint8_t)*p; h *= 16777619u; }
-  char base[48];
-  size_t w = 0;
-  for (const char* p = s_bk_job_arg2; *p && w + 1 < sizeof base; ++p) {
-    const unsigned char c = (unsigned char)*p;
-    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) base[w++] = (char)c;
-    else if ((c == ' ' || c == '-' || c == '_') && w && base[w - 1] != '_') base[w++] = '_';
-  }
-  while (w && base[w - 1] == '_') --w;
-  base[w] = 0;
-  char file[96];
-  snprintf(file, sizeof file, "%s/%s%s%06lx.epub", kBkDir, base, w ? "-" : "", (unsigned long)(h & 0xFFFFFF));
   char path[120];
   snprintf(path, sizeof path, "/api/items/%s/ebook", s_bk_job_arg);
-  fs::FS* fs = booksFs();
-  if (!fs) { snprintf(s_bk_job_msg, sizeof s_bk_job_msg, "Insert an SD card to download books"); return; }
-  s_bk_dl_busy = true;
-  fs->mkdir(kBkDir);
-  File f = fs->open(file, FILE_WRITE);
-  if (!f) {
-    s_bk_dl_busy = false;
-    snprintf(s_bk_job_msg, sizeof s_bk_job_msg, "Cannot write to the SD card");
-    return;
-  }
-  const int code = bkAuthed("GET", path, nullptr, nullptr, nullptr, &f);
-  f.flush();
-  const size_t written = s_bk_dl_got;   // File::size() of a file still open for writing reads 0 on some VFS
-  f.close();
-  if (code != 200 || written == 0) {
-    fs->remove(file);
-    s_bk_dl_busy = false;
-    if (code == HTTPC_ERROR_STREAM_WRITE) snprintf(s_bk_job_msg, sizeof s_bk_job_msg, "The SD card is full");
+  size_t room = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+#if defined(WADA_WEB)
+  room = 64u * 1024u * 1024u;
+#endif
+  room = room > 512u * 1024u ? room - 512u * 1024u : 0;   // leave PSRAM for the rest of the UI
+  if (room > 24u * 1024u * 1024u) room = 24u * 1024u * 1024u;
+  s_bk_body_cap = room;
+  uint8_t* body = nullptr; size_t len = 0;
+  const int code = bkAuthed("GET", path, nullptr, &body, &len, nullptr);
+  s_bk_body_cap = kBkJsonCap;
+  if (code != 200 || !body || len == 0) {
+    bkFree(body);
+    if (code == HTTPC_ERROR_TOO_LESS_RAM)
+      snprintf(s_bk_job_msg, sizeof s_bk_job_msg, "Book too large for memory (%u KB free)", (unsigned)(room / 1024));
     else bkJobMsgForCode(code);
     return;
   }
-  s_bk_dl_busy = false;
-  bkCopy(s_bk_job_msg, sizeof s_bk_job_msg, file);   // the UI adds it to the shelf
+  s_bk_dl_buf = body;
+  s_bk_dl_len = len;
   s_bk_job_ok = true;
 }
 
@@ -587,8 +577,9 @@ static void booksTaskFn(void*) {
   vTaskDelete(nullptr);
 }
 
+static bool s_bk_save_active_fwd();
 static bool booksStartJob(BkJob job) {
-  if (s_bk_job != BkJob::None) return false;
+  if (s_bk_job != BkJob::None || s_bk_save_active_fwd()) return false;
   if (WiFi.status() != WL_CONNECTED) {
     if (g_lv.task) g_lv.task->showAlert(TR("Connect to Wi-Fi first"), 1600);
     return false;
@@ -608,7 +599,9 @@ static bool booksStartJob(BkJob job) {
 static void booksShowView(BkView v);
 static void booksCloseReader(bool to_shelf);
 
+static bool booksSaveStep();
 static void booksClosePage() {
+  while (!booksSaveStep()) {}   // a download still being written finishes first
   if (s_bk_view == BkView::Reader) booksCloseReader(false);
   if (s_bk_timer) { lv_timer_del(s_bk_timer); s_bk_timer = nullptr; }
   appPageEnd(booksClosePage);
@@ -959,12 +952,81 @@ static void booksAddDownloaded(const char* file) {
   booksSaveIndex();
 }
 
+// ---- saving a download to the card, a slice per timer tick (UI task: see bkJobDownload) ----
+static File   s_bk_save_file;
+static size_t s_bk_save_pos = 0;
+static bool   s_bk_save_active = false;
+static char   s_bk_save_path[96] = "";
+
+static void booksSaveFail(const char* why) {
+  if (s_bk_save_file) s_bk_save_file.close();
+  if (fs::FS* fs = booksFs()) fs->remove(s_bk_save_path);
+  s_bk_sd_busy = false;
+  s_bk_save_active = false;
+  bkFree(s_bk_dl_buf); s_bk_dl_buf = nullptr; s_bk_dl_len = 0;
+  booksSetStatus(why);
+  if (g_lv.task) g_lv.task->showAlert(why, 2400);
+}
+
+static void booksSaveBegin() {
+  // A readable file name for the card: the title, then a short hash of the item id.
+  uint32_t h = 2166136261u;
+  for (const char* p = s_bk_job_arg; *p; ++p) { h ^= (uint8_t)*p; h *= 16777619u; }
+  char base[48];
+  size_t w = 0;
+  for (const char* p = s_bk_job_arg2; *p && w + 1 < sizeof base; ++p) {
+    const unsigned char c = (unsigned char)*p;
+    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) base[w++] = (char)c;
+    else if ((c == ' ' || c == '-' || c == '_') && w && base[w - 1] != '_') base[w++] = '_';
+  }
+  while (w && base[w - 1] == '_') --w;
+  base[w] = 0;
+  snprintf(s_bk_save_path, sizeof s_bk_save_path, "%s/%s%s%06lx.epub", kBkDir, base, w ? "-" : "",
+           (unsigned long)(h & 0xFFFFFF));
+  s_bk_save_active = true;
+  s_bk_save_pos = 0;
+  fs::FS* fs = booksFs();
+  if (!fs) { booksSaveFail(TR("Insert an SD card to download books")); return; }
+#if CAP_SD && !defined(WADA_WEB)
+  const uint64_t free_bytes = SD.totalBytes() > SD.usedBytes() ? SD.totalBytes() - SD.usedBytes() : 0;
+  if (free_bytes < (uint64_t)s_bk_dl_len + 64u * 1024u) { booksSaveFail(TR("The SD card is full")); return; }
+#endif
+  s_bk_sd_busy = true;
+  fs->mkdir(kBkDir);
+  s_bk_save_file = fs->open(s_bk_save_path, FILE_WRITE);
+  if (!s_bk_save_file) { booksSaveFail(TR("Cannot write to the SD card")); return; }
+  booksSetStatus(TR("Saving to the SD card\xe2\x80\xa6"));
+}
+
+// One slice; true when finished (either way).
+static bool booksSaveStep() {
+  if (!s_bk_save_active) return true;
+  const size_t slice = 32u * 1024u;
+  const size_t n = s_bk_dl_len - s_bk_save_pos < slice ? s_bk_dl_len - s_bk_save_pos : slice;
+  if (n && s_bk_save_file.write(s_bk_dl_buf + s_bk_save_pos, n) != n) {
+    booksSaveFail(TR("Writing to the SD card failed"));
+    return true;
+  }
+  s_bk_save_pos += n;
+  if (s_bk_save_pos < s_bk_dl_len) return false;
+  s_bk_save_file.close();
+  s_bk_sd_busy = false;
+  s_bk_save_active = false;
+  bkFree(s_bk_dl_buf); s_bk_dl_buf = nullptr; s_bk_dl_len = 0;
+  booksAddDownloaded(s_bk_save_path);
+  if (g_lv.task) g_lv.task->showAlert(TR("Saved to the SD card"), 1400);
+  if (s_bk_root && s_bk_view == BkView::Server) booksShowView(BkView::Server);
+  return true;
+}
+
+static bool s_bk_save_active_fwd() { return s_bk_save_active; }
 static void booksTimerCb(lv_timer_t*) {
   // Reading is long stretches without input: keep the idle timeout from blanking and
   // locking the page while Books is open. Locking by hand (hold Space) still works,
   // and once locked or dark this stops pushing, so the device sleeps as usual.
   if (s_bk_root && g_lv.task && !g_lv.task->isScreenOff() && !g_lv.task->isManualLock())
     g_lv.task->noteUserInput();
+  if (s_bk_save_active) { booksSaveStep(); return; }
   if (s_bk_job == BkJob::None) return;
   if (!s_bk_job_done) {
     if (s_bk_job == BkJob::Download && s_bk_view == BkView::Server) {
@@ -980,10 +1042,7 @@ static void booksTimerCb(lv_timer_t*) {
   const bool ok = s_bk_job_ok;
   s_bk_job = BkJob::None;
   if (job == BkJob::Progress) return;   // fire and forget
-  if (job == BkJob::Download && ok) {
-    booksAddDownloaded(s_bk_job_msg);
-    if (g_lv.task) g_lv.task->showAlert(TR("Downloaded to the device"), 1400);
-  }
+  if (job == BkJob::Download && ok) { booksSaveBegin(); return; }
   if (!ok && job == BkJob::Login) s_abs_token[0] = 0;
   if (!ok && s_bk_job_msg[0] && s_bk_root) {
     if (strstr(s_bk_job_msg, "log in again")) { s_abs_token[0] = 0; booksSaveAbs(); }
