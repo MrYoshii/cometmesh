@@ -30993,6 +30993,8 @@ static void openReaderPage(const char* initial_url = nullptr) {
 }
 #endif  // Reader
 
+#include "BooksApp.inc"   // Apps > Books: the T-Deck Max e-reader (EPUB/TXT + Audiobookshelf)
+
 // ===== Discover app (active node-discovery + live signal-ranked list) =====================
 // Fires a zero-hop NODE_DISCOVER_REQ sweep (ALL node types) every few seconds while open and lists
 // every node that answers, ranked by signal. The engine (MyMesh::_discover[] + uiStartDiscoverScan
@@ -55252,6 +55254,15 @@ static void handleHwKey(int key) {
   //
   // The dismiss key is deliberately NOT forwarded: an app must never be able to
   // trap the user by swallowing its own exit, whether by bug or by design.
+#if defined(CAP_BOOKS)
+  // The Books reader turns pages from the keyboard (not while locked or dark: those
+  // keys wake and unlock, below).
+  if (booksReaderOpen() && !(g_lv.task && (g_lv.task->isManualLock() || g_lv.task->isScreenOff())) &&
+      booksReaderKey(key)) {
+    if (g_lv.task) g_lv.task->noteUserInput();
+    return;
+  }
+#endif
   if (luaAppIsOpen() && !keyReservedFromLuaApps(key)
       // The app's own wada.ui.input prompt is open: the keys are for its text
       // field. luaAppKey takes every key, so forwarding them here left the
@@ -60337,6 +60348,7 @@ enum AppDrawerAction {
   APPACT_TERMINAL, APPACT_FILES, APPACT_FILE_TRANSFER, APPACT_SPECTRUM, APPACT_SNAKE, APPACT_VNC, APPACT_REMOTE, APPACT_READER,
   APPACT_DISCOVER, APPACT_STORE,
   APPACT_USB_FILES,
+  APPACT_BOOKS,
   APPACT_LUA_BASE = 100,   // APPACT_LUA_BASE + i = installed Lua app s_lua_inst[i]
 };
 // The drawer's built-in tiles, which are also what an App widget on Home can open.
@@ -60365,6 +60377,9 @@ static const AppTileDef k_app_tiles[] = {
   { UI_ICON_SLIDERS_HORIZONTAL, "Settings",  APPACT_SETTINGS,  HUE_SYS },     // "!" when an update waits
 #if defined(MULTI_TRANSPORT_COMPANION) && CAP_WEB_BROWSER
   { UI_ICON_GLOBE,              "Web",       APPACT_READER,    HUE_PLACE },   // on-device text browser
+#endif
+#if defined(CAP_BOOKS)
+  { UI_ICON_FILE_TEXT,          "Books",     APPACT_BOOKS,     HUE_PLACE },   // e-reader + Audiobookshelf
 #endif
 #if CAP_FILESYSTEM || defined(TLORA_PAGER)
   { UI_ICON_FOLDER,             "Files",     APPACT_FILES,     HUE_SYS },
@@ -60774,6 +60789,9 @@ static void appLaunch(int act, lv_event_t* e) {
 #endif
 #if CAP_USB_FILES
     case APPACT_USB_FILES: openUsbFilesPage(); return;
+#endif
+#if defined(CAP_BOOKS)
+    case APPACT_BOOKS:     openBooksPage();      return;
 #endif
     default: break;
   }
@@ -84133,8 +84151,12 @@ void UITask::loop() {
         if (_screen_off) wakeScreen(); else maxGoHome();
         _last_input_ms = millis();
       } else if (key_id == 2) {   // right (send) pad: the chats
-        if (_screen_off) wakeScreen();
-        maxGoChats();
+#if defined(CAP_BOOKS)
+        if (!_screen_off && booksReaderOpen()) booksTurn(1);   // reading: next page, one-handed
+        else
+#endif
+        { if (_screen_off) wakeScreen();
+          maxGoChats(); }
         _last_input_ms = millis();
       }
     }

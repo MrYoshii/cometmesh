@@ -33,6 +33,7 @@ extra_flags() {
     test_indicator_expander|test_indicator_dio1) echo "-I variants/sensecap_indicator" ;;
     # The reader is a .cpp of its own; tinfl comes from the web build's miniz.
     test_pmtiles) echo "-I src/ui-touch -I web/third_party/miniz src/ui-touch/PmTiles.cpp web/third_party/miniz/miniz_tinfl.c" ;;
+    test_epub_book) echo "-I src/ui-touch -I web/third_party/miniz src/ui-touch/EpubBook.cpp src/ui-touch/ReaderContent.cpp web/third_party/miniz/miniz_tinfl.c" ;;
     test_emoji_deflated) echo "-I test/emoji_fakes -I $OUT/gen -I src/ui-touch" ;;
     test_tdeck_keyboard_detect) echo "-I test/tdeck_keyboard_fakes" ;;
     test_keyboard_layouts_hw) echo "-I test/kb_layouts_fakes" ;;   # LVGL names only

@@ -27,6 +27,18 @@ LVGL
     Copyright (c) LVGL Kft and contributors
     MIT License — https://lvgl.io
 
+ArduinoJson
+    Copyright (c) 2014-2025 Benoit Blanchon
+    MIT License — https://arduinojson.org
+    Used by the Books app for the Audiobookshelf API and its shelf index.
+
+miniz (tinfl)
+    Copyright (c) 2013-2014 RAD Game Tools and Valve Software,
+    Copyright (c) 2010-2014 Rich Geldreich and Tenacious Software LLC
+    MIT License — https://github.com/richgel999/miniz
+    The ESP32-S3 ROM's copy inflates EPUB chapters (and PMTiles directories);
+    the host builds use the upstream source.
+
 NimBLE-Arduino
     Copyright (c) h2zero and contributors
     Apache License 2.0 — https://github.com/h2zero/NimBLE-Arduino
