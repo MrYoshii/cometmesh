@@ -28082,10 +28082,19 @@ static bool fmSdTryMount() {
   // across radio+LCD+SD too, but timing margins haven't been confirmed on
   // real M9 hardware yet. If SD never mounts, or mounts unreliably, this is
   // the first place to look.
+#if defined(HAS_TDECK_MAX)
+  // Each failed SD.begin on the Max costs ~620 ms (the driver's own CMD0 retries), and
+  // this runs on the UI task: the seven rungs froze the screen for 7.5 s whenever a
+  // card was in but not answering. One try per clock is enough to wake a slow card.
+  static const struct { uint16_t settle_ms; uint32_t hz; } kMountLadder[] = {
+    {  40, 4000000 }, { 300, 1000000 }, { 650,  400000 },
+  };
+#else
   static const struct { uint16_t settle_ms; uint32_t hz; } kMountLadder[] = {
     {  40, 4000000 }, { 120, 4000000 }, { 200, 4000000 },
     { 300, 1000000 }, { 450, 1000000 }, { 650,  400000 }, { 900, 400000 },
   };
+#endif
   const int kAttempts = (int)(sizeof(kMountLadder) / sizeof(kMountLadder[0]));
   bool mounted = false;
   uint32_t mounted_hz = 0;
