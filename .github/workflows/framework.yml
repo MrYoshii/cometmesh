@@ -1,0 +1,116 @@
+name: framework
+
+# Rebuilds the Arduino-ESP32 2.0.17 framework's ESP-IDF libraries for the ESP32-S3
+# with Comet's settings (framework/defconfig.comet, framework/README.md) and
+# publishes the result as a release asset that platformio.ini can point at.
+# Started by hand only; takes the better part of an hour.
+#
+# Everything is pinned to what Arduino-ESP32 2.0.17 itself was built from
+# (its tools/sdk/versions.txt), so only Comet's settings differ.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Release tag to publish (e.g. framework-1)'
+        required: true
+        default: framework-1
+
+permissions:
+  contents: write
+
+env:
+  IDF_REF: v4.4.7
+  IDF_COMMIT: 38eeba213a
+  AR_REF: 2.0.17
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git wget curl flex bison gperf python3 python3-pip python3-venv \
+            cmake ninja-build ccache libffi-dev libssl-dev dfu-util libusb-1.0-0 jq zip
+
+      - name: Lib builder
+        run: |
+          git clone --depth 1 -b release/v4.4 https://github.com/espressif/esp32-arduino-lib-builder lb
+          cat framework/defconfig.comet >> lb/configs/defconfig.common
+          echo "--- defconfig.common tail"; tail -30 lb/configs/defconfig.common
+
+      - name: Components (pinned to 2.0.17)
+        working-directory: lb
+        run: |
+          export AR_BRANCH="$AR_REF"
+          ./tools/update-components.sh
+          pin() { git -C "$1" fetch --unshallow 2>/dev/null || true; git -C "$1" checkout -q "$2" && git -C "$1" submodule update --init --recursive -q; echo "$1 -> $(git -C "$1" rev-parse --short HEAD)"; }
+          pin components/esp-dl 0632d24
+          pin components/esp-rainmaker d8e9345
+          pin components/esp32-camera f0bb429
+          pin components/esp_littlefs 41873c2
+          [ -d components/espressif__esp-dsp ] && pin components/espressif__esp-dsp 9b4a8b4 || true
+          [ -d components/esp-dsp ] && pin components/esp-dsp 9b4a8b4 || true
+          pin components/arduino_tinyusb/tinyusb a0e5626bc
+          git -C components/arduino describe --tags
+
+      - name: ESP-IDF (pinned)
+        working-directory: lb
+        run: |
+          export IDF_BRANCH="$IDF_REF"
+          source ./tools/install-esp-idf.sh
+          git -C esp-idf log --oneline -1
+
+      - name: Build the ESP32-S3 libraries
+        working-directory: lb
+        run: |
+          export IDF_BRANCH="$IDF_REF" AR_BRANCH="$AR_REF"
+          source ./tools/config.sh
+          source esp-idf/export.sh
+          ./build.sh -s -t esp32s3 2>&1 | tee build.log
+          exit ${PIPESTATUS[0]}
+
+      - name: Check the settings took
+        working-directory: lb
+        run: |
+          H=out/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h
+          grep -E "TCP_WND_DEFAULT|TCP_SND_BUF_DEFAULT|TCP_RECVMBOX_SIZE|DYNAMIC_TX_BUFFER|STATIC_TX_BUFFER|ALLOW_BSS_SEG" "$H"
+          grep -q "CONFIG_LWIP_TCP_WND_DEFAULT 32768" "$H"
+
+      - name: Package the framework
+        run: |
+          git clone --depth 1 -b "$AR_REF" https://github.com/espressif/arduino-esp32 fw
+          rm -rf fw/.git fw/tools/sdk/esp32 fw/tools/sdk/esp32s2 fw/tools/sdk/esp32c3 fw/tools/sdk/esp32s3
+          cp -r lb/out/tools/sdk/esp32s3 fw/tools/sdk/esp32s3
+          cp lb/out/tools/sdk/versions.txt fw/tools/sdk/versions.txt 2>/dev/null || true
+          cp framework/defconfig.comet fw/tools/sdk/COMET.defconfig
+          python3 - <<'PY'
+          import json
+          p = 'fw/package.json'
+          d = json.load(open(p))
+          d['version'] = d.get('version', '3.20017.0') + '+comet.' + '${{ inputs.release }}'.split('-')[-1]
+          d['description'] = 'Arduino-ESP32 2.0.17 rebuilt for Comet (ESP32-S3 only), see tools/sdk/COMET.defconfig'
+          json.dump(d, open(p, 'w'), indent=2)
+          print(d['name'], d['version'])
+          PY
+          (cd fw && zip -qr ../framework-arduinoespressif32-comet.zip .)
+          ls -la framework-arduinoespressif32-comet.zip
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ inputs.release }}" framework-arduinoespressif32-comet.zip \
+            --title "Framework ${{ inputs.release }}" --target "${{ github.sha }}" \
+            --notes "Arduino-ESP32 2.0.17 (ESP-IDF v4.4.7) rebuilt for the ESP32-S3 with framework/defconfig.comet."
+
+      - name: Upload the build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: framework-build-log
+          path: lb/build.log
+          if-no-files-found: ignore
