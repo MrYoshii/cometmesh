@@ -83021,6 +83021,7 @@ static bool sdRuntimeLifecycleBusy() {
 #endif
 #if defined(CAP_BOOKS)
   busy = busy || s_bk_sd_busy || s_bk_dl_busy;   // an open book, the shelf index, a download
+  busy = busy || s_bka_sd_busy || s_bkd_active;  // an audiobook playing from / downloading to the card
 #endif
 #if defined(HAS_TDECK_GT911) || defined(TLORA_PAGER) || defined(HAS_TDECK_MAX)
   busy = busy || s_notify_playing;

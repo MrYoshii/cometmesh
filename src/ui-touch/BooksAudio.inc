@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // ===================== Books: audiobook playback engine (T-Deck Max) =====================
 // Included by UITask.cpp after the Lua audio section, whose sink (ES8311 over I2S) and
-// minimp3 decoder it shares; the session it plays comes from BooksApp.inc.
+// minimp3 decoder it shares; the session it plays comes from BooksApp.inc. A track is
+// either a server URL (streamed) or a file on the SD card (downloaded for offline).
 //
 // One task does it all: it streams the current track over HTTP(S) with a Range request,
 // decodes MP3 frames and writes them to the sink, which paces it. Every change of
@@ -97,7 +98,17 @@ static void bkaTaskFn(void*) {
     uint32_t total = 0;
     int code = 0;
     s_bka_buffering = true;
-    if (!bkaOpen(http, tls, plain, tr, from, &total, &code)) {
+    // A downloaded track plays from the card: size known up front, exact offsets.
+    File lf;
+    if (tr.local) {
+      fs::FS* fs = booksFs();
+      lf = fs ? fs->open(tr.url, FILE_READ) : File();
+      if (!lf) { snprintf(s_bka_err, sizeof s_bka_err, "Track missing on the SD card"); break; }
+      total = tr.size = (uint32_t)lf.size();
+      if (t_in_track > 0.5 && tr.dur > 0) from = (uint32_t)((double)total * (t_in_track / tr.dur));
+      if (from >= total) from = total;
+      lf.seek(from);
+    } else if (!bkaOpen(http, tls, plain, tr, from, &total, &code)) {
       if (code == 401 && failures++ == 0 && bkRefresh()) continue;   // token expired: renew once
       if (++failures >= 4) {
         if (code == 401) snprintf(s_bka_err, sizeof s_bka_err, "Signed out by the server: sign in again");
@@ -107,14 +118,21 @@ static void bkaTaskFn(void*) {
       vTaskDelay(pdMS_TO_TICKS(1500 * failures));
       continue;
     }
-    if (total && !tr.size) {
+    if (!tr.local && total && !tr.size) {
       tr.size = total;
       if (from == 0 && t_in_track > 0.5) {   // now the offset can be worked out: reopen there
         http.end();
         continue;
       }
     }
-    WiFiClient* stream = http.getStreamPtr();
+    WiFiClient* stream = tr.local ? nullptr : http.getStreamPtr();
+    // One reader over either source.
+    auto srcAvail = [&]() -> int {
+      if (tr.local) { const uint32_t p = (uint32_t)lf.position(); return p < total ? (int)(total - p > 8192 ? 8192 : total - p) : 0; }
+      return stream ? stream->available() : 0;
+    };
+    auto srcRead = [&](uint8_t* b, size_t n) -> int { return tr.local ? lf.read(b, n) : stream->read(b, n); };
+    auto srcOpen = [&]() -> bool { return tr.local ? (uint32_t)lf.position() < total : (stream && stream->connected()); };
     mp3dec_init(&w->decoder);
     size_t in_start = 0, in_count = 0;
     uint32_t file_pos = from;                 // bytes of the file received so far
@@ -132,13 +150,14 @@ static void bkaTaskFn(void*) {
       // Keep the input topped up from the network (never blocking for long).
       if (in_count < sizeof w->input / 2 && file_pos < (total ? total : UINT32_MAX)) {
         if (in_start) { memmove(w->input, w->input + in_start, in_count); in_start = 0; }
-        const int avail = stream ? stream->available() : 0;
+        const int avail = srcAvail();
         if (avail > 0) {
           size_t room = sizeof w->input - in_count;
           if ((size_t)avail < room) room = (size_t)avail;
-          const int n = stream->read(w->input + in_count, room);
+          const int n = srcRead(w->input + in_count, room);
           if (n > 0) { in_count += (size_t)n; file_pos += (uint32_t)n; idle_since = millis(); }
-        } else if (!stream || !stream->connected()) {
+          else if (tr.local) { snprintf(s_bka_err, sizeof s_bka_err, "SD card read failed"); s_bka_stop = true; break; }
+        } else if (!srcOpen()) {
           // Closed. Without a known size that is the end of the track; with one, a
           // close short of it is a dropped connection, picked up again below.
           if (!total) total = file_pos;
@@ -211,7 +230,7 @@ static void bkaTaskFn(void*) {
       s_bka_pos = base + (double)samples_out / hz;
       failures = 0;
     }
-    http.end();
+    if (tr.local) lf.close(); else http.end();
     if (s_bka_stop) break;
     if (reconnect) {   // dropped mid-track: pick up where it stopped
       t_in_track = s_bka_pos - tr.start;
@@ -229,6 +248,7 @@ done:
   if (w) heap_caps_free(w);
   __atomic_store_n(&s_lua_audio_active, false, __ATOMIC_RELEASE);
   s_bka_buffering = false;
+  s_bka_sd_busy = false;
   s_bka_alive = false;
   s_bka_task = nullptr;
   vTaskDelete(nullptr);
@@ -246,7 +266,10 @@ static bool booksAudioPlayFrom(double t) {
   s_bka_err[0] = 0;
   s_bka_ended = false;
   if (!s_bka_track_count) { snprintf(s_bka_err, sizeof s_bka_err, "Nothing to play"); return false; }
-  if (WiFi.status() != WL_CONNECTED) { snprintf(s_bka_err, sizeof s_bka_err, "Connect to Wi-Fi first"); return false; }
+  if (!s_bka_tracks[0].local && WiFi.status() != WL_CONNECTED) {
+    snprintf(s_bka_err, sizeof s_bka_err, "Connect to Wi-Fi first");
+    return false;
+  }
   if (luaAudioActive()) { snprintf(s_bka_err, sizeof s_bka_err, "An app is playing audio"); return false; }
   if (touchPrefsGetSoundVolume() == 0) { snprintf(s_bka_err, sizeof s_bka_err, "Volume is at 0 (quick panel)"); return false; }
   s_bka_start_t = t < 0 ? 0 : t;
@@ -254,6 +277,7 @@ static bool booksAudioPlayFrom(double t) {
   s_bka_stop = false;
   s_bka_alive = true;
   s_bka_buffering = true;
+  s_bka_sd_busy = s_bka_tracks[0].local;   // reading the card: hold off unmounting it
   __atomic_store_n(&s_lua_audio_active, true, __ATOMIC_RELEASE);   // notification chimes stand aside
   // TLS and the HTTP client want a deep stack; internal RAM, so only while playing.
   if (xTaskCreatePinnedToCore(bkaTaskFn, "bkaudio", 12288, nullptr, 5, &s_bka_task, 0) != pdPASS) {

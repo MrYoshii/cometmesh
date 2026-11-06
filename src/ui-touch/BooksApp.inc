@@ -99,7 +99,8 @@ static lv_obj_t*   s_bk_menu = nullptr;
 static lv_coord_t  s_bk_text_w = 0, s_bk_text_h = 0;
 
 // ---- worker ----
-enum class BkJob : uint8_t { None, Login, Libraries, Items, Download, Progress, OpenSession, SessionSync };
+enum class BkJob : uint8_t { None, Login, Libraries, Items, Download, Progress, OpenSession, SessionSync,
+                              AudioProgress, AudioPull };
 static volatile BkJob s_bk_job = BkJob::None;
 static volatile bool  s_bk_job_done = false;
 static volatile bool  s_bk_job_ok = false;
@@ -112,7 +113,7 @@ static float s_bk_job_progress = 0.f;
 static TaskHandle_t s_bk_task = nullptr;
 
 // ---- audiobooks: the session (BkJob::OpenSession fills it; BooksAudio.inc plays it) ----
-struct BkaTrack   { char url[176]; double start; double dur; uint32_t size; };
+struct BkaTrack   { char url[176]; double start; double dur; uint32_t size; bool local; };   // url: server path, or a card path when local
 struct BkaChapter { double start; double end; char title[56]; };
 static const int kBkaMaxTracks = 400;
 static const int kBkaMaxChapters = 400;
@@ -137,6 +138,8 @@ static lv_obj_t*   s_bka_lbl_state = nullptr;
 static lv_obj_t*   s_bka_bar = nullptr;
 static lv_obj_t*   s_bka_play_lbl = nullptr;
 static lv_timer_t* s_bka_timer = nullptr;       // runs while a session is loaded, page open or not
+static volatile bool s_bka_sd_busy = false;     // the engine is reading a track from the card
+static lv_obj_t*   s_bka_dl_lbl = nullptr;      // the player's download button label
 
 // The playback engine (BooksAudio.inc, after the shared audio sink it uses).
 static bool        booksAudioPlayFrom(double t);   // (re)start at t seconds into the book
@@ -660,6 +663,7 @@ static void bkJobOpenSession() {
     o.start = t["startOffset"] | 0.0;
     o.dur = t["duration"] | 0.0;
     o.size = 0;
+    o.local = false;
   }
   if (codec[0] || tracks == 0) {
     snprintf(s_bk_job_msg, sizeof s_bk_job_msg, "%s audio is not supported yet: MP3 only",
@@ -698,6 +702,31 @@ static void bkJobSessionSync() {
   s_bk_job_ok = code == 200;
 }
 
+// A downloaded audiobook has no server session: its position goes to the user's media
+// progress directly (push), and comes from there when the book is opened (pull).
+static double s_bka_job_time = 0;
+static double s_bka_pulled = -1;
+static void bkJobAudioProgress() {
+  char path[120], payload[160];
+  snprintf(path, sizeof path, "/api/me/progress/%s", s_bk_job_arg);
+  const double d = s_bka_duration > 0 ? s_bka_duration : 1;
+  snprintf(payload, sizeof payload, "{\"currentTime\":%.2f,\"duration\":%.2f,\"progress\":%.4f,\"isFinished\":%s}",
+           s_bka_job_time, s_bka_duration, s_bka_job_time / d, s_bka_job_time >= d - 1 ? "true" : "false");
+  s_bk_job_ok = bkAuthed("PATCH", path, payload, nullptr, nullptr, nullptr) == 200;
+}
+static void bkJobAudioPull() {
+  char path[120];
+  snprintf(path, sizeof path, "/api/me/progress/%s", s_bk_job_arg);
+  uint8_t* body = nullptr; size_t len = 0;
+  s_bka_pulled = -1;
+  const int code = bkAuthed("GET", path, nullptr, &body, &len, nullptr);
+  if (code == 200 && body) {
+    JsonDocument doc(&s_bk_json_alloc);
+    if (!deserializeJson(doc, (const char*)body, len)) { s_bka_pulled = doc["currentTime"] | -1.0; s_bk_job_ok = true; }
+  }
+  bkFree(body);
+}
+
 static void booksTaskFn(void*) {
   switch (s_bk_job) {
     case BkJob::Login:     bkJobLogin();     break;
@@ -707,6 +736,8 @@ static void booksTaskFn(void*) {
     case BkJob::Progress:  bkJobProgress();  break;
     case BkJob::OpenSession: bkJobOpenSession(); break;
     case BkJob::SessionSync: bkJobSessionSync(); break;
+    case BkJob::AudioProgress: bkJobAudioProgress(); break;
+    case BkJob::AudioPull: bkJobAudioPull(); break;
     default: break;
   }
   s_bk_job_done = true;
@@ -732,6 +763,321 @@ static bool booksStartJob(BkJob job) {
   return true;
 }
 
+static void booksShowView(BkView v);
+// ---- audiobooks on the card: /books/audio/<id hash>/ holds the MP3 tracks, book.json
+// (what the player needs: tracks, chapters, durations) and pos.json (where it was, and
+// whether the server has heard about it yet). ----
+struct BkAudioBook { char dir[40]; char item[48]; char title[80]; char author[48]; };
+static const int kBkMaxAudio = 30;
+static BkAudioBook* s_bk_aud = nullptr;   // PSRAM [kBkMaxAudio]
+static int s_bk_aud_count = 0;
+static bool s_bka_local = false;          // the loaded book plays from the card
+static char s_bka_dir[40] = "";           // its folder there
+static bool s_bka_dirty = false;          // listened offline, not reported yet
+
+static void bkAudioDirFor(const char* item, char* out, size_t cap) {
+  uint32_t h = 2166136261u;
+  for (const char* p = item; *p; ++p) { h ^= (uint8_t)*p; h *= 16777619u; }
+  snprintf(out, cap, "/books/audio/%08lx", (unsigned long)h);
+}
+
+// Every downloaded audiobook on the card (read when the shelf is built).
+static void booksScanAudio() {
+  s_bk_aud_count = 0;
+  fs::FS* fs = booksFs();
+  if (!fs) return;
+  if (!s_bk_aud) s_bk_aud = (BkAudioBook*)psAlloc(sizeof(BkAudioBook) * kBkMaxAudio);
+  if (!s_bk_aud) return;
+  const bool was_busy = s_bk_sd_busy;
+  s_bk_sd_busy = true;
+  File root = fs->open("/books/audio");
+  // FAT lists the book folders; a flat store (SPIFFS on the host) lists their files.
+  auto adopt = [&](const char* name) {   // name: the folder under /books/audio
+    if (s_bk_aud_count >= kBkMaxAudio || !name[0]) return;
+    char dir[40];
+    snprintf(dir, sizeof dir, "/books/audio/%s", name);
+    for (int k = 0; k < s_bk_aud_count; ++k) if (strcmp(s_bk_aud[k].dir, dir) == 0) return;
+    char path[80];
+    snprintf(path, sizeof path, "%s/book.json", dir);
+    File m = fs->open(path, FILE_READ);
+    if (!m) return;
+    JsonDocument filter(&s_bk_json_alloc);
+    filter["id"] = true; filter["title"] = true; filter["author"] = true;
+    JsonDocument doc(&s_bk_json_alloc);
+    if (!deserializeJson(doc, m, DeserializationOption::Filter(filter))) {
+      BkAudioBook& b = s_bk_aud[s_bk_aud_count++];
+      bkCopy(b.dir, sizeof b.dir, dir);
+      bkCopy(b.item, sizeof b.item, doc["id"] | "");
+      bkCopy(b.title, sizeof b.title, doc["title"] | name);
+      bkCopy(b.author, sizeof b.author, doc["author"] | "");
+    }
+    m.close();
+  };
+  if (root && root.isDirectory()) {
+    for (File d = root.openNextFile(); d && s_bk_aud_count < kBkMaxAudio; d = root.openNextFile()) {
+      const char* full = d.path();
+      if (d.isDirectory()) {
+        const char* name = strrchr(d.name(), '/');
+        adopt(name ? name + 1 : d.name());
+      } else if (full && strstr(full, "/books/audio/") && strstr(full, "/book.json")) {
+        char name[24];
+        const char* a = strstr(full, "/books/audio/") + 13;
+        const char* b = strchr(a, '/');
+        const size_t n = b && (size_t)(b - a) < sizeof name ? (size_t)(b - a) : 0;
+        memcpy(name, a, n); name[n] = 0;
+        adopt(name);
+      }
+      d.close();
+    }
+  }
+  if (root) root.close();
+  s_bk_sd_busy = was_busy;
+}
+
+static int booksFindAudio(const char* item) {
+  for (int i = 0; i < s_bk_aud_count; ++i) if (strcmp(s_bk_aud[i].item, item) == 0) return i;
+  return -1;
+}
+
+static void booksSaveAudioPos() {
+  if (!s_bka_local || !s_bka_dir[0]) return;
+  fs::FS* fs = booksFs();
+  if (!fs) return;
+  char path[64];
+  snprintf(path, sizeof path, "%s/pos.json", s_bka_dir);
+  const bool was_busy = s_bk_sd_busy;
+  s_bk_sd_busy = true;
+  File f = fs->open(path, FILE_WRITE);
+  if (f) { f.printf("{\"t\":%.2f,\"dirty\":%s}", s_bka_time, s_bka_dirty ? "true" : "false"); f.close(); }
+  s_bk_sd_busy = was_busy;
+}
+
+// Load a downloaded audiobook as the session (no server session: progress goes to
+// /api/me/progress when Wi-Fi is there).
+static bool booksLoadLocalAudio(int idx) {
+  if (idx < 0 || idx >= s_bk_aud_count) return false;
+  fs::FS* fs = booksFs();
+  if (!fs) return false;
+  if (!s_bka_tracks) s_bka_tracks = (BkaTrack*)psAlloc(sizeof(BkaTrack) * kBkaMaxTracks);
+  if (!s_bka_chapters) s_bka_chapters = (BkaChapter*)psAlloc(sizeof(BkaChapter) * kBkaMaxChapters);
+  if (!s_bka_tracks || !s_bka_chapters) return false;
+  const BkAudioBook& b = s_bk_aud[idx];
+  char path[80];
+  snprintf(path, sizeof path, "%s/book.json", b.dir);
+  const bool was_busy = s_bk_sd_busy;
+  s_bk_sd_busy = true;
+  File m = fs->open(path, FILE_READ);
+  JsonDocument doc(&s_bk_json_alloc);
+  const bool ok = m && !deserializeJson(doc, m);
+  if (m) m.close();
+  double pos = 0;
+  bool dirty = false;
+  snprintf(path, sizeof path, "%s/pos.json", b.dir);
+  File p = fs->open(path, FILE_READ);
+  if (p) {
+    JsonDocument pd(&s_bk_json_alloc);
+    if (!deserializeJson(pd, p)) { pos = pd["t"] | 0.0; dirty = pd["dirty"] | false; }
+    p.close();
+  }
+  s_bk_sd_busy = was_busy;
+  if (!ok) return false;
+  int n = 0;
+  for (JsonObject t : doc["tracks"].as<JsonArray>()) {
+    if (n >= kBkaMaxTracks) break;
+    BkaTrack& o = s_bka_tracks[n++];
+    snprintf(o.url, sizeof o.url, "%s/%s", b.dir, t["f"] | "");
+    o.start = t["start"] | 0.0;
+    o.dur = t["dur"] | 0.0;
+    o.size = 0;
+    o.local = true;
+  }
+  if (!n) return false;
+  s_bka_track_count = n;
+  s_bka_chapter_count = 0;
+  for (JsonObject c : doc["chapters"].as<JsonArray>()) {
+    if (s_bka_chapter_count >= kBkaMaxChapters) break;
+    BkaChapter& o = s_bka_chapters[s_bka_chapter_count++];
+    o.start = c["s"] | 0.0; o.end = c["e"] | 0.0;
+    bkCopy(o.title, sizeof o.title, c["t"] | "");
+  }
+  bkCopy(s_bka_item, sizeof s_bka_item, b.item);
+  bkCopy(s_bka_title, sizeof s_bka_title, b.title);
+  bkCopy(s_bka_author, sizeof s_bka_author, b.author);
+  bkCopy(s_bka_dir, sizeof s_bka_dir, b.dir);
+  s_bka_session[0] = 0;
+  s_bka_local = true;
+  s_bka_duration = doc["duration"] | 0.0;
+  s_bka_time = pos;
+  s_bka_dirty = dirty;
+  return true;
+}
+
+// ---- downloading the loaded (streamed) audiobook to the card: its own task, so the
+// shelf's worker stays free for syncs ----
+static TaskHandle_t  s_bkd_task = nullptr;
+static volatile bool s_bkd_active = false;
+static volatile bool s_bkd_cancel = false;
+static volatile int  s_bkd_track = 0;        // the track being written
+static volatile int  s_bkd_tracks = 0;
+static volatile bool s_bkd_done = false;     // finished (s_bkd_msg says how)
+static volatile bool s_bkd_ok = false;
+static char s_bkd_msg[64] = "";
+static char s_bkd_dir[40] = "";
+static char s_bkd_item[48] = "";
+
+static void bkdTaskFn(void*) {
+  fs::FS* fs = booksFs();
+  const int n = s_bkd_tracks;
+  bool ok = fs != nullptr;
+  if (!ok) snprintf(s_bkd_msg, sizeof s_bkd_msg, "Insert an SD card to download");
+  if (ok) { fs->mkdir("/books"); fs->mkdir("/books/audio"); fs->mkdir(s_bkd_dir); }
+  for (int i = 0; ok && i < n && !s_bkd_cancel; ++i) {
+    s_bkd_track = i;
+    char path[64];
+    snprintf(path, sizeof path, "%s/%03d.mp3", s_bkd_dir, i + 1);
+    if (fs->exists(path)) {   // a finished track from an earlier attempt
+      File e = fs->open(path, FILE_READ);
+      const size_t have = e ? e.size() : 0;
+      if (e) e.close();
+      if (have > 0) continue;
+    }
+    char part[72];
+    snprintf(part, sizeof part, "%s.part", path);
+    File f = fs->open(part, FILE_WRITE);
+    if (!f) { snprintf(s_bkd_msg, sizeof s_bkd_msg, "Cannot write to the SD card"); ok = false; break; }
+    const int code = bkAuthed("GET", s_bka_tracks[i].url, nullptr, nullptr, nullptr, &f);
+    f.flush();
+    const uint32_t got = s_bk_dl_got;
+    f.close();
+    if (code != 200 || !got) {
+      fs->remove(part);
+      if (code == HTTPC_ERROR_STREAM_WRITE) snprintf(s_bkd_msg, sizeof s_bkd_msg, "The SD card is full");
+      else snprintf(s_bkd_msg, sizeof s_bkd_msg, "Track %d failed (%d)", i + 1, code);
+      ok = false;
+      break;
+    }
+    fs->rename(part, path);
+  }
+  if (ok && s_bkd_cancel) { snprintf(s_bkd_msg, sizeof s_bkd_msg, "Download stopped"); ok = false; }
+  if (ok) {   // the manifest last: its presence means "complete"
+    JsonDocument doc(&s_bk_json_alloc);
+    doc["id"] = s_bkd_item; doc["title"] = s_bka_title; doc["author"] = s_bka_author;
+    doc["duration"] = s_bka_duration;
+    JsonArray ta = doc["tracks"].to<JsonArray>();
+    for (int i = 0; i < n; ++i) {
+      JsonObject t = ta.add<JsonObject>();
+      char fname[12];
+      snprintf(fname, sizeof fname, "%03d.mp3", i + 1);
+      t["f"] = fname; t["start"] = s_bka_tracks[i].start; t["dur"] = s_bka_tracks[i].dur;
+    }
+    JsonArray ca = doc["chapters"].to<JsonArray>();
+    for (int i = 0; i < s_bka_chapter_count; ++i) {
+      JsonObject c = ca.add<JsonObject>();
+      c["s"] = s_bka_chapters[i].start; c["e"] = s_bka_chapters[i].end; c["t"] = s_bka_chapters[i].title;
+    }
+    char path[64];
+    snprintf(path, sizeof path, "%s/book.json", s_bkd_dir);
+    File m = fs->open(path, FILE_WRITE);
+    if (m) { serializeJson(doc, m); m.close(); }
+    else { snprintf(s_bkd_msg, sizeof s_bkd_msg, "Cannot write to the SD card"); ok = false; }
+  }
+  if (ok) snprintf(s_bkd_msg, sizeof s_bkd_msg, "On the SD card: plays offline");
+  s_bkd_ok = ok;
+  s_bkd_done = true;
+  s_bkd_active = false;
+  s_bkd_task = nullptr;
+  vTaskDelete(nullptr);
+}
+
+static void booksAudioDownloadStart() {
+  if (s_bkd_active || !s_bka_item[0] || s_bka_local) return;
+  if (!booksFs()) { if (g_lv.task) g_lv.task->showAlert(TR("Insert an SD card to download"), 1800); return; }
+  if (WiFi.status() != WL_CONNECTED) { if (g_lv.task) g_lv.task->showAlert(TR("Connect to Wi-Fi first"), 1600); return; }
+  if (s_bk_job == BkJob::Download) { if (g_lv.task) g_lv.task->showAlert(TR("A book is still downloading"), 1600); return; }
+  bkAudioDirFor(s_bka_item, s_bkd_dir, sizeof s_bkd_dir);
+  bkCopy(s_bkd_item, sizeof s_bkd_item, s_bka_item);
+  s_bkd_tracks = s_bka_track_count;
+  s_bkd_track = 0;
+  s_bkd_cancel = false;
+  s_bkd_done = false;
+  s_bkd_msg[0] = 0;
+  s_bkd_active = true;
+  if (xTaskCreatePinnedToCore(bkdTaskFn, "bkdl", 12288, nullptr, 3, &s_bkd_task, 0) != pdPASS) {
+    s_bkd_active = false;
+    if (g_lv.task) g_lv.task->showAlert(TR("Not enough memory to download"), 1800);
+  }
+}
+
+// Remove a downloaded audiobook's folder.
+static int s_bk_aud_delete = -1;
+static void booksDeleteAudioConfirmed() {
+  const int i = s_bk_aud_delete;
+  s_bk_aud_delete = -1;
+  fs::FS* fs = booksFs();
+  if (i < 0 || i >= s_bk_aud_count || !fs) return;
+  if (s_bka_local && strcmp(s_bka_dir, s_bk_aud[i].dir) == 0) {
+    if (booksAudioRunning()) booksAudioStop();
+    s_bka_item[0] = 0; s_bka_local = false; s_bka_track_count = 0;
+  }
+  s_bk_sd_busy = true;
+  // Listing while deleting is not safe on FAT: collect a batch of names, delete them,
+  // and go again until the folder is empty.
+  for (int round = 0; round < 32; ++round) {
+    File d = fs->open(s_bk_aud[i].dir);
+    char names[64][16];
+    int k = 0;
+    if (d && d.isDirectory()) {
+      for (File e = d.openNextFile(); e && k < 64; e = d.openNextFile()) {
+        const char* nm = strrchr(e.name(), '/');
+        bkCopy(names[k++], sizeof names[0], nm ? nm + 1 : e.name());
+        e.close();
+      }
+    }
+    if (d) d.close();
+    if (!k) break;
+    for (int j = 0; j < k; ++j) {
+      char path[64];
+      snprintf(path, sizeof path, "%s/%s", s_bk_aud[i].dir, names[j]);
+      fs->remove(path);
+    }
+  }
+  fs->rmdir(s_bk_aud[i].dir);
+  s_bk_sd_busy = false;
+  booksShowView(BkView::Shelf);
+}
+
+static void booksOpenLocalAudio(int i);
+static void booksAudioRowCb(lv_event_t* e) {
+  const int i = (int)(intptr_t)lv_event_get_user_data(e);
+  if (i < 0 || i >= s_bk_aud_count) return;
+  if (lv_event_get_code(e) == LV_EVENT_LONG_PRESSED) {
+    s_bk_aud_delete = i;
+    static char msg[160];
+    snprintf(msg, sizeof msg, "%s\n\n%s", TR("Remove this audiobook from the SD card?"), s_bk_aud[i].title);
+    showConfirm(msg, TR("Remove"), booksDeleteAudioConfirmed);
+    return;
+  }
+  if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+  booksOpenLocalAudio(i);
+}
+
+static void booksOpenLocalAudio(int i) {
+  if (s_bka_item[0] && strcmp(s_bka_item, s_bk_aud[i].item) == 0 && s_bka_local) { booksOpenPlayer(); return; }
+  if (s_bkd_active) { if (g_lv.task) g_lv.task->showAlert(TR("An audiobook is still downloading"), 1600); return; }
+  if (booksAudioRunning()) { s_bka_time = booksAudioPos(); booksAudioStop(); }
+  if (!booksLoadLocalAudio(i)) { if (g_lv.task) g_lv.task->showAlert(TR("This audiobook could not be read"), 1800); return; }
+  s_bka_listened_ms = 0;
+  s_bka_last_sync_ms = millis();
+  if (WiFi.status() == WL_CONNECTED && s_abs_token[0] && s_bk_job == BkJob::None) {
+    bkCopy(s_bk_job_arg, sizeof s_bk_job_arg, s_bka_item);
+    if (s_bka_dirty) { s_bka_job_time = s_bka_time; booksStartJob(BkJob::AudioProgress); }   // offline listening first
+    else booksStartJob(BkJob::AudioPull);
+  }
+  booksOpenPlayer();
+  if (!booksAudioPlayFrom(s_bka_time) && g_lv.task) g_lv.task->showAlert(booksAudioError(), 2000);
+  booksPlayerRefresh();
+}
+
 // ================================= page chrome =================================
 static void booksShowView(BkView v);
 static void booksCloseReader(bool to_shelf);
@@ -745,7 +1091,7 @@ static void booksClosePage() {
   if (s_bk_root) { appPageDeleteRootAsync(s_bk_root); s_bk_root = nullptr; }
   s_bk_body = s_bk_status = s_bk_user_ta = s_bk_pass_ta = s_bk_server_ta = nullptr;
   s_bk_text_lbl = s_bk_foot = s_bk_menu = nullptr;
-  s_bka_lbl_time = s_bka_lbl_chapter = s_bka_lbl_state = s_bka_bar = s_bka_play_lbl = nullptr;
+  s_bka_lbl_time = s_bka_lbl_chapter = s_bka_lbl_state = s_bka_bar = s_bka_play_lbl = s_bka_dl_lbl = nullptr;
 }
 
 static bool booksReaderOpen() { return s_bk_root && s_bk_view == BkView::Reader && s_bk_text_lbl; }
@@ -897,8 +1243,18 @@ static void booksNowPlayingRow(lv_obj_t* list) {
   booksRow(list, s_bka_title, sub, LV_SYMBOL_AUDIO, booksNowPlayingCb, 0);
 }
 
+// Audiobooks downloaded to the card (the loaded one is already the first row).
+static void booksAudioRowCb(lv_event_t* e);
+static void booksAudioRows(lv_obj_t* list) {
+  for (int i = 0; i < s_bk_aud_count; ++i) {
+    if (s_bka_item[0] && strcmp(s_bka_item, s_bk_aud[i].item) == 0) continue;
+    booksRow(list, s_bk_aud[i].title, s_bk_aud[i].author, LV_SYMBOL_AUDIO, booksAudioRowCb, i);
+  }
+}
+
 static void booksBuildShelf() {
   booksTabs(s_bk_body, BkView::Shelf);
+  booksScanAudio();
   if (!booksFs() && !s_bka_item[0]) {
     lv_obj_t* l = booksLabel(s_bk_body,
         TR("No SD card.\n\nBooks are stored on the SD card: insert one, then open Books again."),
@@ -908,7 +1264,7 @@ static void booksBuildShelf() {
     lv_obj_set_pos(l, 12, 50);
     return;
   }
-  if (s_bk_count == 0 && !s_bka_item[0]) {
+  if (s_bk_count == 0 && !s_bka_item[0] && s_bk_aud_count == 0) {
     lv_obj_t* l = booksLabel(s_bk_body,
         TR("No books yet.\n\nGet them from your Audiobookshelf server (the tab above), "
            "or copy .epub and .txt files to the folder /books on the SD card."),
@@ -920,6 +1276,7 @@ static void booksBuildShelf() {
   }
   lv_obj_t* list = booksList(s_bk_body, 40);
   booksNowPlayingRow(list);
+  booksAudioRows(list);
   for (int k = 0; k < s_bk_count; ++k) {
     const int i = booksSortedIndex(k);
     const BkBook& b = s_bk_books[i];
@@ -1202,7 +1559,25 @@ static void booksTimerCb(lv_timer_t*) {
   const bool ok = s_bk_job_ok;
   s_bk_job = BkJob::None;
   if (job == BkJob::Progress || job == BkJob::SessionSync) return;   // fire and forget
+  if (job == BkJob::AudioProgress) {
+    if (ok && s_bka_local) { s_bka_dirty = false; booksSaveAudioPos(); }
+    return;
+  }
+  if (job == BkJob::AudioPull) {
+    // The server's position wins when it is newer (listened elsewhere): only before
+    // playback has moved on here.
+    if (ok && s_bka_local && s_bka_pulled >= 0 && fabs(s_bka_pulled - s_bka_time) > 5 && !s_bka_dirty) {
+      const bool was = booksAudioRunning();
+      s_bka_time = s_bka_pulled;
+      if (was) booksAudioPlayFrom(s_bka_time);
+      booksPlayerRefresh();
+    }
+    return;
+  }
   if (job == BkJob::OpenSession && ok) {
+    s_bka_local = false;   // a streamed session now (a card copy had been loaded before)
+    s_bka_dir[0] = 0;
+    s_bka_dirty = false;
     s_bka_listened_ms = 0;
     s_bka_last_sync_ms = millis();
     if (s_bk_root) booksOpenPlayer();
@@ -1577,6 +1952,20 @@ static int booksAudioChapterAt(double t) {
 static double booksAudioNow() { return booksAudioRunning() ? booksAudioPos() : s_bka_time; }
 
 static void booksAudioSyncSoon(bool close) {
+  if (s_bka_local) {   // a card copy: remember here, report when the server is reachable
+    s_bka_time = booksAudioNow();
+    if (WiFi.status() != WL_CONNECTED || s_bk_job != BkJob::None || !s_abs_token[0]) {
+      s_bka_dirty = true;
+      booksSaveAudioPos();
+      return;
+    }
+    bkCopy(s_bk_job_arg, sizeof s_bk_job_arg, s_bka_item);
+    s_bka_job_time = s_bka_time;
+    s_bka_dirty = true;
+    booksSaveAudioPos();
+    if (booksStartJob(BkJob::AudioProgress)) { s_bka_listened_ms %= 1000; s_bka_last_sync_ms = millis(); }
+    return;
+  }
   if (!s_bka_session[0] || s_bk_job != BkJob::None) return;
   if (WiFi.status() != WL_CONNECTED) return;
   s_bka_sync_time = booksAudioNow();
@@ -1607,12 +1996,24 @@ static void booksPlayerRefresh() {
                  : TR("Paused");
   lv_label_set_text(s_bka_lbl_state, st);
   lv_label_set_text(s_bka_play_lbl, booksAudioRunning() ? LV_SYMBOL_PAUSE : LV_SYMBOL_PLAY);
+  if (s_bka_dl_lbl) {
+    char dl[64];
+    if (s_bka_local || booksFindAudio(s_bka_item) >= 0) snprintf(dl, sizeof dl, "%s", TR("On the SD card: plays offline"));
+    else if (s_bkd_active && strcmp(s_bkd_item, s_bka_item) == 0) {
+      if (s_bk_dl_total) snprintf(dl, sizeof dl, "%s %d/%d  %u%%  (%s)", TR("Saving"), s_bkd_track + 1, s_bkd_tracks,
+                                  (unsigned)(s_bk_dl_got * 100ull / s_bk_dl_total), TR("tap to stop"));
+      else snprintf(dl, sizeof dl, "%s %d/%d  (%s)", TR("Saving"), s_bkd_track + 1, s_bkd_tracks, TR("tap to stop"));
+    } else snprintf(dl, sizeof dl, "%s", TR("Download for offline listening"));
+    lv_label_set_text(s_bka_dl_lbl, dl);
+  }
 }
 
+static bool s_bka_user_stopped = false;   // the stop was ours: no second sync for it
 static void booksAudioPause() {
   if (!booksAudioRunning()) return;
   s_bka_time = booksAudioPos();
   booksAudioStop();
+  s_bka_user_stopped = true;
   booksAudioSyncSoon(false);
 }
 
@@ -1640,6 +2041,9 @@ static void booksPlayerBtnCb(lv_event_t* e) {
       if (booksAudioRunning()) booksAudioPause();
       else {
         if (s_bka_duration > 0 && s_bka_time >= s_bka_duration - 1) s_bka_time = 0;   // finished: again from the start
+        // Downloaded while it streamed: from now on from the card.
+        const int li = s_bka_local ? -1 : booksFindAudio(s_bka_item);
+        if (li >= 0 && !s_bkd_active) { const double t = s_bka_time; if (booksLoadLocalAudio(li)) s_bka_time = t; }
         if (!booksAudioPlayFrom(s_bka_time) && g_lv.task) g_lv.task->showAlert(booksAudioError(), 2000);
       }
       break;
@@ -1650,6 +2054,15 @@ static void booksPlayerBtnCb(lv_event_t* e) {
       break;
     }
   }
+  booksPlayerRefresh();
+}
+
+// Download for offline / stop the download; on a card copy it only says so.
+static void booksDownloadBtnCb(lv_event_t* e) {
+  if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+  if (s_bka_local) return;
+  if (s_bkd_active) { s_bkd_cancel = true; return; }
+  booksAudioDownloadStart();
   booksPlayerRefresh();
 }
 
@@ -1689,11 +2102,10 @@ static void booksBuildPlayer() {
     lv_obj_set_pos(b, 6 + i * (bw + 6), 184);
     if (i == 2) s_bka_play_lbl = lv_obj_get_child(b, 0);
   }
-  lv_obj_t* hint = booksLabel(s_bk_body, TR("Keeps playing with the screen off. Volume: quick panel."),
-                              &g_font_12, COLOR_SUB);
-  lv_label_set_long_mode(hint, LV_LABEL_LONG_WRAP);
-  lv_obj_set_width(hint, w - 20);
-  lv_obj_set_pos(hint, 10, 236);
+  lv_obj_t* dl = booksButton(s_bk_body, "", booksDownloadBtnCb, nullptr, w - 12, 30);
+  lv_obj_set_pos(dl, 6, 238);
+  s_bka_dl_lbl = lv_obj_get_child(dl, 0);
+  lv_obj_set_style_text_font(s_bka_dl_lbl, &g_font_12, LV_PART_MAIN);
   booksPlayerRefresh();
 }
 
@@ -1713,11 +2125,27 @@ static void booksAudioTimerCb(lv_timer_t*) {
   if (running && !booksAudioBuffering()) s_bka_listened_ms += dt;
   if (running) s_bka_time = booksAudioPos();
   if (running && now - s_bka_last_sync_ms >= 60000u) booksAudioSyncSoon(false);
-  if (s_was_running && !running) {   // ended or failed on its own
-    if (booksAudioEnded()) s_bka_time = s_bka_duration;
-    booksAudioSyncSoon(false);
+  if (s_bkd_done) {   // an offline download finished (or stopped)
+    s_bkd_done = false;
+    if (g_lv.task) g_lv.task->showAlert(s_bkd_msg, 2200);
+    if (s_bkd_ok) {
+      booksScanAudio();
+      // The loaded book is now on the card: switch to it while it is not playing.
+      const int i = booksFindAudio(s_bkd_item);
+      if (i >= 0 && !running && strcmp(s_bka_item, s_bkd_item) == 0) {
+        const double t = s_bka_time;
+        if (booksLoadLocalAudio(i)) s_bka_time = t;
+      }
+    }
     s_last_paint = 0;
   }
+  if (s_bkd_active && s_bk_root && s_bk_view == BkView::Player && now - s_last_paint >= 3000u) s_last_paint = 0;
+  if (s_was_running && !running) {   // ended or failed on its own (a pause synced already)
+    if (booksAudioEnded()) s_bka_time = s_bka_duration;
+    if (!s_bka_user_stopped) booksAudioSyncSoon(false);
+    s_last_paint = 0;
+  }
+  if (running) s_bka_user_stopped = false;
   s_was_running = running;
   if (s_bk_root && s_bk_view == BkView::Player && (s_last_paint == 0 || now - s_last_paint >= 10000u)) {
     s_last_paint = now;
@@ -1738,6 +2166,16 @@ static void booksNowPlayingCb(lv_event_t* e) {
 // A different audiobook replaces the loaded session.
 static void booksStartAudiobook(const BkAbsItem& it) {
   if (s_bka_item[0] && strcmp(s_bka_item, it.id) == 0) { booksOpenPlayer(); return; }
+  if (s_bkd_active) {   // the download reads the loaded session's tracks
+    if (g_lv.task) g_lv.task->showAlert(TR("An audiobook is still downloading"), 1600);
+    return;
+  }
+  booksScanAudio();
+  const int local = booksFindAudio(it.id);
+  if (local >= 0) {   // downloaded: play the card copy
+    booksOpenLocalAudio(local);
+    return;
+  }
   if (booksAudioRunning()) { s_bka_time = booksAudioPos(); booksAudioStop(); }
   // The old session is left to the server, which ends idle sessions on its own.
   if (s_bk_job != BkJob::None) {
@@ -1756,7 +2194,7 @@ static void booksShowView(BkView v) {
   if (s_bk_body) { lv_obj_del(s_bk_body); s_bk_body = nullptr; }
   s_bk_status = s_bk_user_ta = s_bk_pass_ta = s_bk_server_ta = nullptr;
   s_bk_text_lbl = s_bk_foot = nullptr;
-  s_bka_lbl_time = s_bka_lbl_chapter = s_bka_lbl_state = s_bka_bar = s_bka_play_lbl = nullptr;
+  s_bka_lbl_time = s_bka_lbl_chapter = s_bka_lbl_state = s_bka_bar = s_bka_play_lbl = s_bka_dl_lbl = nullptr;
   s_bk_view = v;
   // The bar first: the reader slims it, the shelf has the tall "< Books" row.
   if (v == BkView::Reader) appPageBeginSlim(s_bk_page_title, booksClosePage);
