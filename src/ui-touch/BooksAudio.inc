@@ -93,8 +93,8 @@ static bool bkaOpen(HTTPClient& http, WiFiClientSecure& tls, WiFiClient& plain, 
     if (code < 0) {   // no HTTP answer at all: say why (connect, DNS, TLS, memory)
       char err[96] = "";
       if (https) tls.lastError(err, sizeof err);
-      Serial.printf("[books] open %s: %s, tls=\"%s\", internal free=%u largest=%u\n", url,
-                    HTTPClient::errorToString(code).c_str(), err,
+      Serial.printf("[books] open %s: %s, tls=\"%s\", wifi status %d rssi %d, internal free=%u largest=%u\n", url,
+                    HTTPClient::errorToString(code).c_str(), err, (int)WiFi.status(), (int)WiFi.RSSI(),
                     (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
                     (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
     }

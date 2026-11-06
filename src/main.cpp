@@ -1642,7 +1642,12 @@ void setup() {
     // device with no serial console.
     WiFi.onEvent([](WiFiEvent_t, WiFiEventInfo_t info){
         g_wifi_last_disc_reason = info.wifi_sta_disconnected.reason;
+        Serial.printf("[wifi] disconnected, reason %u, t=%lus\n",
+                      (unsigned)info.wifi_sta_disconnected.reason, (unsigned long)(millis() / 1000));
       }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+    WiFi.onEvent([](WiFiEvent_t, WiFiEventInfo_t info){
+        Serial.printf("[wifi] got IP, t=%lus\n", (unsigned long)(millis() / 1000));
+      }, ARDUINO_EVENT_WIFI_STA_GOT_IP);
     // Without the WIFI_DEBUG_PRINTLN tracing the old copy had: that macro comes
     // from SerialWifiInterface.h, which is not in scope this early in setup().
     // The prints were debug-only and compile to nothing in a release build; the
