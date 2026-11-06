@@ -998,7 +998,10 @@ static char s_bkd_item[48] = "";
 // task, the card's writes failed part-way (read as "card full"). So the task fetches
 // into a ring in PSRAM and asks the UI task, through s_bkd_fstate, to open, fill,
 // close and rename the files; booksDownloadPump() does that on a 50 ms timer.
-enum BkdFile : uint8_t { BkdIdle, BkdOpenReq, BkdOpen, BkdSkip, BkdCloseReq, BkdClosed, BkdFailed };
+// BkdRetry: a write to the card failed (on the Max a busy card can fail the driver's
+// status check and with it the open file); the file is closed and the worker goes on
+// from what the card holds, the way it resumes a dropped connection.
+enum BkdFile : uint8_t { BkdIdle, BkdOpenReq, BkdOpen, BkdSkip, BkdCloseReq, BkdClosed, BkdFailed, BkdRetry };
 static const size_t kBkdRing = 256 * 1024;
 static uint8_t* s_bkd_ring = nullptr;
 static volatile size_t s_bkd_head = 0, s_bkd_tail = 0;
@@ -1007,12 +1010,15 @@ static char s_bkd_fpath[72] = "";     // the file to open (a .part, or book.json
 static char s_bkd_final[72] = "";     // on close: rename to this ("" = keep the name)
 static bool s_bkd_fappend = false;    // open to continue (a .part) instead of anew
 static volatile uint32_t s_bkd_fsize = 0;   // the size the open file had
+static uint32_t s_bkd_fwritten = 0;          // written to it since (UI task)
+static uint8_t s_bkd_write_fails = 0;        // write failures in a row (UI task)
 static File s_bkd_file;                // UI task only
 static lv_timer_t* s_bkd_timer = nullptr;
 
 static bool bkdWait(uint8_t a, uint8_t b, uint32_t ms) {   // until the UI side moved on
   const uint32_t t0 = millis();
   while (s_bkd_fstate != a && s_bkd_fstate != b) {
+    if (s_bkd_fstate == BkdFailed || s_bkd_fstate == BkdRetry) return false;   // the UI side gave up on the file
     if (s_bkd_cancel || millis() - t0 > ms) return false;
     vTaskDelay(pdMS_TO_TICKS(10));
   }
@@ -1022,7 +1028,7 @@ static bool bkdWait(uint8_t a, uint8_t b, uint32_t ms) {   // until the UI side 
 static bool bkdPut(const uint8_t* d, size_t n) {   // into the ring, waiting while it is full
   while (n) {
     while (s_bkd_head - s_bkd_tail >= kBkdRing) {
-      if (s_bkd_cancel || s_bkd_fstate == BkdFailed) return false;
+      if (s_bkd_cancel || s_bkd_fstate == BkdFailed || s_bkd_fstate == BkdRetry) return false;
       vTaskDelay(pdMS_TO_TICKS(10));
     }
     size_t room = kBkdRing - (s_bkd_head - s_bkd_tail);
@@ -1046,12 +1052,13 @@ static uint8_t bkdOpen(const char* path, const char* final_name, bool append, ui
   s_bkd_head = s_bkd_tail = 0;
   __sync_synchronize();
   s_bkd_fstate = BkdOpenReq;
-  if (!bkdWait(BkdOpen, BkdSkip, 15000) && s_bkd_fstate != BkdFailed) return BkdFailed;
+  if (!bkdWait(BkdOpen, BkdSkip, 15000) && s_bkd_fstate != BkdFailed && s_bkd_fstate != BkdRetry) return BkdFailed;
   if (have) *have = s_bkd_fsize;
   return s_bkd_fstate;
 }
 
 static bool bkdClose(bool rename_it) {   // drained, closed, renamed by the UI task
+  if (s_bkd_fstate == BkdFailed || s_bkd_fstate == BkdRetry) return false;   // already closed
   if (!rename_it) s_bkd_final[0] = 0;
   __sync_synchronize();
   s_bkd_fstate = BkdCloseReq;
@@ -1078,6 +1085,7 @@ static void bkdTaskFn(void*) {
       uint32_t have = 0;
       const uint8_t st = bkdOpen(part, path, append, &have);
       if (st == BkdSkip) { track_ok = true; break; }   // finished in an earlier attempt
+      if (st == BkdRetry) { --attempt; vTaskDelay(pdMS_TO_TICKS(500)); continue; }   // the card did not open it (the UI caps these)
       if (st != BkdOpen) { ok = false; break; }        // the UI side said why
       // Fetched the way the player streams (a Range request, which the server and any
       // proxy in front of it answer at once), continuing a .part where it stopped.
@@ -1118,8 +1126,21 @@ static void bkdTaskFn(void*) {
         idle_since = millis();
       }
       http.end();
+      if (s_bkd_fstate == BkdRetry) {   // the card failed a write: go on from what it holds
+        Serial.printf("[books] download track %d: card write failed at %u, retrying\n", i + 1, (unsigned)pos);
+        append = true;
+        --attempt;   // not the link's fault: the UI side caps these
+        vTaskDelay(pdMS_TO_TICKS(500));
+        continue;
+      }
       const bool complete = (total && pos >= total) || (!total && pos > 0 && !put_failed);
-      if (!bkdClose(complete && !s_bkd_cancel)) { ok = false; break; }   // a write failed: the UI said why
+      if (!bkdClose(complete && !s_bkd_cancel)) {
+        if (s_bkd_fstate == BkdRetry && !s_bkd_cancel) {   // the last writes failed: fetch them again
+          append = true; --attempt; vTaskDelay(pdMS_TO_TICKS(500));
+          continue;
+        }
+        ok = false; break;                                 // the UI said why
+      }
       append = true;
       if (complete) track_ok = true;
       else Serial.printf("[books] download track %d: broke off at %u of %u, retrying\n", i + 1, (unsigned)pos, (unsigned)total);
@@ -1194,11 +1215,17 @@ static void booksDownloadPump(lv_timer_t*) {
     s_bkd_file = fs->open(s_bkd_fpath, have ? FILE_APPEND : FILE_WRITE);
     if (!s_bkd_file) {
       s_bk_sd_busy = false;
+      if (s_bkd_write_fails && s_bkd_write_fails < 5) {   // just after a failed write: try again
+        ++s_bkd_write_fails;
+        s_bkd_fstate = BkdRetry;
+        return;
+      }
       snprintf(s_bkd_msg, sizeof s_bkd_msg, "Cannot write to the SD card");
       s_bkd_fstate = BkdFailed;
       return;
     }
     s_bkd_fsize = have;
+    s_bkd_fwritten = 0;
     __sync_synchronize();
     s_bkd_fstate = BkdOpen;
     return;
@@ -1211,21 +1238,35 @@ static void booksDownloadPump(lv_timer_t*) {
     size_t n = s_bkd_head - s_bkd_tail;
     if (n > kBkdRing - at) n = kBkdRing - at;
     if (n > budget) n = budget;
+    errno = 0;
     const size_t w = s_bkd_file.write(s_bkd_ring + at, n);
     if (w != n) {
-      Serial.printf("[books] download write %u of %u at %u: errno %d\n", (unsigned)w, (unsigned)n,
-                    (unsigned)s_bkd_file.size(), errno);
+      Serial.printf("[books] download write %u of %u at %u: errno %d (failure %u)\n", (unsigned)w, (unsigned)n,
+                    (unsigned)(s_bkd_fsize + s_bkd_fwritten), errno, (unsigned)s_bkd_write_fails + 1);
       s_bkd_file.close();
+      s_bk_sd_busy = false;
+      bool full = false;
 #if CAP_SD && !defined(WADA_WEB)
       const uint64_t free_b = SD.totalBytes() > SD.usedBytes() ? SD.totalBytes() - SD.usedBytes() : 0;
-      if (free_b < 1024u * 1024u) snprintf(s_bkd_msg, sizeof s_bkd_msg, "The SD card is full");
-      else
+      full = free_b < 1024u * 1024u;
 #endif
-      snprintf(s_bkd_msg, sizeof s_bkd_msg, "Writing to the SD card failed");
-      s_bk_sd_busy = false;
-      s_bkd_fstate = BkdFailed;
+      if (full) {
+        snprintf(s_bkd_msg, sizeof s_bkd_msg, "The SD card is full");
+        s_bkd_fstate = BkdFailed;
+      } else if (++s_bkd_write_fails <= 5) {   // reopened and continued from what the card holds
+        snprintf(s_bkd_msg, sizeof s_bkd_msg, "SD card busy, retrying");
+        s_bkd_fstate = BkdRetry;
+      } else {
+        snprintf(s_bkd_msg, sizeof s_bkd_msg, "Writing to the SD card failed");
+        s_bkd_fstate = BkdFailed;
+      }
       return;
     }
+    // Every 256 KB onto the card for good (FAT records a file's size only then), so a
+    // failed write later costs at most that much again.
+    if ((s_bkd_fwritten + n) / (256u * 1024u) != s_bkd_fwritten / (256u * 1024u)) s_bkd_file.flush();
+    s_bkd_fwritten += n;
+    if (s_bkd_write_fails && s_bkd_fwritten >= 1024u * 1024u) s_bkd_write_fails = 0;   // going well again
     __sync_synchronize();
     s_bkd_tail += n;
     budget -= n;
@@ -1255,6 +1296,7 @@ static void booksAudioDownloadStart() {
   s_bkd_tracks = s_bka_track_count;
   s_bkd_track = 0;
   s_bkd_cancel = false;
+  s_bkd_write_fails = 0;
   s_bkd_done = false;
   s_bkd_msg[0] = 0;
   s_bkd_fstate = BkdIdle;

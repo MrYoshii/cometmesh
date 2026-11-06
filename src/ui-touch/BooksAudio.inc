@@ -12,7 +12,9 @@
 // Every change of position (play, seek, pause/resume) restarts both at a time: a time
 // inside a track maps to a byte offset in proportion (exact for CBR, close for VBR),
 // and minimp3 finds the next frame from there. A track's size comes from the first
-// reply's Content-Range; a dropped connection resumes at the exact byte.
+// reply's Content-Range; a dropped connection resumes at the exact byte. A stream lets
+// go of its connection when the ring is full and asks again at half, and a link that only
+// trickles while the ring runs low is dropped and opened afresh.
 #if defined(CAP_BOOKS) && CAP_LUA_AUDIO
 
 struct BkaWork {
@@ -24,7 +26,11 @@ struct BkaWork {
 };
 
 // The ring between the two tasks: one writer, one reader, so plain indices will do.
-static const size_t   kBkaRing = 384 * 1024;    // ~48 s at 64 kbit/s, ~12 s at 256
+static const size_t   kBkaRing = 1024 * 1024;   // ~2 min at 64 kbit/s, ~30 s at 256
+// A stream does not hold its connection open on a full ring: a connection left waiting
+// (TCP window shut) came back at a trickle on the Max and the ring ran dry. The reader
+// lets go at full and asks again (a Range request from the exact byte) at half.
+static const size_t   kBkaRefill = kBkaRing / 2;
 static uint8_t*       s_bka_ring = nullptr;     // PSRAM, kept once allocated
 static volatile size_t s_bka_head = 0, s_bka_tail = 0;   // written / read, ever-growing
 static volatile bool  s_bka_eof = false;        // the reader has put in everything
@@ -172,9 +178,29 @@ static void bkaReaderFn(void*) {
     uint8_t id3[10];
     size_t id3_have = 0;
     uint32_t idle_since = millis();
-    bool done_track = false, dropped = false;
+    bool done_track = false, dropped = false, parked = false;
+    // The link watch: what the book needs a second, and what came in the last 3 s.
+    const uint32_t need_bps = tr.size && tr.dur > 1 ? (uint32_t)((double)tr.size / tr.dur) : 16000;
+    uint32_t win_start = millis(), win_bytes = 0;
     while (!s_bka_stop) {
       int n = 0;
+      if (!tr.local) {
+        if (kBkaRing - bkaRingUsed() < 4096 + 16) { parked = true; break; }   // full: let go
+        const uint32_t now = millis();
+        if (now - win_start >= 3000) {
+          // Running low and the link brings less than the book plays: a stuck connection
+          // (it trickles on rather than closing). A fresh one is quicker than waiting.
+          const bool low = bkaRingUsed() < 96 * 1024;
+          const bool slow = (uint64_t)win_bytes * 1000 < (uint64_t)need_bps * (now - win_start) * 3 / 4;
+          if (low && slow) {
+            Serial.printf("[bka] link slow (%u B in %u ms, ring %u KB): reconnecting\n", (unsigned)win_bytes,
+                          (unsigned)(now - win_start), (unsigned)(bkaRingUsed() / 1024));
+            dropped = true;
+            break;
+          }
+          win_start = now; win_bytes = 0;
+        }
+      }
       if (tr.local) {
         if ((uint32_t)lf.position() >= total) { done_track = true; break; }
         n = lf.read(chunk, 4096);
@@ -194,6 +220,7 @@ static void bkaReaderFn(void*) {
         n = stream->read(chunk, avail < 4096 ? avail : 4096);
         if (n <= 0) continue;
         idle_since = millis();
+        win_bytes += (uint32_t)n;
       }
       file_pos += (uint32_t)n;
       const uint8_t* p = chunk;
@@ -219,10 +246,15 @@ static void bkaReaderFn(void*) {
     }
     if (tr.local) lf.close(); else http.end();
     if (s_bka_stop) break;
+    if (parked) {   // the ring is full: wait until half of it has played, then ask again
+      resume_at = !checked_id3 ? 0 : file_pos + skip;
+      while (!s_bka_stop && bkaRingUsed() > kBkaRefill) vTaskDelay(pdMS_TO_TICKS(100));
+      continue;
+    }
     if (dropped) {
-      resume_at = file_pos;
-      if (++failures >= 5) { snprintf(s_bka_err, sizeof s_bka_err, "The connection keeps dropping"); break; }
-      vTaskDelay(pdMS_TO_TICKS(1000 * failures));
+      resume_at = !checked_id3 ? 0 : file_pos + skip;
+      if (++failures >= 6) { snprintf(s_bka_err, sizeof s_bka_err, "The connection keeps dropping"); break; }
+      vTaskDelay(pdMS_TO_TICKS(failures == 1 ? 100 : 1000 * (failures - 1)));
       continue;
     }
     if (done_track) { ++track; t_in_track = 0; resume_at = UINT32_MAX; }
@@ -261,6 +293,7 @@ static void bkaTaskFn(void*) {
   // The codec's DMA holds ~12 ms (4 x 128 frames at 44.1 kHz): a longer pause between
   // two writes means it ran dry and the sound broke. Counted in microseconds.
   uint32_t last_write_end_us = 0, dry = 0, max_gap_us = 0;
+  size_t prime_bytes = 16 * 1024;
   if (!w) { snprintf(s_bka_err, sizeof s_bka_err, "Not enough memory to play"); s_bka_stop = true; goto done; }
   s_wada_mp3_scratch = &w->scratch;
   mp3dec_init(&w->decoder);
@@ -284,13 +317,16 @@ static void bkaTaskFn(void*) {
       in_count += bkaRingGet(w->input + in_count, sizeof w->input - in_count);
     }
     const bool eof = s_bka_eof && bkaRingUsed() == 0;
-    if (!primed) {   // a second or two in hand before sound starts, after a stall too
-      if (eof || bkaRingUsed() + in_count >= 16 * 1024) { primed = true; s_bka_buffering = false; }
-      else { s_bka_buffering = true; bkaIdle(&sink, w); continue; }
+    if (!primed) {   // a second or so in hand before sound starts; more after a stall
+      if (eof || bkaRingUsed() + in_count >= prime_bytes) { primed = true; s_bka_buffering = false; }
+      else { s_bka_buffering = true; bkaIdle(&sink, w); last_write_end_us = 0; continue; }
     }
     if (in_count < 2048 && !eof) {
-      if (in_count == 0) { primed = false; ++underruns; last_write_end_us = 0; }   // ran dry: buffer up again
+      if (bkaRingUsed() == 0) {   // ran dry: buffer up again, deeper, rather than stutter
+        primed = false; ++underruns; prime_bytes = 64 * 1024;
+      }
       bkaIdle(&sink, w);
+      last_write_end_us = 0;   // the gap counts below only CPU stalls, not waits for data
       continue;
     }
     if (!in_count) break;   // everything played
