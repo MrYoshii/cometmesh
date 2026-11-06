@@ -3,9 +3,13 @@
 /* Boards whose Wi-Fi and Bluetooth start in a fixed order, owned by main.cpp:
  * Wi-Fi claims its memory and associates first, Bluetooth comes up after it.
  * The T-Pager needs this for WPA3 stability; the T-Deck Max for memory, as its
- * internal RAM fits both radios only in that order. */
+ * internal RAM fits both radios only in that order -- on Arduino-ESP32 2.0.17.
+ * The ESP-IDF 5 build (COMET_IDF_BUILD) leaves the Max some 140 KB of internal RAM
+ * with both up, so there it starts both like the T-Deck: Bluetooth at boot, Wi-Fi
+ * joining in the background whenever the network is in range, never blocking boot
+ * and never paused for Bluetooth when it is not. */
 #if !defined(WADA_ORDERED_WIFI_BLE) && \
-    (defined(TLORA_PAGER) || (defined(HAS_TDECK_MAX) && !defined(WADA_WEB)))
+    (defined(TLORA_PAGER) || (defined(HAS_TDECK_MAX) && !defined(WADA_WEB) && !defined(COMET_IDF_BUILD)))
 #define WADA_ORDERED_WIFI_BLE 1
 #endif
 
