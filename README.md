@@ -1,149 +1,98 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/wadamesh-readme-dark.svg">
-    <img alt="WADAMESH" src="assets/wadamesh-readme-light.svg" width="440">
-  </picture>
+  <img alt="COMET: one radio, every mesh" src="assets/cometmesh-banner.svg" width="900">
 </p>
 
-<p align="center"><b>A real touchscreen UI for your mesh radio.</b> &middot; open source &middot; GPL-3.0</p>
+<p align="center"><b>One radio, every mesh.</b> &middot; open source &middot; GPL-3.0</p>
 
-Touch-UI [MeshCore](https://github.com/meshcore-dev/MeshCore) companion-radio
-firmware for the **LilyGo T-Deck / T-Deck Plus**, **Heltec V4 + TFT** and other boards
-(ESP32-S3).
+<p align="center">
+  <img alt="status: early development" src="https://img.shields.io/badge/status-early%20development-orange">
+  <img alt="license: GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-blue">
+  <img alt="ESP32-S3" src="https://img.shields.io/badge/MCU-ESP32--S3-lightgrey">
+</p>
 
-An LVGL touch UI (map, chat, contacts, channels, settings) split out of
-[meshcomod](https://github.com/ALLFATHER-BV/meshcomod). The app depends on a
-MeshCore fork via PlatformIO `lib_deps`.
+**Comet** is firmware for LoRa handhelds that turns them into an always-with-you
+off-grid device: mesh messaging, offline maps, an e-reader and audiobook player,
+and later SMS and calls over the built-in modem. You pick which mesh is active
+from one app screen.
+
+Today it speaks [MeshCore](https://github.com/meshcore-dev/MeshCore). Meshtastic
+and other meshes are on the roadmap.
+
+> Comet is a fork of [wadamesh](https://github.com/ALLFATHER-BV/wadamesh), which
+> itself grew out of [meshcomod](https://github.com/ALLFATHER-BV/meshcomod). It
+> is an independent project and not affiliated with wadamesh, MeshCore,
+> Meshtastic or LilyGo.
 
 ## Boards
 
-See **[DEVICES.md](DEVICES.md)** for the full support matrix, install paths and
-per-board status.
+| Board | Status | PlatformIO env |
+|---|---|---|
+| LilyGo T-Deck Max (e-paper, A7682E modem) | main target | `LilyGo_TDeck_Max_companion_radio_touch` |
+| LilyGo T-LoRa Pager (SX1262 / LR1121) | supported | `tlora_pager_sx1262_companion_radio_touch` / `tlora_pager_lr1121_companion_radio_touch` |
 
-- LilyGo T-Deck / T-Deck Plus: env `LilyGo_TDeck_companion_radio_touch` (stable)
-- Heltec V4 + TFT + CHSC6x touch: env `heltec_v4_tft_companion_radio_usb_tcp_touch` (stable)
-- Tanmatsu (ESP32-P4): built from `tanmatsu/` (ESP-IDF), ships via the Tanmatsu app store; [sideload guide](TANMATSU_SIDELOAD.md) for running your own build
-- Elecrow ThinkNode M9: env `ThinkNode_M9_companion_radio_touch` (beta); [keyboard & d-pad guide](THINKNODE_M9_SHORTCUTS.md)
-- RAK WisMesh Tap V2 (RAK3312): env `rak_tap_v2_companion_radio_touch` (beta)
-- LilyGo T-Lora Pager: envs `tlora_pager_lr1121_companion_radio_touch` / `tlora_pager_sx1262_companion_radio_touch` (beta); [keyboard shortcuts](TLORA_PAGER_SHORTCUTS.md)
-- Heltec V4-R8 + Expansion Kit V2: env `heltec_v4_r8_tft_companion_radio_usb_tcp_touch` (beta)
-- LilyGo T-Display P4: built from `tdisplay_p4/` (ESP-IDF); AMOLED + SX1262 by default, with `WADA_P4_LCD=1` for TFT-LCD and `WADA_P4_LR2021=1` for LR2021 (beta)
-- Seeed SenseCAP Indicator D1L: env `sensecap_indicator_companion_radio_touch` (experimental, community port, PR #682)
-- Elecrow CrowPanel Advanced 10.1 (ESP32-P4): built from `crowpanel_p4_101/` (ESP-IDF), one image per board revision with `WADA_CP_REV=1.0|1.1|1.2` (experimental, not yet tested on hardware; requires an SX1262 in the wireless slot)
-- Attaky Mesh Series: env `attaky_mesh_series_companion_radio_touch` (beta)
-- Elecrow CrowPanel Advance 3.5: env `crowpanel_35_companion_radio_touch` (beta, hardware validation pending; requires an SX1262 in the expansion slot)
-- Elecrow CrowPanel Advance 5.0: env `crowpanel_50_companion_radio_touch` (beta, hardware validation pending; requires an SX1262 in the wireless slot and the DIP switch set to it)
+More boards will follow once the multi-mesh core is in place.
 
-## Architecture
+## What works
 
-This repo holds only the **app**: the `companion_radio` glue, the `ui-touch`
-LVGL UI, each board's glue/variants, and `platformio.ini`. The **MeshCore
-core is not vendored here**: it's pulled as a library via `lib_deps` from the
-[`ALLFATHER-BV/meshcomod`](https://github.com/ALLFATHER-BV/meshcomod) monorepo
-(the same repo as the non-touch firmware), pinned by a lean source-only `core-*`
-git tag. The touch-app files this repo owns (TouchPrefsStore, WifiRuntimeStore,
-the transports, …) are dropped from the lib via `-DMC_VENDORED_TOUCH_APP` so they
-aren't compiled twice. The build is byte-identical to the original in-tree
-meshcomod firmware.
+- **MeshCore**: chats, channels, contacts, map, settings, the companion app over
+  BLE, Wi-Fi or USB
+- **Books**: an EPUB/TXT reader with remembered text size, and an
+  [Audiobookshelf](https://www.audiobookshelf.org/) client for e-books and
+  audiobooks, which can be streamed, downloaded for offline listening or copied
+  to the SD card as a folder of MP3s
+- **USB Files**: browse, upload and download the SD card from a browser over
+  the USB cable
+- **T-Deck Max**: tuned e-paper (contrast, periodic full refresh), keyboard and
+  touch, haptics, audio with a usable volume curve, and Wi-Fi and Bluetooth that
+  hand over cleanly
 
-Lua apps use the on-device SDK described in [LUA_APPS.md](LUA_APPS.md). For
-WAV/MP3 playback, including a ready-to-sideload transport test app and exact SD
-and internal-storage paths, see [AUDIO_PLAYBACK_TESTING.md](AUDIO_PLAYBACK_TESTING.md).
-Region discovery, known-region management, and per-channel flood scopes are
-described in [REGIONS.md](REGIONS.md).
+## Roadmap
 
-## Offline map tiles
+- **Multi-mesh**: MeshCore and Meshtastic on one radio, with a selector for the
+  active mesh
+- **Modem (T-Deck Max)**: SMS, voice calls and mobile data on the A7682E
+- **Own framework build**: Wi-Fi, network and TLS buffers in PSRAM for far more
+  free internal RAM and faster transfers
+- **USB mass storage**: the SD card as a drive on your computer
+- **More boards**
 
-Builds with a microSD card expose a **Transfer** app for authenticated browser
-uploads over the local Wi-Fi network. WadaMesh accepts unpacked 256x256 PNG XYZ
-tiles in a `z/x/y.png` directory tree.
+## Flashing
 
-PNG raster tiles can also be packed as PMTiles v3 archives and copied to the
-SD card as `maps/<name>/<name>.pmtiles`; the archive basename must match its
-directory, e.g. `maps/osm/osm.pmtiles` or `maps/osm-light/osm-light.pmtiles`.
-Enable **Tiles from SD card**, then pick the archive under **Map options → Map
-file**; the choice is remembered across restarts. Without a saved choice the
-`osm` archive is used if present, otherwise the first one found. Archives are
-read-only; tiles missing from the selected archive still load from the
-`maps/osm/z/x/y.png` or `/tiles/z/x/y.jpg` layouts and the normal Wi-Fi tile
-fallback, and **Folder tiles only** turns archives off. JPEG and vector
-PMTiles archives are not supported.
+There are no releases yet. Builds come from GitHub Actions as artifacts.
 
-Picking an archive moves the zoom into its range if it is outside. With
-**Tiles from SD card** on, **Map options → Zoom: map levels only** limits the
-zoom slider and +/- buttons to the levels the map actually holds: the selected
-archive's zoom range, or with **Folder tiles only** every `z` folder of the
-`maps/osm/z/x/y` and `tiles/z/x/y` trees.
-
-To create a compatible pack with [QGIS](https://qgis.org/):
-
-1. Add a map source whose licence and service terms explicitly permit offline
-  or bulk use. A self-hosted source is also suitable. Do **not** bulk-download
-  from `tile.openstreetmap.org`: the official
-  [OSM tile policy](https://operations.osmfoundation.org/policies/tiles/)
-  prohibits offline downloads from that community service.
-2. Frame only the area needed in the QGIS map canvas. Tile counts quadruple at
-  every added zoom level, so a small region and a practical range such as
-  zoom 8 through 16 are preferable to exporting an entire country at zoom 19.
-3. Open **Processing Toolbox → Raster tools → Generate XYZ tiles (Directory)**.
-4. Use the map-canvas extent, choose minimum and maximum zooms within 3–19,
-  select **PNG**, set tile width and height to **256**, leave **Use inverted
-  tile Y axis (TMS conventions)** disabled, and select an output directory.
-5. Confirm the output contains paths such as `12/2048/1362.png`. If obtaining
-  an existing pack instead, extract it first and confirm it has the same XYZ
-  directory layout and that its provider permits offline use and redistribution.
-
-To upload the pack:
-
-1. Connect the device and the browser to the same Wi-Fi network.
-2. Open **Transfer** from the device's app drawer, visit the displayed URL, and
-  enter the six-digit session code.
-3. Choose **Offline OSM map (/tiles)**, select the generated output folder, and
-  start the upload. The browser ignores unrelated files and uploads valid tiles
-  sequentially while preserving their coordinates.
-4. Existing tiles are skipped by default, allowing an interrupted upload to be
-  resumed. Enable **Replace existing map tiles** when intentionally refreshing
-  a pack.
-5. Close Transfer after completion. In **Map options**, disable **Topographic
-  map** and enable **Tiles from SD card**. Disable Wi-Fi to verify that the
-  uploaded area renders offline.
-
-Individual PNG tiles must be no larger than 256 KB. Keep the map provider's
-required attribution and licence information with any pack you distribute.
-
-## Build
-
-[PlatformIO](https://platformio.org/) pulls the core fork and all libraries
-automatically:
+Update an existing install (keeps your settings):
 
 ```bash
-pio run -e heltec_v4_tft_companion_radio_usb_tcp_touch   # Heltec V4 TFT
-pio run -e LilyGo_TDeck_companion_radio_touch            # LilyGo T-Deck
-pio run -e crowpanel_35_companion_radio_touch             # CrowPanel Advance 3.5
-pio run -e crowpanel_50_companion_radio_touch             # CrowPanel Advance 5.0
-# or just `pio run` to build the configured default environments
+esptool --chip esp32s3 --port <PORT> write-flash 0x10000 firmware.bin
 ```
 
-Flash with the NVS-preserving 4-component chain (bootloader / partitions /
-boot_app0 / firmware at `0x0 / 0x8000 / 0xe000 / 0x10000`) so saved Wi-Fi
-credentials survive, not a merged image, which 0xFF-pads and wipes NVS.
+A first install uses the merged image at `0x0`, which also erases the device's
+settings.
 
-## Contributing
+## Building
 
-Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). One topic per
-PR; inbound contributions are accepted under the project's GPL-3.0 license.
+[PlatformIO](https://platformio.org/) fetches the MeshCore core fork and all
+libraries:
+
+```bash
+pio run -e LilyGo_TDeck_Max_companion_radio_touch
+pio run -e tlora_pager_sx1262_companion_radio_touch
+```
+
+## Credits
+
+Comet stands on the work of others:
+
+- **wadamesh** by Kaj Schittecat and the wadamesh contributors (GPL-3.0): the
+  touch UI this project is built on
+- **MeshCore** by Scott Powell / rippleradios.com and contributors (MIT): the
+  mesh core, built through **meshcomod**, the MeshCore fork wadamesh uses (MIT)
+- **LVGL**, **ArduinoJson**, **minimp3**, **miniz** and the other libraries
+  listed in [NOTICE](NOTICE)
 
 ## License
 
-**GPL-3.0-or-later**: see [LICENSE](LICENSE). wadamesh is copyleft: anyone who
-distributes a build or a fork must also make their source available under the GPL.
-This keeps the UI open and concentrates community effort instead of fragmenting it
-into closed forks.
-
-wadamesh incorporates and depends on
-[MeshCore](https://github.com/meshcore-dev/MeshCore) (MIT, © Scott Powell /
-rippleradios.com) and other third-party components; see [NOTICE](NOTICE) for the
-full list and their licenses. MeshCore-derived files keep their MIT notices; the
-combined work is distributed under the GPL (MIT is GPL-compatible). The MeshCore
-fork that wadamesh builds against stays **MIT** on purpose, so its Wi-Fi/BLE hooks
-remain upstreamable to MeshCore.
+**GPL-3.0-or-later**: see [LICENSE](LICENSE). Anyone who distributes a build
+or a fork must also make its source available under the GPL. MeshCore-derived
+files keep their MIT notices; see [NOTICE](NOTICE) for every component and its
+license.
