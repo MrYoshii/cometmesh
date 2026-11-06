@@ -7,7 +7,7 @@
 //     libraries and downloads an item's EPUB onto the shelf;
 //   * the reader: one chapter at a time as plain text (EpubBook.h), cut into pages
 //     that fit the screen exactly, turned by tapping the left or right edge, the
-//     keyboard (space / n / b, arrows) or the right front pad.
+//     keyboard (n / b, Enter / Backspace, arrows) or the right front pad.
 // Network and download work runs on a short-lived core-0 worker; the UI polls it.
 // Audiobooks are listed but not played yet (the audio player is the next step).
 #if defined(HAS_TDECK_MAX) && defined(ESP32) && defined(MULTI_TRANSPORT_COMPANION)
@@ -920,6 +920,11 @@ static void booksAddDownloaded(const char* file) {
 }
 
 static void booksTimerCb(lv_timer_t*) {
+  // Reading is long stretches without input: keep the idle timeout from blanking and
+  // locking the page while Books is open. Locking by hand (hold Space) still works,
+  // and once locked or dark this stops pushing, so the device sleeps as usual.
+  if (s_bk_root && g_lv.task && !g_lv.task->isScreenOff() && !g_lv.task->isManualLock())
+    g_lv.task->noteUserInput();
   if (s_bk_job == BkJob::None) return;
   if (!s_bk_job_done) {
     if (s_bk_job == BkJob::Download && s_bk_view == BkView::Server) {
@@ -1190,12 +1195,13 @@ static void booksPageTapCb(lv_event_t* e) {
   else booksMenuOpen();
 }
 
-// Keyboard: space / n / j / Enter / right / down turn forward; b / p / k / Backspace /
+// Keyboard: n / j / Enter / right / down turn forward; b / p / k / Backspace /
 // left / up turn back; + and - change the size; m opens the menu.
 static bool booksReaderKey(int key) {
   if (!booksReaderOpen()) return false;
   switch (key) {
-    case ' ': case 'n': case 'N': case 'j': case 'J': case LV_KEY_ENTER: case '\r':
+    // Not Space: holding it locks the screen, and its press would turn a page first.
+    case 'n': case 'N': case 'j': case 'J': case LV_KEY_ENTER: case '\r':
     case LV_KEY_RIGHT: case LV_KEY_DOWN:
       booksTurn(1); return true;
     case 'b': case 'B': case 'p': case 'P': case 'k': case 'K': case LV_KEY_BACKSPACE:
