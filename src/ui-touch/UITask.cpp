@@ -33298,6 +33298,12 @@ static void fileTransferStopCb(lv_event_t* e) {
 }
 
 static void fileTransferTimerCb(lv_timer_t*) {
+#if defined(HAS_TDECK_MAX)
+  // A transfer runs for minutes without a touch: the idle timeout locked the screen
+  // and dropped the CPU to 80 MHz under it, and a locked Max received at half speed.
+  // Stays awake while the page is open; a manual lock (hold Space) still works.
+  if (g_lv.task && !g_lv.task->isScreenOff() && !g_lv.task->isManualLock()) g_lv.task->noteUserInput();
+#endif
   fileTransferRefresh();
 }
 
@@ -60285,7 +60291,15 @@ static void usbFilesRefresh() {
   }
 }
 
-static void usbFilesTimerCb(lv_timer_t*) { usbFilesRefresh(); }
+static void usbFilesTimerCb(lv_timer_t*) {
+#if defined(HAS_TDECK_MAX)
+  // A transfer runs for minutes without a touch: the idle timeout locked the screen
+  // and dropped the CPU to 80 MHz under it, and a locked Max received at half speed.
+  // Stays awake while the page is open; a manual lock (hold Space) still works.
+  if (g_lv.task && !g_lv.task->isScreenOff() && !g_lv.task->isManualLock()) g_lv.task->noteUserInput();
+#endif
+  usbFilesRefresh();
+}
 
 static void usbFilesStopCb(lv_event_t* e) {
   if (lv_event_get_code(e) == LV_EVENT_CLICKED) closeUsbFilesPage();
