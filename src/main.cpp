@@ -1283,11 +1283,14 @@ void setup() {
         { 300, 1000000 }, { 450, 1000000 }, { 650,  400000 }, { 900, 400000 },
       };
       int tries = want_full_sd ? 7 : 3;
+      Serial.printf("[SDT] boot mount: %d tries (want_full_sd=%d), t=%lums\n", tries, (int)want_full_sd, millis());   // TEST BUILD ONLY
       for (int a = 0; a < tries && !sd_mounted; ++a) {
         SD.end();
         delay(kBootMount[a].settle_ms);
         const bool begin_ok = SD.begin(PIN_SD_CS, *_spi, kBootMount[a].hz, "/sd", 6);
         const bool card_ready = begin_ok && SD.cardType() != CARD_NONE;
+        Serial.printf("[SDT] boot try %d: %luHz begin=%s type=%d\n", a, (unsigned long)kBootMount[a].hz,
+                      begin_ok ? "ok" : "FAILED", (int)SD.cardType());   // TEST BUILD ONLY
         sdMountDiagAttempt(kBootMount[a].hz, begin_ok, card_ready);
         if (card_ready) {
           sd_mounted = true;
