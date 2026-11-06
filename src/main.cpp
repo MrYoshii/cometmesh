@@ -1,4 +1,5 @@
-#include <Arduino.h>   // needed for PlatformIO
+#include <Arduino.h>
+#include <esp_log.h>   // needed for PlatformIO
 #include <Mesh.h>
 #include "MyMesh.h"
 
@@ -816,6 +817,11 @@ void setup() {
       "                   *                 .\n"
       "\n");
   Serial.println("[BOOT] setup start");
+#if ESP_IDF_VERSION_MAJOR >= 5
+  // IDF 5 logs every esp_task_wdt_reset() from a task the watchdog does not watch
+  // (IDF 4.4 returned the same error silently). Several feed points run on such tasks.
+  esp_log_level_set("task_wdt", ESP_LOG_NONE);
+#endif
   Serial.printf("[BOOT] Comet %s on meshcomod %s\n", FIRMWARE_VERSION, FIRMWARE_CORE_VERSION);
   // The SDK ships CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096: every allocation
   // under 4 KB is forced into internal DRAM even when PSRAM is free. On the V4

@@ -89,7 +89,18 @@ static bool bkaOpen(HTTPClient& http, WiFiClientSecure& tls, WiFiClient& plain, 
   http.addHeader("Accept-Encoding", "identity");
   const int code = http.GET();
   if (code_out) *code_out = code;
-  if (code != 206 && code != 200) { http.end(); return false; }
+  if (code != 206 && code != 200) {
+    if (code < 0) {   // no HTTP answer at all: say why (connect, DNS, TLS, memory)
+      char err[96] = "";
+      if (https) tls.lastError(err, sizeof err);
+      Serial.printf("[books] open %s: %s, tls=\"%s\", internal free=%u largest=%u\n", url,
+                    HTTPClient::errorToString(code).c_str(), err,
+                    (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                    (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+    }
+    http.end();
+    return false;
+  }
   uint32_t size = 0;
   const String cr = http.header("Content-Range");   // "bytes 100-999/1000"
   const int slash = cr.lastIndexOf('/');
