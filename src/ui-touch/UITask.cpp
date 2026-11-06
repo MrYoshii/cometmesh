@@ -74890,6 +74890,8 @@ static bool luaAudioPathEndsWith(const char* path, const char* suffix) {
 }
 }  // namespace
 
+#include "BooksAudio.inc"   // Books: audiobook playback on the shared sink + minimp3
+
 bool luaHostAudioPlay(fs::FS* fs, const char* path, const char* shown, const char* source,
                       uint32_t owner, char* error, size_t error_cap) {
   if (!fs) return luaAudioReturnError(error, error_cap, "no storage");
@@ -80546,7 +80548,12 @@ static void setCpuForScreen(bool screen_on) {
   (void)screen_on;
 #else
   static int s_cur_mhz = 240;
+#if defined(CAP_BOOKS) && CAP_LUA_AUDIO
+  // An audiobook playing with the screen off still needs the full clock to decode.
+  const int want = (screen_on || booksAudioRunning()) ? 240 : 80;
+#else
   const int want = screen_on ? 240 : 80;
+#endif
   if (want == s_cur_mhz) return;
   setCpuFrequencyMhz(want);
   s_cur_mhz = want;
