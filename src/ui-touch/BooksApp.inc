@@ -1357,7 +1357,7 @@ static void booksAudioRowCb(lv_event_t* e) {
     showConfirm(msg, TR("Remove"), booksDeleteAudioConfirmed);
     return;
   }
-  if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+  if (lv_event_get_code(e) != LV_EVENT_SHORT_CLICKED) return;
   booksOpenLocalAudio(i);
 }
 
@@ -1462,7 +1462,9 @@ static lv_obj_t* booksRow(lv_obj_t* list, const char* title, const char* sub, co
     lv_obj_align(g, LV_ALIGN_RIGHT_MID, 0, 0);
   }
   if (cb) {
-    lv_obj_add_event_cb(row, cb, LV_EVENT_CLICKED, (void*)ud);
+    // A short click opens; a long press (remove, where a row offers it) must not also
+    // open on release, which a plain CLICKED would.
+    lv_obj_add_event_cb(row, cb, LV_EVENT_SHORT_CLICKED, (void*)ud);
     lv_obj_add_event_cb(row, cb, LV_EVENT_LONG_PRESSED, (void*)ud);
   }
   return row;
@@ -1533,7 +1535,7 @@ static void booksShelfRowCb(lv_event_t* e) {
     showConfirm(msg, TR("Remove"), booksDeleteConfirmed);
     return;
   }
-  if (lv_event_get_code(e) == LV_EVENT_CLICKED) booksOpenReader(idx);
+  if (lv_event_get_code(e) == LV_EVENT_SHORT_CLICKED) booksOpenReader(idx);
 }
 
 static void booksNowPlayingCb(lv_event_t* e);
@@ -1643,7 +1645,7 @@ static void booksReloadCb(lv_event_t* e) {
 }
 
 static void booksLibCb(lv_event_t* e) {
-  if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+  if (lv_event_get_code(e) != LV_EVENT_SHORT_CLICKED) return;
   const int i = (int)(intptr_t)lv_event_get_user_data(e);
   if (i < 0 || i >= s_abs_lib_count) return;
   bkCopy(s_abs_lib, sizeof s_abs_lib, s_abs_libs[i].id);
@@ -1668,7 +1670,7 @@ static int booksFindItem(const char* item_id) {
 }
 
 static void booksItemCb(lv_event_t* e) {
-  if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+  if (lv_event_get_code(e) != LV_EVENT_SHORT_CLICKED) return;
   const int i = (int)(intptr_t)lv_event_get_user_data(e);
   if (i < 0 || i >= s_abs_item_count) return;
   const BkAbsItem& it = s_abs_items[i];
@@ -2484,6 +2486,10 @@ static void booksAudioTimerCb(lv_timer_t*) {
   }
   if (running) s_bka_user_stopped = false;
   s_was_running = running;
+  // Waiting for data shows at once (the panel said "Playing" through a silent stall).
+  static bool s_was_buffering = false;
+  const bool buffering = booksAudioBuffering();
+  if (buffering != s_was_buffering) { s_was_buffering = buffering; s_last_paint = 0; }
   if (s_bk_root && s_bk_view == BkView::Player && (s_last_paint == 0 || now - s_last_paint >= 10000u)) {
     s_last_paint = now;
     booksPlayerRefresh();
@@ -2496,7 +2502,7 @@ static void booksOpenPlayer() {
 }
 
 static void booksNowPlayingCb(lv_event_t* e) {
-  if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+  if (lv_event_get_code(e) != LV_EVENT_SHORT_CLICKED) return;
   booksOpenPlayer();
 }
 
