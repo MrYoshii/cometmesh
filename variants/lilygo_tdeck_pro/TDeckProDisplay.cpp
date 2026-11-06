@@ -438,7 +438,7 @@ void TDeckProDisplay::finishUpdate(bool wait) {
     return;
   }
   digitalWrite(P_LORA_NSS, HIGH);
-  digitalWrite(PIN_SD_CS, HIGH);
+  // (no SD chip-select poke: the SD driver owns that line, and Books writes the card from its own task)
   _epd.epd2.finishRefresh(_epd_busy_full);
   // The controller diffs against its "previous" RAM: make that the frame now shown.
   _epd.epd2.writeImageAgain(_sent, 0, 0, WIDTH, HEIGHT);
@@ -493,7 +493,7 @@ void TDeckProDisplay::serviceRefresh(bool force) {
     s_prev = now;
   }
   digitalWrite(P_LORA_NSS, HIGH);
-  digitalWrite(PIN_SD_CS, HIGH);
+  // (no SD chip-select poke: the SD driver owns that line, and Books writes the card from its own task)
   digitalWrite(PIN_TFT_CS, HIGH);
   memcpy(_sent, _mono, MONO_BYTES);
   _sent_valid = true;
@@ -531,7 +531,10 @@ void TDeckProDisplay::serviceRefresh(bool force) {
   }
 
   digitalWrite(P_LORA_NSS, HIGH);
+#if !defined(HAS_TDECK_MAX)
   digitalWrite(PIN_SD_CS, HIGH);
+#endif   // the Max: the SD driver owns that line; Books writes the card from its own task, and
+         // forcing chip select high here in the middle of such a transfer broke the write
   digitalWrite(PIN_TFT_CS, HIGH);
   if (full) _epd.setFullWindow();
   else _epd.setPartialWindow(0, 0, WIDTH, HEIGHT);
