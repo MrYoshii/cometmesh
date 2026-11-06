@@ -4,6 +4,9 @@
 #include <helpers/ArduinoSerialInterface.h>
 #include "TCPCompanionServer.h"
 #include "WebSocketCompanionServer.h"
+#if defined(HAS_TDECK_MAX)
+#include "WifiRuntimeStore.h"   // WADA_ORDERED_WIFI_BLE: the Max uses the Pager's ordered handoff
+#endif
 #ifdef BLE_PIN_CODE
 #include <helpers/esp32/SerialBLEInterface.h>
 #endif
@@ -45,10 +48,16 @@ public:
   void prepareBle(const char* prefix, char* name, uint32_t pin_code);
   void enableBle() override;
   void disableBle() override;
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
   // Quiesce BLE without changing the saved intent or destroying its bond/GATT
   // state. Wi-Fi can then re-associate before enableBle() resumes advertising.
   bool suspendBleForWifiReconnect();
+#endif
+#if defined(HAS_TDECK_MAX) && defined(WADA_ORDERED_WIFI_BLE)
+  // T-Deck Max: unload NimBLE (keeping the saved Bluetooth preference) so a cold
+  // Wi-Fi start gets the internal RAM it had at boot. main.cpp starts Bluetooth
+  // again once Wi-Fi has associated or timed out, the same order as at boot.
+  void releaseBleForWifiColdStart();
 #endif
   bool isBleEnabled() const override { return _ble_enabled; }
   bool isBleStackBegun() const { return _ble_begun; }

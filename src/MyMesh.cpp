@@ -1,4 +1,7 @@
 #include "MyMesh.h"
+#if defined(HAS_TDECK_MAX)
+#include "helpers/esp32/WifiRuntimeStore.h"   // WADA_ORDERED_WIFI_BLE
+#endif
 #include <esp_heap_caps.h>
 
 #include <Arduino.h> // needed for PlatformIO
@@ -792,7 +795,7 @@ bool MyMesh::handleMeshcomodCommand(const char* text, int text_len) {
           snprintf(ble, sizeof(ble), "on (%s)", peer);
         else
           snprintf(ble, sizeof(ble), "on");
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
       } else if (wifiConfigGetBleEnabled()) {
         snprintf(ble, sizeof(ble), "pending");
 #endif
@@ -879,7 +882,7 @@ bool MyMesh::handleMeshcomodCommand(const char* text, int text_len) {
     p += 3;
     while (*p == ' ' || *p == '\t') p++;
     if (strncasecmp(p, "on", 2) == 0 && (p[2] == '\0' || p[2] == ' ' || p[2] == '\t')) {
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
       // Record the request before asking the transport. A cold start may be
       // intentionally refused while WPA owns the Pager coexistence handoff;
       // main.cpp observes this preference and restores BLE on success/timeout.
@@ -888,7 +891,7 @@ bool MyMesh::handleMeshcomodCommand(const char* text, int text_len) {
       _serial->enableBle();
       if (_serial->isBleEnabled()) {
         pushMeshcomodReply("OK\nble: on");
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
       } else if (wifiConfigPagerWifiBlocksBle()) {
         pushMeshcomodReply("OK\nble: pending (Wi-Fi handoff)");
       } else if (wifiConfigGetBleEnabled()) {
@@ -917,7 +920,7 @@ bool MyMesh::handleMeshcomodCommand(const char* text, int text_len) {
         } else {
           pushMeshcomodReply("ble: on");
         }
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
       } else if (wifiConfigGetBleEnabled()) {
         pushMeshcomodReply("ble: pending");
 #endif
@@ -1105,7 +1108,7 @@ bool MyMesh::handleMeshcomodCommand(const char* text, int text_len) {
     }
     // Ensure STA is fully up before scan; disconnected STA needs a bit more settle time.
     wifi_mode_t mode = WiFi.getMode();
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
     // Never cold-initialize Wi-Fi from a command handler while NimBLE is
     // resident. The main loop performs the ordered live handoff; a subsequent
     // command can scan once that short transition has completed.

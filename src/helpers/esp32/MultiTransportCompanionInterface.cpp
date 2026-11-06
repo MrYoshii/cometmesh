@@ -234,7 +234,7 @@ void MultiTransportCompanionInterface::enableBle() {
     // Deferred at boot (heap guard) or toggled on from off: bring the stack up
     // now, live, from the params stashed by prepareBle()/beginBle().
     if (_ble_prefix[0] == '\0' && _ble_name[0] == '\0') { s_ble_fail = BLE_FAIL_NO_PARAMS; return; }   // no params known
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
     // An idle STA may be kept up for on-device scans with no credentials, and
     // a failed association explicitly falls back to BLE. Only the ordered WPA
     // phase blocks a cold NimBLE start; main.cpp owns every phase transition.
@@ -292,7 +292,7 @@ void MultiTransportCompanionInterface::enableBle() {
 #if CAP_BLE_KEYBOARD
   BleKbd::suspend(false);           // back from a Pager Wi-Fi handoff, if it was one
 #endif
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
   // A successful live enable means NimBLE is now resident. Do not let the
   // Arduino Wi-Fi event path enter WPA automatically after a later link loss.
   // main.cpp first releases NimBLE, then explicitly re-associates and recreates
@@ -339,7 +339,7 @@ void MultiTransportCompanionInterface::disableBle() {
   // WPA phase is always visible to the BLE ownership gate.
   // Other boards retain their established resident-stack disable/re-enable
   // behavior.
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
   if (_ble_begun) {
     bleDetachServerCallbacks();
 #if CAP_BLE_KEYBOARD
@@ -352,7 +352,7 @@ void MultiTransportCompanionInterface::disableBle() {
 #endif
 }
 
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
 bool MultiTransportCompanionInterface::suspendBleForWifiReconnect() {
   // Preserve both the user's BLE preference and NimBLE's live bond/GATT state.
   // Recreating the controller/server here made an already-bonded phone fall
@@ -390,6 +390,22 @@ bool MultiTransportCompanionInterface::suspendBleForWifiReconnect() {
   _ble_enabled = false;
   if (WiFi.getMode() != WIFI_MODE_NULL) WiFi.setAutoReconnect(false);
   return true;
+}
+#endif
+
+#if defined(HAS_TDECK_MAX) && defined(WADA_ORDERED_WIFI_BLE)
+void MultiTransportCompanionInterface::releaseBleForWifiColdStart() {
+  if (!_ble_begun) return;
+  if (_ble_enabled) _ble.disable();   // stop advertising and drop the phone
+  _ble_enabled = false;               // the saved preference (ble_en) stays on
+  bleDetachServerCallbacks();
+#if CAP_BLE_KEYBOARD
+  BleKbd::stackGoingDown();
+#endif
+  NimBLEDevice::deinit(true);
+  _ble_begun = false;
+  Serial.printf("[ble] released for a cold Wi-Fi start: internal free=%u\n",
+                (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
 }
 #endif
 

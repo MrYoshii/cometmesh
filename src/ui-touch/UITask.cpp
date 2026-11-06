@@ -9417,7 +9417,7 @@ static char          s_wifiscan_ssids[kWifiScanMax][WIFI_CONFIG_SSID_MAX];
 static volatile int  s_wifiscan_count   = 0;
 static volatile bool s_wifiscan_request = false;   // UI -> worker: scan now
 static volatile bool s_wifiscan_done    = false;   // worker -> UI: results ready
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
 static bool          s_wifiscan_wait_for_radio = false; // main task must cold-start STA first
 static uint32_t      s_wifiscan_pager_guard_ms = 0;     // recover if worker never services request
 #endif
@@ -13430,7 +13430,7 @@ static void toggleTcpCb(lv_event_t* e) {
 }
 
 static bool bleEnableWaitingForWifi() {
-#if defined(TLORA_PAGER) && defined(MULTI_TRANSPORT_COMPANION)
+#if defined(WADA_ORDERED_WIFI_BLE) && defined(MULTI_TRANSPORT_COMPANION)
   return wifiConfigPagerWifiBlocksBle();
 #else
   return false;
@@ -13459,7 +13459,7 @@ static const char* bleEnableFailureText() {
 // dead, and turn the first tap into "clear my preference" instead of "start it".
 static bool bleRequestedOrEnabled() {
   bool requested = g_lv.task && g_lv.task->isBleEnabled();
-#if defined(TLORA_PAGER) && defined(MULTI_TRANSPORT_COMPANION)
+#if defined(WADA_ORDERED_WIFI_BLE) && defined(MULTI_TRANSPORT_COMPANION)
   requested = requested || wifiConfigGetBleEnabled();
 #endif
   return requested;
@@ -20366,7 +20366,7 @@ static void bleEnableSwitchCb(lv_event_t* e) {
       // checked so a second tap can cancel; only a true refusal reverts to OFF.
       // Other boards have no pending-request state, so a refusal always reverts.
       bool still_requested = false;
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
       still_requested = wifiConfigGetBleEnabled();
 #endif
       if (still_requested)
@@ -21338,12 +21338,12 @@ static void wifiQueueScanWhenReady() {
   if (wifiScanIsActive() ||
       __atomic_load_n(&s_wifiscan_request, __ATOMIC_ACQUIRE) ||
       s_wifiscan_drop_req || s_wifiscan_drop_ms != 0
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
       || s_wifiscan_wait_for_radio
 #endif
      ) return;
   ensureTileFetchTaskRunning();   // the worker idles out after 5 s — respawn it
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
   wifiScanSetActive(true);   // suppress main-loop reconnects for the whole sweep
   s_wifiscan_pager_guard_ms = millis();
   s_wifiscan_reconnect_after = false;
@@ -21391,7 +21391,7 @@ enum class WifiEnableGate : uint8_t { Ready, LowMemory };
 
 static WifiEnableGate wifiEnableGate() {
 #if defined(ESP32)
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
   const bool ordered_by_main_loop = true;
 #else
   const bool ordered_by_main_loop = false;
@@ -21434,7 +21434,7 @@ static bool wifiPrepareEnable(lv_obj_t* switch_to_revert = nullptr) {
 // apply too: once STA has been up for a few seconds without a link, ask for one rejoin
 // (wifiSwitchRejoinService). The Pager has its own ordered cold start; the Tanmatsu's
 // Wi-Fi lives on its C6.
-#if !defined(TLORA_PAGER) && !defined(HAS_TANMATSU)
+#if !defined(WADA_ORDERED_WIFI_BLE) && !defined(HAS_TANMATSU)
 static uint32_t s_wifi_switch_rejoin_ms = 0;   // when the wait started; 0 = nothing pending
 static void wifiSwitchRejoinService() {   // the decision: WifiSwitchRejoin.h (host-tested)
   if (!s_wifi_switch_rejoin_ms) return;
@@ -21452,7 +21452,7 @@ static void wifiSwitchRejoinService() {   // the decision: WifiSwitchRejoin.h (h
 #endif
 static void wifiRadioSwitch(bool on) {
   wifiConfigSetRadioEnabled(on);
-#if !defined(TLORA_PAGER) && !defined(HAS_TANMATSU)
+#if !defined(WADA_ORDERED_WIFI_BLE) && !defined(HAS_TANMATSU)
   s_wifi_switch_rejoin_ms = on ? millis() : 0;
 #endif
 }
@@ -21490,7 +21490,7 @@ static void wifiKickScan() {
   ensureTileFetchTaskRunning();
 #if defined(HAS_TANMATSU)
   __atomic_store_n(&s_wifiscan_request, true, __ATOMIC_RELEASE); // esp-hosted C6 sweeps fine while associated
-#elif defined(TLORA_PAGER)
+#elif defined(WADA_ORDERED_WIFI_BLE)
   wifiQueueScanWhenReady();                          // main task owns any cold STA allocation
 #else
   if (WiFi.status() == WL_CONNECTED) s_wifiscan_drop_req = true;
@@ -21505,7 +21505,7 @@ static void wifiKickScan() {
 // never eraseap, which wedges this radio). Drop the link, let the disassoc settle,
 // then kick the worker; wifiScanService rejoins once results land.
 static void wifiScanMainService() {
-#if !defined(TLORA_PAGER)
+#if !defined(WADA_ORDERED_WIFI_BLE)
   wifiSwitchRejoinService();
 #endif
   if (s_wifiscan_drop_req) {
@@ -21549,7 +21549,7 @@ static void wifiScanMainService() {
       const bool reconnect = s_wifiscan_reconnect_after;
       s_wifiscan_reconnect_after = false;
       wifiScanSetActive(false);           // un-gate main.cpp's reconnect retry
-#if !defined(TLORA_PAGER)
+#if !defined(WADA_ORDERED_WIFI_BLE)
       WiFi.setAutoReconnect(true);
 #endif
       if (reconnect) wifiConfigRequestApply();
@@ -21563,7 +21563,7 @@ static void wifiScanService() {
 #if defined(ESP32) && defined(MULTI_TRANSPORT_COMPANION) && !defined(HAS_TANMATSU)
   wifiScanMainService();   // drive the drop-link-then-scan handshake (main task)
 #endif
-#if defined(TLORA_PAGER) && defined(MULTI_TRANSPORT_COMPANION)
+#if defined(WADA_ORDERED_WIFI_BLE) && defined(MULTI_TRANSPORT_COMPANION)
   if (s_wifiscan_wait_for_radio) {
     const bool sta_ready = (WiFi.getMode() & WIFI_MODE_STA) != 0;
     if (!wifiConfigWantsWifi()) {
@@ -21599,7 +21599,7 @@ static void wifiScanService() {
 #if defined(ESP32) && defined(MULTI_TRANSPORT_COMPANION)
   wifiRebuildNetworkList();   // refresh the reworked Wi-Fi page (guarded: no-op unless it's open)
 #if !defined(HAS_TANMATSU)
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
   const bool reconnect_after_scan = s_wifiscan_reconnect_after;
   s_wifiscan_reconnect_after = false;
   s_wifiscan_pager_guard_ms = 0;
@@ -21611,7 +21611,7 @@ static void wifiScanService() {
     s_wifiscan_reconnect_after = false;
     s_wifiscan_guard_ms = 0;              // normal completion — disarm the stuck-gate deadline
     wifiScanSetActive(false);
-#if !defined(TLORA_PAGER)
+#if !defined(WADA_ORDERED_WIFI_BLE)
     WiFi.setAutoReconnect(true);
 #endif
     if (reconnect_after_scan)
@@ -21925,7 +21925,7 @@ static void wifiRefreshRowCb(lv_event_t* e) {
   if (!wifiConfigWantsWifi()) { if (g_lv.task) g_lv.task->showAlert(TR("Turn Wi-Fi on first"), 1200); return; }
   if (wifiScanIsActive() || s_wifiscan_request ||
       s_wifiscan_drop_req || s_wifiscan_drop_ms
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
       || s_wifiscan_wait_for_radio
 #endif
      ) return;   // a scan is already queued/running
@@ -21951,7 +21951,7 @@ static void wifiRebuildNetworkList() {
   // "Scanning…" spans the whole cycle: the main-task drop window AND the worker sweep.
   const bool scanning_now = (wifiScanIsActive() || s_wifiscan_request ||
                              s_wifiscan_drop_req || s_wifiscan_drop_ms != 0
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
                              || s_wifiscan_wait_for_radio
 #endif
                             );
@@ -36868,13 +36868,7 @@ static void uiLangFileBootLoad() {
 // but no SSID connected), always ran BOTH passes and tripped the task watchdog
 // -> panic reboot. Returns the AP count (0 on none/failure/timeout); read
 // results with WiFi.SSID(i).
-#if defined(HAS_TDECK_MAX) && !defined(WADA_WEB)
-void maxWifiEnsureStarted();   // main.cpp: a parked (stopped, still loaded) driver cannot scan
-#endif
 static int wifiScanWatchdogSafe(uint32_t cap_ms, uint16_t per_chan_ms = 300) {
-#if defined(HAS_TDECK_MAX) && !defined(WADA_WEB)
-  maxWifiEnsureStarted();
-#endif
   s_swd_status = (uint8_t)WiFi.status();
 #if defined(HAS_TDISPLAY_P4)
   // The P4 facade queues AT+CWLAP on the separate C6 worker. That command has
@@ -37580,7 +37574,7 @@ static void tileFetchTaskFn(void* arg) {
       // then OOM-panic (BLE-vs-Wi-Fi mutex, see main.cpp). wantsWifi() mirrors the boot
       // transport choice: true only when Wi-Fi is the active transport.
       if (!wifiConfigWantsWifi()) { s_wifiscan_done = true; continue; }
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
       // Cold STA allocation is order-sensitive with NimBLE on the Pager and is
       // owned exclusively by main.cpp. If the driver disappeared after the UI
       // released this request, fail the sweep instead of initializing it here.
@@ -81821,7 +81815,7 @@ static bool uiHistWaitWorkerIdle() {
 
 bool UITask::enableBle() {
   if (!_serial) return false;
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
   if (bleEnableWaitingForWifi()) {
     // Remember the request; main.cpp enables BLE when this bounded association
     // either succeeds or falls back. Wi-Fi intent without an active attempt
@@ -81834,7 +81828,7 @@ bool UITask::enableBle() {
   // The concrete transport applies the heap guard only when it must cold-start
   // NimBLE. A resident disabled stack can always be re-enabled allocation-free.
   if (_serial->isBleEnabled()) return true;
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
   // Same cold-start contract as Wi-Fi above. This is not an OOM failure the
   // user can repair by toggling the other radio: remember the requested state
   // and allocate NimBLE during the next ordered boot, before LVGL fragments

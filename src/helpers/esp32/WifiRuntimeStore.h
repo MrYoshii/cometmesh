@@ -1,5 +1,14 @@
 #pragma once
 
+/* Boards whose Wi-Fi and Bluetooth start in a fixed order, owned by main.cpp:
+ * Wi-Fi claims its memory and associates first, Bluetooth comes up after it.
+ * The T-Pager needs this for WPA3 stability; the T-Deck Max for memory, as its
+ * internal RAM fits both radios only in that order. */
+#if !defined(WADA_ORDERED_WIFI_BLE) && \
+    (defined(TLORA_PAGER) || (defined(HAS_TDECK_MAX) && !defined(WADA_WEB)))
+#define WADA_ORDERED_WIFI_BLE 1
+#endif
+
 /* NVS Wi-Fi credentials: namespace meshcomod; used by companion_radio and repeater_tcp. */
 #if defined(ESP32)
 
@@ -27,7 +36,7 @@ void wifiConfigSetRadioEnabled(bool enabled);
 bool wifiConfigGetBleEnabled();
 void wifiConfigSetBleEnabled(bool enabled);
 
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
 /* Pager coexistence ownership. Wi-Fi intent alone cannot answer whether a
  * cold NimBLE start is safe: touch builds keep the STA scannable even with no
  * SSID. Cold STA allocation and active WPA association own the short ordering

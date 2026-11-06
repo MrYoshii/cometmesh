@@ -22,25 +22,7 @@ static void memTrace(const char* tag) {
 #include <WiFi.h>
 #include <esp_wifi.h>
 #include <mbedtls/platform.h>
-// Wi-Fi off parks the driver instead of unloading it (as the Pager keeps its STA):
-// esp_wifi_stop() powers the radio down but keeps esp_wifi_init's ~36 KB of internal
-// RAM. Unloading it and loading it again needs a 20 KB contiguous block, which with
-// Bluetooth running the heap no longer had ("cold start refused"), so Wi-Fi could
-// not be turned back on without a reboot.
-static bool s_max_wifi_parked = false;
-static void maxWifiPark() {
-  WiFi.disconnect(false, false);
-  delay(50);
-  if (esp_wifi_stop() == ESP_OK) s_max_wifi_parked = true;
-  Serial.printf("[wifi] radio off (driver kept, parked=%d)\n", (int)s_max_wifi_parked);
-}
-static void maxWifiUnpark() {
-  if (!s_max_wifi_parked) return;
-  s_max_wifi_parked = false;
-  const esp_err_t e = esp_wifi_start();
-  Serial.printf("[wifi] radio on (unparked: %d)\n", (int)e);
-}
-void maxWifiEnsureStarted() { maxWifiUnpark(); }   // UITask: before a scan on a parked driver
+#include "helpers/esp32/WifiRuntimeStore.h"   // WADA_ORDERED_WIFI_BLE before the handoff blocks below
 static void* maxMbedtlsCalloc(size_t n, size_t size) {
   void* p = heap_caps_calloc(n, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   return p ? p : heap_caps_calloc(n, size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
@@ -169,7 +151,7 @@ static uint32_t _atoi(const char* sp) {
       #define WS_PORT 8765
     #endif
 
-    #if defined(TLORA_PAGER)
+    #if defined(WADA_ORDERED_WIFI_BLE)
     static void pagerLogInternalHeap(const char* phase) {
       const uint32_t caps = MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT;
       Serial.printf("[heap] %s: internal free=%u largest=%u low=%u dma=%u psram=%u\n",
@@ -1631,7 +1613,7 @@ void setup() {
    * on the Pager. Claim Wi-Fi's DMA/coexistence resources before starting BLE;
    * T-Deck does not reproduce this sequencing constraint. */
   bool want_wifi = wifiConfigWantsWifi();
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
   bool pager_wifi_ready_for_ble = false;
   const bool pager_want_ble = wifiConfigGetBleEnabled();
   const bool pager_has_wifi_credentials = wifiConfigHasRuntime();
@@ -1673,7 +1655,7 @@ void setup() {
         else if (event == ARDUINO_EVENT_WIFI_STA_GOT_IP)    wifi_needs_reconnect = false;
     });
     const bool wifi_mode_ready = WiFi.mode(WIFI_STA);
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
     if (!wifi_mode_ready) {
       pagerWifiEnterBleFallback("boot STA initialization failed");
     }
@@ -1689,7 +1671,7 @@ void setup() {
     // setup wizard, no creds yet) DTIM modem-sleep naps the radio through the
     // scan dwell, so WiFi.scanNetworks() comes back empty ("no networks found").
     // It's enabled once we actually associate — see the GOT_IP handler below.
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
     /* Arduino-ESP32 2.0.17 can watchdog in WPA3 SAE on the Pager when NimBLE
      * already owns the coexistence path. Start the saved Wi-Fi association
      * first and wait on the state transition (not a fixed delay), while
@@ -1748,7 +1730,7 @@ void setup() {
   // between BLE start-up and the UI taking over.
   serial_interface.setBlePhoneLinkPaused(touchPrefsGetBleKbdMode());
 #endif
-#if defined(TLORA_PAGER)
+#if defined(WADA_ORDERED_WIFI_BLE)
   {
     const bool want_ble = pager_want_ble;
     /* Serialise the Pager's first association before BLE init. Once associated,
@@ -1862,7 +1844,7 @@ void setup() {
   ui_task.begin(disp, &sensors, the_mesh.getNodePrefs());  // still want to pass this in as dependency, as prefs might be moved
   Serial.println("[BOOT] ui ready");
   memTrace("ui ready");
-#if defined(TLORA_PAGER) && defined(MULTI_TRANSPORT_COMPANION)
+#if defined(WADA_ORDERED_WIFI_BLE) && defined(MULTI_TRANSPORT_COMPANION)
   pagerLogInternalHeap("after UI init");
 #endif
 #endif
@@ -1918,7 +1900,7 @@ void loop() {
    * Pager setup separately guarantees that Wi-Fi claims its coexistence
    * resources before a cold BLE start. */
   bool wifi_radio_en = wifiConfigWantsWifi();
-#if defined(TLORA_PAGER) && defined(BLE_PIN_CODE)
+#if defined(WADA_ORDERED_WIFI_BLE) && defined(BLE_PIN_CODE)
   // BLE fallback pauses automatic association so a missing AP cannot make the
   // advertised GATT service disappear every retry interval. Turning Bluetooth
   // off resumes retries only when the STA allocation itself is healthy; an
@@ -1943,14 +1925,10 @@ void loop() {
   } else if (wifi_radio_en != wifi_radio_prev) {
     wifi_radio_prev = wifi_radio_en;
     if (!wifi_radio_en) {
-#if defined(HAS_TDECK_MAX)
-      if (WiFi.getMode() != WIFI_OFF) maxWifiPark();
-#else
       WiFi.disconnect(true);
       delay(50);
       WiFi.mode(WIFI_OFF);
-#endif
-#if defined(TLORA_PAGER) && defined(BLE_PIN_CODE)
+#if defined(WADA_ORDERED_WIFI_BLE) && defined(BLE_PIN_CODE)
       s_pager_wifi_ble_deadline_ms = 0;
       wifiConfigSetPagerWifiBlePhase(PagerWifiBlePhase::Idle);
       const bool ble_waiting = s_pager_ble_after_wifi ||
@@ -1984,7 +1962,7 @@ void loop() {
   wifi_apply_ready = !wifiScanIsActive();
 #endif
   if (wifi_apply_ready && wifiConfigConsumeApplyRequest()) {
-#if defined(TLORA_PAGER) && defined(BLE_PIN_CODE)
+#if defined(WADA_ORDERED_WIFI_BLE) && defined(BLE_PIN_CODE)
     // Cold Wi-Fi allocation and credential changes use the same live handoff:
     // preserve BLE intent and bond state, quiesce BLE traffic, let the main task
     // own esp_wifi_init and WPA, then resume BLE once Wi-Fi is stable (or has
@@ -1997,6 +1975,15 @@ void loop() {
       s_pager_wifi_ble_deadline_ms = 0;
       wifiConfigSetPagerWifiBlePhase(ordered_handoff
           ? PagerWifiBlePhase::Associating : PagerWifiBlePhase::Idle);
+#if defined(HAS_TDECK_MAX)
+      // The Max's internal RAM fits both radios only in boot order: with NimBLE
+      // resident, esp_wifi_init has too little left. Unload Bluetooth first;
+      // s_pager_ble_after_wifi brings it back after the association below.
+      if (cold_sta && serial_interface.isBleStackBegun()) {
+        serial_interface.releaseBleForWifiColdStart();
+        s_pager_ble_after_wifi = wifiConfigGetBleEnabled();
+      }
+#endif
       if (ordered_handoff && serial_interface.isBleStackBegun()) {
         if (!serial_interface.suspendBleForWifiReconnect()) {
           s_pager_ble_after_wifi = false;
@@ -2036,13 +2023,9 @@ void loop() {
      * so it is safe to add and it closes that leak. */
     if (wifi_started || WiFi.getMode() != WIFI_OFF) {
       if (!wifi_radio_en) {
-#if defined(HAS_TDECK_MAX)
-        if (!s_max_wifi_parked) maxWifiPark();
-#else
         WiFi.disconnect(true);
         delay(50);
         WiFi.mode(WIFI_OFF);
-#endif
       } else {
         WiFi.disconnect(false, false);
         delay(50);
@@ -2052,17 +2035,14 @@ void loop() {
     last_wifi_retry_ms = 0;
   }
   bool wifi_state_machine_active = wifi_radio_en;
-#if defined(TLORA_PAGER) && defined(BLE_PIN_CODE)
+#if defined(WADA_ORDERED_WIFI_BLE) && defined(BLE_PIN_CODE)
   wifi_state_machine_active = wifi_state_machine_active && !wifiConfigPagerBleFallbackActive();
 #endif
   if (wifi_state_machine_active) {
     if (!wifi_started) {
       const bool wifi_mode_ready = WiFi.mode(WIFI_STA);
-#if defined(HAS_TDECK_MAX)
-      if (wifi_mode_ready) maxWifiUnpark();   // WiFi.mode() sees STA already set and starts nothing
-#endif
       if (!wifi_mode_ready) {
-#if defined(TLORA_PAGER) && defined(BLE_PIN_CODE)
+#if defined(WADA_ORDERED_WIFI_BLE) && defined(BLE_PIN_CODE)
         const bool ble_waiting = s_pager_ble_after_wifi ||
                                  (wifiConfigGetBleEnabled() &&
                                   !serial_interface.isBleStackBegun());
@@ -2092,14 +2072,14 @@ void loop() {
         wifiConfigGetSsid(ssid, sizeof(ssid));
         wifiConfigGetPwd(pwd, sizeof(pwd));
         if (strlen(ssid) > 0 && WiFi.status() != WL_CONNECTED) {
-#if defined(TLORA_PAGER) && defined(BLE_PIN_CODE)
+#if defined(WADA_ORDERED_WIFI_BLE) && defined(BLE_PIN_CODE)
           wifiConfigSetPagerWifiBlePhase(PagerWifiBlePhase::Associating);
 #endif
           WiFi.begin(ssid, pwd[0] ? pwd : nullptr);
         }
         last_wifi_retry_ms = millis();
         wifi_rejoin.noteAttempt(last_wifi_retry_ms);
-#if defined(TLORA_PAGER) && defined(BLE_PIN_CODE)
+#if defined(WADA_ORDERED_WIFI_BLE) && defined(BLE_PIN_CODE)
       } else if (wifi_mode_ready) {
         wifiConfigSetPagerWifiBlePhase(PagerWifiBlePhase::Idle);
         s_pager_wifi_ble_deadline_ms = 0;
@@ -2134,7 +2114,7 @@ void loop() {
       uint32_t now = millis();
       if (wifi_rejoin.shouldRejoin(rejoin_in, now)) {
         last_wifi_retry_ms = now;
-#if defined(TLORA_PAGER) && defined(BLE_PIN_CODE)
+#if defined(WADA_ORDERED_WIFI_BLE) && defined(BLE_PIN_CODE)
         s_pager_ble_after_wifi = wifiConfigGetBleEnabled();
         s_pager_wifi_ble_deadline_ms = 0;
         wifiConfigSetPagerWifiBlePhase(PagerWifiBlePhase::Associating);
@@ -2177,7 +2157,7 @@ void loop() {
      * timestamps on messages are accurate and an RTC chip gets it too
      * (SntpClockPush.h has why "first result only" was not enough). */
     if (WiFi.status() == WL_CONNECTED) {
-#if defined(TLORA_PAGER) && defined(BLE_PIN_CODE)
+#if defined(WADA_ORDERED_WIFI_BLE) && defined(BLE_PIN_CODE)
       wifiConfigSetPagerWifiBlePhase(PagerWifiBlePhase::Connected);
       s_pager_wifi_ble_deadline_ms = 0;
       // Consume only the explicit handoff token. If a cold NimBLE start is
@@ -2251,14 +2231,14 @@ void loop() {
         }
       }
     } else {
-#if defined(TLORA_PAGER) && defined(BLE_PIN_CODE)
+#if defined(WADA_ORDERED_WIFI_BLE) && defined(BLE_PIN_CODE)
       if (wifiConfigGetPagerWifiBlePhase() == PagerWifiBlePhase::Connected)
         wifiConfigSetPagerWifiBlePhase(PagerWifiBlePhase::Idle);
 #endif
       // Link dropped: allow re-sync on next reconnect.
       s_sntp_push.linkDown();
     }
-#if defined(TLORA_PAGER) && defined(BLE_PIN_CODE)
+#if defined(WADA_ORDERED_WIFI_BLE) && defined(BLE_PIN_CODE)
     if (s_pager_wifi_ble_deadline_ms != 0 &&
         (int32_t)(millis() - s_pager_wifi_ble_deadline_ms) >= 0) {
       s_pager_wifi_ble_deadline_ms = 0;
