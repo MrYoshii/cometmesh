@@ -1,0 +1,93 @@
+name: build
+
+# Comet firmware build: the T-Deck Max and both T-LoRa Pager radio variants.
+# Started by hand only (Actions -> build -> Run workflow, or
+# `gh workflow run build.yml`), so nothing builds on a push by itself.
+# Every board's flashable images are attached as artifacts: firmware.bin (app
+# only, flash at 0x10000, keeps settings) and firmware-merged.bin (full image at
+# 0x0, erases settings).
+
+on:
+  workflow_dispatch:
+    inputs:
+      boards:
+        description: 'Which boards'
+        type: choice
+        default: all
+        options: [all, max, pager]
+
+permissions:
+  contents: read
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      envs: ${{ steps.pick.outputs.envs }}
+    steps:
+      - id: pick
+        run: |
+          case "${{ inputs.boards }}" in
+            max)   envs='["LilyGo_TDeck_Max_companion_radio_touch"]' ;;
+            pager) envs='["tlora_pager_sx1262_companion_radio_touch","tlora_pager_lr1121_companion_radio_touch"]' ;;
+            *)     envs='["LilyGo_TDeck_Max_companion_radio_touch","tlora_pager_sx1262_companion_radio_touch","tlora_pager_lr1121_companion_radio_touch"]' ;;
+          esac
+          echo "envs=$envs" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env: ${{ fromJSON(needs.matrix.outputs.envs) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            .pio/libdeps
+          key: pio-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: pio-${{ matrix.env }}-
+
+      - name: Install PlatformIO
+        run: pip install --upgrade platformio
+
+      - name: Build
+        run: |
+          unset WIFI_SSID WIFI_PWD
+          TAG="dev-${GITHUB_SHA::7}"
+          export PLATFORMIO_BUILD_FLAGS="-DFIRMWARE_RELEASE_TAG='\"${TAG}\"' -DFIRMWARE_VERSION='\"${TAG}\"'"
+          pio run -t mergebin -e "${{ matrix.env }}" 2>&1 | tee build.log
+          exit ${PIPESTATUS[0]}
+
+      - name: Report compiler errors
+        if: failure()
+        run: |
+          grep -E "(error|Error)[: ]" build.log | grep -v "^Compiling" | head -40 | while IFS= read -r l; do
+            echo "::error::${l//%/%25}"
+          done
+
+      - name: Upload firmware
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: comet-${{ matrix.env }}-${{ github.sha }}
+          path: |
+            .pio/build/${{ matrix.env }}/firmware-merged.bin
+            .pio/build/${{ matrix.env }}/firmware.bin
+          if-no-files-found: error
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: log-${{ matrix.env }}-${{ github.sha }}
+          path: build.log

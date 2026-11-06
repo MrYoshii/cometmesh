@@ -14,7 +14,7 @@ body:
     attributes:
       label: Board
       description: Which device, and which revision if you know it.
-      placeholder: LilyGo T-Deck Plus
+      placeholder: LilyGo T-Deck Max
     validations:
       required: true
 
@@ -22,8 +22,8 @@ body:
     id: version
     attributes:
       label: Firmware version
-      description: Settings, About. A beta number such as beta_84, or the stable version.
-      placeholder: beta_84
+      description: Settings, About. The build, such as dev-1a2b3c4.
+      placeholder: dev-1a2b3c4
     validations:
       required: true
 
