@@ -292,6 +292,7 @@ static int bkHttp(const char* method, const char* url, const char* payload, bool
   http.setTimeout(20000);
   http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
   http.setUserAgent("wadamesh-books");
+  http.useHTTP10(true);   // no chunked replies: the body is read straight off the stream
   WiFiClientSecure tls; WiFiClient plain;
   const bool https = strncasecmp(url, "https://", 8) == 0;
   bool began;
