@@ -461,6 +461,10 @@ static int bkAuthed(const char* method, const char* path, const char* payload,
 
 static void bkJobMsgForCode(int code) {
   if (code == 401) snprintf(s_bk_job_msg, sizeof s_bk_job_msg, "Signed out by the server: log in again");
+  else if (code == HTTPC_ERROR_TOO_LESS_RAM)
+    snprintf(s_bk_job_msg, sizeof s_bk_job_msg, "The server's reply is too large (%d)", code);
+  else if (code == HTTPC_ERROR_CONNECTION_LOST || code == HTTPC_ERROR_READ_TIMEOUT)
+    snprintf(s_bk_job_msg, sizeof s_bk_job_msg, "The reply broke off (%d)", code);
   else if (code < 0) snprintf(s_bk_job_msg, sizeof s_bk_job_msg, "Server not reachable (%d)", code);
   else snprintf(s_bk_job_msg, sizeof s_bk_job_msg, "Server answered %d", code);
 }
@@ -612,8 +616,17 @@ static void bkJobOpenSession() {
       "{\"deviceInfo\":{\"clientName\":\"wadamesh\",\"deviceId\":\"wadamesh-max\"},"
       "\"forceDirectPlay\":true,\"forceTranscode\":false,\"mediaPlayer\":\"wadamesh\","
       "\"supportedMimeTypes\":[\"audio/mpeg\"]}";
+  // The reply carries the whole library item (every audio file with its tags), easily
+  // past the usual limit for a long book: allow what PSRAM has.
+  size_t room = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  room = room > 1024u * 1024u ? room - 1024u * 1024u : kBkJsonCap;
+  if (room > 6u * 1024u * 1024u) room = 6u * 1024u * 1024u;
+  if (room < kBkJsonCap) room = kBkJsonCap;
+  s_bk_body_cap = room;
   uint8_t* body = nullptr; size_t len = 0;
   const int code = bkAuthed("POST", path, kBody, &body, &len, nullptr);
+  s_bk_body_cap = kBkJsonCap;
+  Serial.printf("[books] play session: HTTP %d, %u bytes\n", code, (unsigned)len);
   if (code != 200 || !body) { bkJobMsgForCode(code); bkFree(body); return; }
   JsonDocument filter(&s_bk_json_alloc);
   filter["id"] = true;
