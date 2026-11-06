@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# LilyGo T-Deck Max: ESP32-S3R8 module flash 16 MB QIO, 8 MB QSPI PSRAM.
+CONFIG_IDF_TARGET="esp32s3"
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+CONFIG_SPIRAM_MODE_QUAD=y
+CONFIG_SPIRAM_SPEED_80M=y
+# Same table as the PlatformIO build: NVS and the user-data partition keep their offsets,
+# so switching between the two builds keeps settings, contacts and chats.
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="../variants/lilygo_tdeck_max/partitions_tdeck_max.csv"

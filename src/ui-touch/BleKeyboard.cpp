@@ -24,6 +24,15 @@
 #  include "nimble/nimble/host/include/host/ble_hs.h"
 #endif
 #include <cstring>
+// NimBLE-Arduino 1.4 (PlatformIO build) or esp-nimble-cpp 2.x (ESP-IDF build): the 2.x
+// callbacks take connection info and const devices, scans and timeouts are in ms.
+#if defined(NIMBLE_CPP_DEVICE_H_)
+#  define BLEKBD_NIMBLE2 1
+#  define BLEKBD_SECONDS(s) ((s) * 1000)
+#else
+#  define BLEKBD_NIMBLE2 0
+#  define BLEKBD_SECONDS(s) (s)
+#endif
 #include "esp_heap_caps.h"
 #include "esp_system.h"   // esp_random()
 #include "freertos/FreeRTOS.h"
@@ -487,7 +496,11 @@ void onReport(NimBLERemoteCharacteristic* chr, uint8_t* data, size_t len, bool) 
 // ---- link -----------------------------------------------------------------------
 
 class ClientCallbacks : public NimBLEClientCallbacks {
+#if BLEKBD_NIMBLE2
+  void onDisconnect(NimBLEClient*, int) override {
+#else
   void onDisconnect(NimBLEClient*) override {
+#endif
     memset(s_prev_keys, 0, sizeof s_prev_keys);
     s_gui_down = false;
     s_gui_alone = false;
@@ -501,8 +514,16 @@ class ClientCallbacks : public NimBLEClientCallbacks {
 };
 ClientCallbacks s_client_cb;
 
+void onScanDone();
+
+#if BLEKBD_NIMBLE2
+class ScanCallbacks : public NimBLEScanCallbacks {
+  void onScanEnd(const NimBLEScanResults&, int) override { onScanDone(); }
+  void onResult(const NimBLEAdvertisedDevice* adv) override {
+#else
 class ScanCallbacks : public NimBLEAdvertisedDeviceCallbacks {
   void onResult(NimBLEAdvertisedDevice* adv) override {
+#endif
     const bool hid = adv->isAdvertisingService(NimBLEUUID(kUuidHid));
     const uint16_t appearance = adv->haveAppearance() ? adv->getAppearance() : 0;
     const bool hid_appearance = appearance >= 0x03C0 && appearance <= 0x03CF;
@@ -514,7 +535,11 @@ class ScanCallbacks : public NimBLEAdvertisedDeviceCallbacks {
       strncpy(dev.name, n.c_str(), sizeof dev.name - 1);
     }
     const NimBLEAddress addr = adv->getAddress();
+#if BLEKBD_NIMBLE2
+    memcpy(dev.addr, addr.getVal(), 6);
+#else
     memcpy(dev.addr, addr.getNative(), 6);
+#endif
     dev.addr_type = addr.getType();
     const int rssi = adv->getRSSI();
     dev.rssi = (int8_t)(rssi < -127 ? -127 : (rssi > 0 ? 0 : rssi));
@@ -540,6 +565,14 @@ class ScanCallbacks : public NimBLEAdvertisedDeviceCallbacks {
 };
 ScanCallbacks s_scan_cb;
 
+bool nimbleUp() {
+#if BLEKBD_NIMBLE2
+  return NimBLEDevice::isInitialized();
+#else
+  return NimBLEDevice::getInitialized();
+#endif
+}
+
 State restingState() {
   if (isLinkUp()) return State::Connected;
   portENTER_CRITICAL(&s_mux);
@@ -548,9 +581,12 @@ State restingState() {
   return st;
 }
 
-void onScanDone(NimBLEScanResults) {
+void onScanDone() {
   if (getState() == State::Scanning) setState(restingState());
 }
+#if !BLEKBD_NIMBLE2
+void onScanDoneCb(NimBLEScanResults) { onScanDone(); }
+#endif
 
 void stopScan() {
   NimBLEScan* scan = NimBLEDevice::getScan();
@@ -568,7 +604,7 @@ NimBLEAddress toAddress(const Device& dev) {
 }
 
 bool ensureClient() {
-  if (!NimBLEDevice::getInitialized()) {
+  if (!nimbleUp()) {
     s_client = nullptr;
     return false;
   }
@@ -650,7 +686,11 @@ bool setupHid() {
   // Discover every characteristic once and take them all from this list: a
   // later refresh deletes these objects, along with the notify callbacks set
   // on them.
+#if BLEKBD_NIMBLE2
+  const std::vector<NimBLERemoteCharacteristic*>* chars = &hid->getCharacteristics(true);
+#else
   const std::vector<NimBLERemoteCharacteristic*>* chars = hid->getCharacteristics(true);
+#endif
   if (!chars || chars->empty()) {
     Serial.println("[blekbd] HID: no characteristics");
     return false;
@@ -792,7 +832,7 @@ void doPair(int index, bool with_code) {
                 addr.toString().c_str(), (unsigned)dev.addr_type, with_code ? "with" : "without");
   setError(Error::None);
   setState(State::Connecting);
-  s_client->setConnectTimeout(12);
+  s_client->setConnectTimeout(BLEKBD_SECONDS(12));
   forgetAttributes();
   s_connecting = true;
   bool ok = s_client->connect(addr, true);
@@ -847,7 +887,7 @@ bool reconnectOnce() {
     setError(Error::NeedsPairing);
     return false;
   }
-  s_client->setConnectTimeout(10);
+  s_client->setConnectTimeout(BLEKBD_SECONDS(10));
   forgetAttributes();
   s_connecting = true;
   bool ok = s_client->connect(addr, true);
@@ -876,7 +916,7 @@ bool wantReconnect() {
   portENTER_CRITICAL(&s_mux);
   const bool want = s_active && s_have_peer && s_error != Error::NeedsPairing;
   portEXIT_CRITICAL(&s_mux);
-  return want && !s_suspended && NimBLEDevice::getInitialized();
+  return want && !s_suspended && nimbleUp();
 }
 
 void handle(const Cmd& c) {
@@ -887,7 +927,7 @@ void handle(const Cmd& c) {
       setState(restingState());
       break;
     case CmdType::Deactivate:
-      if (NimBLEDevice::getInitialized()) {
+      if (nimbleUp()) {
         stopScan();
         disconnectAndWait();
       }
@@ -901,20 +941,28 @@ void handle(const Cmd& c) {
       bumpLocked();
       portEXIT_CRITICAL(&s_mux);
       NimBLEScan* scan = NimBLEDevice::getScan();
+#if BLEKBD_NIMBLE2
+      scan->setScanCallbacks(&s_scan_cb, true);
+#else
       scan->setAdvertisedDeviceCallbacks(&s_scan_cb, true);
+#endif
       scan->setMaxResults(0);   // keep nothing; the callback copies what it needs
       scan->setActiveScan(true);
       scan->setInterval(100);
       scan->setWindow(60);
       scan->clearResults();
       setError(Error::None);
-      if (scan->start(kScanSeconds, onScanDone, false)) setState(State::Scanning);
+#if BLEKBD_NIMBLE2
+      if (scan->start(kScanSeconds * 1000, false, false)) setState(State::Scanning);
+#else
+      if (scan->start(kScanSeconds, onScanDoneCb, false)) setState(State::Scanning);
+#endif
       break;
     }
     case CmdType::ScanOff: {
       // Also closes out a failed attempt: leaving the pairing screen resumes
       // reconnecting to the keyboard that was paired before.
-      if (NimBLEDevice::getInitialized()) stopScan();
+      if (nimbleUp()) stopScan();
       const State st = getState();
       if (st == State::Scanning || st == State::Failed) {
         if (st == State::Failed) setError(Error::None);
@@ -928,7 +976,7 @@ void handle(const Cmd& c) {
     case CmdType::Forget: {
       Device dev = {};
       const bool had = havePeer(&dev);
-      if (NimBLEDevice::getInitialized()) {
+      if (nimbleUp()) {
         disconnectAndWait();
         if (had) {
           const NimBLEAddress addr = toAddress(dev);
@@ -1015,7 +1063,7 @@ void setActive(bool on) {
   } else if (s_task) {
     interruptConnect();
     // Wake a pairing or reconnect that is waiting on the keyboard.
-    if (NimBLEDevice::getInitialized() && isLinkUp()) s_client->disconnect();
+    if (nimbleUp() && isLinkUp()) s_client->disconnect();
     post(CmdType::Deactivate);
   }
 }
@@ -1244,13 +1292,13 @@ void suspend(bool on) {
   s_suspended = on;
   if (on) {
     interruptConnect();
-    if (NimBLEDevice::getInitialized() && isLinkUp()) s_client->disconnect();
+    if (nimbleUp() && isLinkUp()) s_client->disconnect();
   } else if (s_cmdq) {
     post(CmdType::Activate);   // wakes the worker, which reconnects
   }
 }
 
-bool linkUp() { return NimBLEDevice::getInitialized() && isLinkUp(); }
+bool linkUp() { return nimbleUp() && isLinkUp(); }
 
 void stackGoingDown() {
   if (!s_task) return;

@@ -2,6 +2,7 @@
 #include "TDeckProDisplay.h"
 
 #include <Arduino.h>
+#include <helpers/esp32/LedcCompat.h>
 #if defined(HAS_TDECK_MAX)
 #include "esp32-hal-i2c.h"
 #endif
@@ -122,11 +123,10 @@ bool TDeckProDisplay::begin() {
   // at about 40 MHz here; 12 kHz x 12 bit never came up). The flicker seen at low
   // levels was the LED driver failing to regulate very short pulses, not the PWM
   // rate, so the bottom of the range is lifted instead (writeBrightness).
-  ledcSetup(TDECK_PRO_FRONTLIGHT_CHANNEL, 12000, 11);
+  ledcCompatAttach(PIN_TFT_LEDA_CTL, TDECK_PRO_FRONTLIGHT_CHANNEL, 12000, 11);
 #else
-  ledcSetup(TDECK_PRO_FRONTLIGHT_CHANNEL, 12000, 8);
+  ledcCompatAttach(PIN_TFT_LEDA_CTL, TDECK_PRO_FRONTLIGHT_CHANNEL, 12000, 8);
 #endif
-  ledcAttachPin(PIN_TFT_LEDA_CTL, TDECK_PRO_FRONTLIGHT_CHANNEL);
   writeBrightness(0);
 #else
   _brightness = 0;
@@ -401,9 +401,9 @@ void TDeckProDisplay::writeBrightness(uint8_t brightness) {
     // fifth of the slider barely changed anything.
     duty = (uint32_t)(kMinDuty + (2047.0f - kMinDuty) * f * sqrtf(f) + 0.5f);
   }
-  ledcWrite(TDECK_PRO_FRONTLIGHT_CHANNEL, duty);
+  ledcCompatWrite(PIN_TFT_LEDA_CTL, TDECK_PRO_FRONTLIGHT_CHANNEL, duty);
 #elif defined(PIN_TFT_LEDA_CTL) && (PIN_TFT_LEDA_CTL >= 0)
-  ledcWrite(TDECK_PRO_FRONTLIGHT_CHANNEL, brightness);
+  ledcCompatWrite(PIN_TFT_LEDA_CTL, TDECK_PRO_FRONTLIGHT_CHANNEL, brightness);
 #else
   (void)brightness;
 #endif

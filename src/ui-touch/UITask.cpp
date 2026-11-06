@@ -1,4 +1,5 @@
 #include "UITask.h"
+#include <helpers/esp32/LedcCompat.h>
 #include "TouchSleep.h"
 #include "ChatHashtag.h"
 #include <climits>         // INT_MAX (glibc does not pull it in transitively, macOS/ESP-IDF do)
@@ -58039,11 +58040,10 @@ static void applyBrightness(uint8_t pct) {
   if (pct > 100) pct = 100;
   s_brightness_pct = pct;
   if (!s_bl_pwm_ready) {
-    ledcSetup(kBlPwmChannel, 20000, 8);              // 20 kHz, 8-bit
-    ledcAttachPin(PIN_TFT_LEDA_CTL, kBlPwmChannel);  // takes the pin over from the display's digitalWrite
+    ledcCompatAttach(PIN_TFT_LEDA_CTL, kBlPwmChannel, 20000, 8);   // 20 kHz, 8-bit; takes the pin over from the display's digitalWrite
     s_bl_pwm_ready = true;
   }
-  ledcWrite(kBlPwmChannel, (uint32_t)pct * 255u / 100u);
+  ledcCompatWrite(PIN_TFT_LEDA_CTL, kBlPwmChannel, (uint32_t)pct * 255u / 100u);
 }
 #elif defined(HAS_TANMATSU)
 // Tanmatsu: backlights + audio go through the bsp — the CH32 coprocessor (screen +
@@ -80482,7 +80482,7 @@ static inline void touchScreenBacklight(bool on) {
   // the PWM duty directly: 0 = off, saved brightness = on.
   if (!s_bl_pwm_ready) applyBrightness(s_brightness_pct);   // ensure LEDC is attached
   if (on) touchPanelSleep(false);   // wake the panel BEFORE lighting it (old frame intact)
-  ledcWrite(kBlPwmChannel, on ? ((uint32_t)s_brightness_pct * 255u / 100u) : 0u);
+  ledcCompatWrite(PIN_TFT_LEDA_CTL, kBlPwmChannel, on ? ((uint32_t)s_brightness_pct * 255u / 100u) : 0u);
   if (!on) touchPanelSleep(true);   // then stop the panel driving the crystals (anti burn-in)
 #if defined(HELTEC_LORA_V4_R8)
   // Dark screen: throttle the CHSC6x poll task (8 ms -> 50 ms) — its blocking

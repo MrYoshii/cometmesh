@@ -5,6 +5,7 @@
 
 #include <Arduino.h>
 #include <Wire.h>
+#include <helpers/esp32/LedcCompat.h>
 #include <Adafruit_TCA8418.h>
 #include "PagerKeyboardState.h"
 
@@ -157,11 +158,10 @@ int pagerKeyboardReadKey() {
 
 void pagerKeyboardSetBacklight(uint8_t level) {
   if (!s_bl_ready) {
-    ledcSetup(kKbBacklightPwmChannel, 1000 /* Hz */, 8 /* bits */);
-    ledcAttachPin(KB_BACKLIGHT, kKbBacklightPwmChannel);
+    ledcCompatAttach(KB_BACKLIGHT, kKbBacklightPwmChannel, 1000 /* Hz */, 8 /* bits */);
     s_bl_ready = true;
   }
-  ledcWrite(kKbBacklightPwmChannel, level);
+  ledcCompatWrite(KB_BACKLIGHT, kKbBacklightPwmChannel, level);
 }
 
 bool pagerKeyboardAltHeld() { return s_state.altHeld(); }
