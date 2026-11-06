@@ -1,5 +1,6 @@
 #include "UITask.h"
 #include <helpers/esp32/LedcCompat.h>
+#include <helpers/esp32/WdtFeed.h>
 #include "TouchSleep.h"
 #include "ChatHashtag.h"
 #include <climits>         // INT_MAX (glibc does not pull it in transitively, macOS/ESP-IDF do)
@@ -61742,7 +61743,7 @@ static void captureScreenToSerial(const char* name) {
   Serial.flush();
   free(buf);
 }
-static void docSettle(int frames) { for (int i = 0; i < frames; ++i) { lv_timer_handler(); delay(22); } esp_task_wdt_reset(); }
+static void docSettle(int frames) { for (int i = 0; i < frames; ++i) { lv_timer_handler(); delay(22); } wdtFeed(); }
 static void docSettleLong(int frames) {   // docSettle only feeds the watchdog at its end
   for (; frames > 0; frames -= 25) docSettle(frames < 25 ? frames : 25);
 }
@@ -61752,7 +61753,7 @@ static void ssaverTeardown(bool lit);
 #endif
 static void docAuditTour();       // every other surface, defined at the end of the file
 static void docCaptureTour() {
-  delay(400); esp_task_wdt_reset();
+  delay(400); wdtFeed();
   Serial.print("\n<<<WMTOUR START>>>\n"); Serial.flush();
   // The device can sit idle long enough waiting for the host that the screensaver
   // (or a dark screen) comes up, and the tour blocks the loop that would end it, so
@@ -61803,7 +61804,7 @@ static void docCaptureTour() {
   // The reader renders from the UI-update poll (which doesn't run while this tour
   // blocks the loop), so drive the fetch-wait + render inline here.
   openReaderPage("wadamesh.com");
-  { int _w = 0; while (s_reader_busy && _w < 700) { lv_timer_handler(); delay(22); ++_w; } esp_task_wdt_reset(); }
+  { int _w = 0; while (s_reader_busy && _w < 700) { lv_timer_handler(); delay(22); ++_w; } wdtFeed(); }
   if (s_reader_ok) { readerRenderBody(); readerSetAddrExpanded(false); }
   else             { readerShowMessage(s_reader_msg[0] ? s_reader_msg : "Couldn't load page", 0xE0A0A0); readerSetAddrExpanded(true); }
   docSettle(8); captureScreenToSerial("app_web");       closeReaderPage(); docSettle(6);
@@ -87078,7 +87079,7 @@ static void docMeshWait(uint32_t ms, bool (*done)() = nullptr) {
     the_mesh.loop();
     lv_timer_handler();
     delay(5);
-    esp_task_wdt_reset();
+    wdtFeed();
     if (done && done()) break;
   }
 }
@@ -87322,7 +87323,7 @@ static void docAuditFocus() {
       ++calls;
       ssaverTick(millis());
       delay(4);
-      esp_task_wdt_reset();
+      wdtFeed();
     }
     Serial.printf("DBG: mode %d: LVGL busy %u%%, %d calls, flush %u ms for %u px\n", mode,
                   (unsigned)(busy / 60000u), calls, (unsigned)(s_dbg_flush_us / 1000u), (unsigned)s_dbg_flush_px);

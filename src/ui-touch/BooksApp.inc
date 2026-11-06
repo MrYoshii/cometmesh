@@ -859,6 +859,16 @@ static void bkAudioDirFor(const char* item, char* out, size_t cap) {
 // A book copied onto the card by hand gets an id of its own: never sent to a server.
 static bool bkIsLocalId(const char* id) { return strncmp(id, "local:", 6) == 0; }
 
+// A download's own folder (bkAudioDirFor: eight hex digits). Its book.json is written last,
+// so until then it holds MP3s and no manifest, which is exactly what a folder copied by
+// hand looks like. Such a folder is never imported: it is a download that has not finished.
+static bool bkIsDownloadDirName(const char* name) {
+  if (strlen(name) != 8) return false;
+  for (int i = 0; i < 8; ++i)
+    if (!((name[i] >= '0' && name[i] <= '9') || (name[i] >= 'a' && name[i] <= 'f'))) return false;
+  return true;
+}
+
 static bool bkIsMp3(const char* name) {
   const char* dot = strrchr(name, '.');
   return name[0] != '.' && dot && strcasecmp(dot, ".mp3") == 0;   // not macOS "._x.mp3"
@@ -887,6 +897,8 @@ static void booksScanAudio() {
     char path[kBkDirMax + 16];
     snprintf(path, sizeof path, "%s/book.json", dir);
     File m = fs->open(path, FILE_READ);
+    const bool download_dir = bkIsDownloadDirName(name);
+    if (!m && download_dir) return;   // a download still under way, or broken off: not a book yet
     if (!m) {
       // No manifest: a folder of MP3s copied here is a book to import.
       bool mp3 = mp3_seen;
@@ -913,7 +925,11 @@ static void booksScanAudio() {
     JsonDocument filter(&s_bk_json_alloc);
     filter["id"] = true; filter["title"] = true; filter["author"] = true;
     JsonDocument doc(&s_bk_json_alloc);
-    if (!deserializeJson(doc, m, DeserializationOption::Filter(filter))) {
+    const bool parsed = !deserializeJson(doc, m, DeserializationOption::Filter(filter));
+    // Before this check, an unfinished download was imported as a hand-copied folder: a local
+    // book named after its folder. Hide those; finishing the download writes the real book.json.
+    if (parsed && download_dir && bkIsLocalId(doc["id"] | "")) { m.close(); return; }
+    if (parsed) {
       BkAudioBook& b = s_bk_aud[s_bk_aud_count++];
       memset(&b, 0, sizeof b);
       bkCopy(b.dir, sizeof b.dir, dir);
@@ -1280,7 +1296,23 @@ static bool bkdClose(bool rename_it) {   // drained, closed, renamed by the UI t
 
 static bool bkaOpen(HTTPClient& http, WiFiClientSecure& tls, WiFiClient& plain, const BkaTrack& tr,
                     uint32_t from, uint32_t* total, int* code_out);   // BooksAudio.inc
+#include <esp_bt.h>     // esp_bt_controller_get_status
+#include <esp_wifi.h>   // esp_wifi_set_ps
+
+// Wi-Fi power save off for the length of a download: with modem sleep the radio dozes
+// between beacons, and on a weak link that is where the downloads stall. Only while
+// Bluetooth is down, because the controller needs modem sleep to share the antenna
+// (main.cpp: WIFI_PS_NONE aborts in the Wi-Fi PM with the controller running).
+static void bkWifiFast(bool on) {
+  static bool s_on = false;
+  if (on == s_on) return;
+  if (on && esp_bt_controller_get_status() != ESP_BT_CONTROLLER_STATUS_IDLE) return;
+  if (esp_wifi_set_ps(on ? WIFI_PS_NONE : WIFI_PS_MIN_MODEM) == ESP_OK) s_on = on;
+  Serial.printf("[bkd] Wi-Fi power save %s\n", s_on ? "off for the download" : "back on");
+}
+
 static void bkdTaskFn(void*) {
+  bkWifiFast(true);
   uint8_t* buf = (uint8_t*)heap_caps_malloc(4096, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   uint32_t log_at = millis(), net_bytes = 0;   // the 10 s download log
   if (!s_bkd_ring) s_bkd_ring = (uint8_t*)heap_caps_malloc(kBkdRing, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -1438,6 +1470,7 @@ static void bkdTaskFn(void*) {
   }
   if (ok) snprintf(s_bkd_msg, sizeof s_bkd_msg, "On the SD card: plays offline");
   if (buf) heap_caps_free(buf);
+  bkWifiFast(false);
   s_bkd_ok = ok;
   s_bkd_done = true;
   s_bkd_active = false;

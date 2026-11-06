@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <esp_log.h>   // needed for PlatformIO
+#include <helpers/esp32/WdtFeed.h>
 #include <Mesh.h>
 #include "MyMesh.h"
 
@@ -534,7 +535,7 @@ bool meshcomodMigrateSpiffsToSd(bool force) {
       source_read += n;
       // A large history file on a slow card can exceed the task-WDT window.
       since_feed += n;
-      if (since_feed >= 32768) { esp_task_wdt_reset(); since_feed = 0; }
+      if (since_feed >= 32768) { wdtFeed(); since_feed = 0; }
     }
     source.close();
     if (d) d.close();
@@ -595,7 +596,7 @@ bool meshcomodMigrateSpiffsToSd(bool force) {
       SD.remove(tmp);
 #endif
     }
-    esp_task_wdt_reset();
+    wdtFeed();
     yield();
   }
   root.close();
@@ -625,7 +626,7 @@ bool meshcomodMigrateSpiffsToSd(bool force) {
     }
     ++copied;
     identity_ok = true;
-    esp_task_wdt_reset();
+    wdtFeed();
     yield();
   }
   // The boot path skips files the card already has — an identity already on the
@@ -817,11 +818,6 @@ void setup() {
       "                   *                 .\n"
       "\n");
   Serial.println("[BOOT] setup start");
-#if ESP_IDF_VERSION_MAJOR >= 5
-  // IDF 5 logs every esp_task_wdt_reset() from a task the watchdog does not watch
-  // (IDF 4.4 returned the same error silently). Several feed points run on such tasks.
-  esp_log_level_set("task_wdt", ESP_LOG_NONE);
-#endif
   Serial.printf("[BOOT] Comet %s on meshcomod %s\n", FIRMWARE_VERSION, FIRMWARE_CORE_VERSION);
   // The SDK ships CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096: every allocation
   // under 4 KB is forced into internal DRAM even when PSRAM is free. On the V4
@@ -1657,6 +1653,12 @@ void setup() {
         else if (event == ARDUINO_EVENT_WIFI_STA_GOT_IP)    wifi_needs_reconnect = false;
     });
     const bool wifi_mode_ready = WiFi.mode(WIFI_STA);
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
+    // Join the strongest access point of the network, not the first one the scan meets:
+    // with several (a mesh, a repeater) the fast scan could settle on one at -80 dBm.
+    WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
+    WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
+#endif
 #if defined(WADA_ORDERED_WIFI_BLE)
     if (!wifi_mode_ready) {
       pagerWifiEnterBleFallback("boot STA initialization failed");
