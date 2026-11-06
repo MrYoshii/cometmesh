@@ -82987,6 +82987,9 @@ static bool sdRuntimeLifecycleBusy() {
 #if CAP_LUA_AUDIO
   busy = busy || luaAudioStorageBusy();
 #endif
+#if defined(CAP_BOOKS)
+  busy = busy || s_bk_sd_busy || s_bk_dl_busy;   // an open book, the shelf index, a download
+#endif
 #if defined(HAS_TDECK_GT911) || defined(TLORA_PAGER) || defined(HAS_TDECK_MAX)
   busy = busy || s_notify_playing;
 #endif

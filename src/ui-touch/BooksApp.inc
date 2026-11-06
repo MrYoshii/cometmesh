@@ -2,7 +2,7 @@
 // ============================ Books: e-reader (T-Deck Max) ============================
 // Included by UITask.cpp (it uses the page chrome, fonts, palette and keyboard plumbing
 // defined there). Two halves:
-//   * the shelf: books on the device (SPIFFS /bk), EPUB and plain text, with the
+//   * the shelf: books on the SD card (/books), EPUB and plain text, with the
 //     reading position of each, and an Audiobookshelf client that lists a server's
 //     libraries and downloads an item's EPUB onto the shelf;
 //   * the reader: one chapter at a time as plain text (EpubBook.h), cut into pages
@@ -15,9 +15,15 @@
 #include <ArduinoJson.h>
 #define CAP_BOOKS 1
 
-static const char kBkDir[]       = "/bk";
-static const char kBkIndex[]     = "/bk/index.json";
+// Books live on the SD card: internal flash (SPIFFS) holds the chats and is far too
+// small for them. Only the Audiobookshelf sign-in stays in flash, so it survives a
+// card swap. The host build has no card and keeps the books in its SPIFFS folder.
+static const char kBkDir[]       = "/books";
+static const char kBkIndex[]     = "/books/.shelf.json";
+static const char kBkAbsDir[]    = "/bk";
 static const char kBkAbsConfig[] = "/bk/abs.json";
+static volatile bool s_bk_sd_busy = false;   // UI: a book or the shelf index is open (holds off SD unmount)
+static volatile bool s_bk_dl_busy = false;   // worker: a download is being written
 static const int  kBkMaxBooks    = 40;
 static const int  kBkMaxItems    = 50;     // one page of a server library
 static const int  kBkMaxLibs     = 12;
@@ -25,7 +31,7 @@ static const size_t kBkTxtChunk  = 24 * 1024;
 static const size_t kBkJsonCap   = 768 * 1024;
 
 struct BkBook {
-  char file[32];        // "/bk/b1a2b3c4.epub"
+  char file[96];        // "/books/Title-1a2b3c.epub"
   char title[96];
   char author[64];
   char item_id[48];     // Audiobookshelf library item, "" for a local file
@@ -161,6 +167,18 @@ static void bkCopy(char* dst, size_t cap, const char* src) {
 }
 
 // ======================= storage: the shelf index + account =======================
+static fs::FS* booksFs() {
+#if defined(WADA_WEB)
+  return &SPIFFS;
+#elif CAP_SD
+  if (sdAdoptLiveMount()) return &SD;
+  if (!sdRuntimeLifecycleBusy() && fmSdTryMount()) return &SD;
+  return nullptr;
+#else
+  return nullptr;
+#endif
+}
+
 static void booksSaveIndex() {
   JsonDocument doc(&s_bk_json_alloc);
   doc["font"] = s_bk_font;
@@ -171,11 +189,14 @@ static void booksSaveIndex() {
     o["f"] = b.file; o["t"] = b.title; o["a"] = b.author; o["id"] = b.item_id;
     o["c"] = b.chapter; o["o"] = b.offset; o["n"] = b.chapters; o["p"] = b.pct; o["s"] = b.seq;
   }
-  SPIFFS.mkdir(kBkDir);
-  File f = SPIFFS.open(kBkIndex, FILE_WRITE);
-  if (!f) return;
-  serializeJson(doc, f);
-  f.close();
+  fs::FS* fs = booksFs();
+  if (!fs) return;
+  const bool was_busy = s_bk_sd_busy;   // the reader may already hold the card
+  s_bk_sd_busy = true;
+  fs->mkdir(kBkDir);
+  File f = fs->open(kBkIndex, FILE_WRITE);
+  if (f) { serializeJson(doc, f); f.close(); }
+  s_bk_sd_busy = was_busy;
 }
 
 static bool booksHasFile(const char* path) {
@@ -194,7 +215,10 @@ static void booksLoadIndex() {
   if (!s_bk_books) s_bk_books = (BkBook*)psAlloc(sizeof(BkBook) * kBkMaxBooks);
   if (!s_bk_books) return;
   s_bk_count = 0;
-  File f = SPIFFS.open(kBkIndex, FILE_READ);
+  fs::FS* fs = booksFs();
+  if (!fs) return;
+  s_bk_sd_busy = true;
+  File f = fs->open(kBkIndex, FILE_READ);
   if (f) {
     JsonDocument doc(&s_bk_json_alloc);
     if (!deserializeJson(doc, f)) {
@@ -205,7 +229,7 @@ static void booksLoadIndex() {
         BkBook& b = s_bk_books[s_bk_count];
         memset(&b, 0, sizeof b);
         bkCopy(b.file, sizeof b.file, o["f"] | "");
-        if (!b.file[0] || !SPIFFS.exists(b.file)) continue;
+        if (!b.file[0] || !fs->exists(b.file)) continue;
         bkCopy(b.title, sizeof b.title, o["t"] | "");
         bkCopy(b.author, sizeof b.author, o["a"] | "");
         bkCopy(b.item_id, sizeof b.item_id, o["id"] | "");
@@ -217,48 +241,35 @@ static void booksLoadIndex() {
     }
     f.close();
   }
-  // Untracked book files. A subdirectory listing works on the host; on the device's
-  // flat SPIFFS the root listing carries the "/bk/" prefix in each path.
-  auto consider = [&](const char* path) {
-    if (s_bk_count >= kBkMaxBooks || !booksIsBookName(path)) return;
-    char full[40];
-    if (strncmp(path, "/bk/", 4) == 0) bkCopy(full, sizeof full, path);
-    else if (path[0] != '/') snprintf(full, sizeof full, "/bk/%s", path);
-    else return;
-    if (booksHasFile(full)) return;
-    BkBook& b = s_bk_books[s_bk_count++];
-    memset(&b, 0, sizeof b);
-    bkCopy(b.file, sizeof b.file, full);
-    EpubBook::titleFromFileName(full, b.title, sizeof b.title);
-  };
-  File dir = SPIFFS.open(kBkDir);
+  // Book files nobody indexed yet (copied onto the card by hand).
+  File dir = fs->open(kBkDir);
   if (dir && dir.isDirectory()) {
     for (File e = dir.openNextFile(); e; e = dir.openNextFile()) {
-      if (!e.isDirectory()) {
-        const char* p = e.path();
-        consider(strncmp(p, "/bk/", 4) == 0 ? p : e.name());
+      const char* name = e.name();
+      const char* base = strrchr(name, '/');
+      base = base ? base + 1 : name;
+      if (!e.isDirectory() && base[0] != '.' && booksIsBookName(base) && s_bk_count < kBkMaxBooks) {
+        char full[96];
+        snprintf(full, sizeof full, "%s/%s", kBkDir, base);
+        if (!booksHasFile(full)) {
+          BkBook& b = s_bk_books[s_bk_count++];
+          memset(&b, 0, sizeof b);
+          bkCopy(b.file, sizeof b.file, full);
+          EpubBook::titleFromFileName(full, b.title, sizeof b.title);
+        }
       }
       e.close();
     }
-    dir.close();
-  } else {
-    if (dir) dir.close();
-    File root = SPIFFS.open("/");
-    if (root) {
-      for (File e = root.openNextFile(); e; e = root.openNextFile()) {
-        if (strstr(e.path(), "/bk/")) consider(strstr(e.path(), "/bk/"));
-        e.close();
-      }
-      root.close();
-    }
   }
+  if (dir) dir.close();
+  s_bk_sd_busy = false;
 }
 
 static void booksSaveAbs() {
   JsonDocument doc(&s_bk_json_alloc);
   doc["server"] = s_abs_server; doc["user"] = s_abs_user;
   doc["token"] = s_abs_token; doc["refresh"] = s_abs_refresh; doc["lib"] = s_abs_lib;
-  SPIFFS.mkdir(kBkDir);
+  SPIFFS.mkdir(kBkAbsDir);
   File f = SPIFFS.open(kBkAbsConfig, FILE_WRITE);
   if (!f) return;
   serializeJson(doc, f);
@@ -511,25 +522,44 @@ static void bkJobItems() {
 }
 
 static void bkJobDownload() {
-  char file[32];
-  uint32_t h = 2166136261u;   // FNV-1a of the item id: a stable, short SPIFFS name
+  // A readable file name for the card: the title, then a short hash of the item id.
+  uint32_t h = 2166136261u;
   for (const char* p = s_bk_job_arg; *p; ++p) { h ^= (uint8_t)*p; h *= 16777619u; }
-  snprintf(file, sizeof file, "/bk/b%08lx.epub", (unsigned long)h);
+  char base[48];
+  size_t w = 0;
+  for (const char* p = s_bk_job_arg2; *p && w + 1 < sizeof base; ++p) {
+    const unsigned char c = (unsigned char)*p;
+    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) base[w++] = (char)c;
+    else if ((c == ' ' || c == '-' || c == '_') && w && base[w - 1] != '_') base[w++] = '_';
+  }
+  while (w && base[w - 1] == '_') --w;
+  base[w] = 0;
+  char file[96];
+  snprintf(file, sizeof file, "%s/%s%s%06lx.epub", kBkDir, base, w ? "-" : "", (unsigned long)(h & 0xFFFFFF));
   char path[120];
   snprintf(path, sizeof path, "/api/items/%s/ebook", s_bk_job_arg);
-  SPIFFS.mkdir(kBkDir);
-  File f = SPIFFS.open(file, FILE_WRITE);
-  if (!f) { snprintf(s_bk_job_msg, sizeof s_bk_job_msg, "Cannot write to the device storage"); return; }
+  fs::FS* fs = booksFs();
+  if (!fs) { snprintf(s_bk_job_msg, sizeof s_bk_job_msg, "Insert an SD card to download books"); return; }
+  s_bk_dl_busy = true;
+  fs->mkdir(kBkDir);
+  File f = fs->open(file, FILE_WRITE);
+  if (!f) {
+    s_bk_dl_busy = false;
+    snprintf(s_bk_job_msg, sizeof s_bk_job_msg, "Cannot write to the SD card");
+    return;
+  }
   const int code = bkAuthed("GET", path, nullptr, nullptr, nullptr, &f);
   f.flush();
   const size_t written = s_bk_dl_got;   // File::size() of a file still open for writing reads 0 on some VFS
   f.close();
   if (code != 200 || written == 0) {
-    SPIFFS.remove(file);
-    if (code == HTTPC_ERROR_STREAM_WRITE) snprintf(s_bk_job_msg, sizeof s_bk_job_msg, "Device storage is full");
+    fs->remove(file);
+    s_bk_dl_busy = false;
+    if (code == HTTPC_ERROR_STREAM_WRITE) snprintf(s_bk_job_msg, sizeof s_bk_job_msg, "The SD card is full");
     else bkJobMsgForCode(code);
     return;
   }
+  s_bk_dl_busy = false;
   bkCopy(s_bk_job_msg, sizeof s_bk_job_msg, file);   // the UI adds it to the shelf
   s_bk_job_ok = true;
 }
@@ -669,7 +699,7 @@ static void booksTabCb(lv_event_t* e) {
 static void booksTabs(lv_obj_t* body, BkView active) {
   const lv_coord_t w = s_bk_body_w;
   const lv_coord_t bw = (w - 18) / 2;
-  lv_obj_t* a = booksButton(body, TR("On device"), booksTabCb, (void*)(intptr_t)BkView::Shelf, bw, 30);
+  lv_obj_t* a = booksButton(body, TR("SD card"), booksTabCb, (void*)(intptr_t)BkView::Shelf, bw, 30);
   lv_obj_set_pos(a, 6, 4);
   lv_obj_t* b = booksButton(body, "Audiobookshelf", booksTabCb, (void*)(intptr_t)BkView::Server, bw, 30);
   lv_obj_set_pos(b, 12 + bw, 4);
@@ -698,7 +728,7 @@ static void booksDeleteConfirmed() {
   const int i = s_bk_delete_idx;
   s_bk_delete_idx = -1;
   if (i < 0 || i >= s_bk_count) return;
-  SPIFFS.remove(s_bk_books[i].file);
+  if (fs::FS* fs = booksFs()) fs->remove(s_bk_books[i].file);
   for (int k = i; k + 1 < s_bk_count; ++k) s_bk_books[k] = s_bk_books[k + 1];
   --s_bk_count;
   booksSaveIndex();
@@ -720,10 +750,19 @@ static void booksShelfRowCb(lv_event_t* e) {
 
 static void booksBuildShelf() {
   booksTabs(s_bk_body, BkView::Shelf);
+  if (!booksFs()) {
+    lv_obj_t* l = booksLabel(s_bk_body,
+        TR("No SD card.\n\nBooks are stored on the SD card: insert one, then open Books again."),
+        &g_font_14, COLOR_SUB);
+    lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(l, s_bk_body_w - 24);
+    lv_obj_set_pos(l, 12, 50);
+    return;
+  }
   if (s_bk_count == 0) {
     lv_obj_t* l = booksLabel(s_bk_body,
         TR("No books yet.\n\nGet them from your Audiobookshelf server (the tab above), "
-           "or copy .epub and .txt files to the folder /bk on the device."),
+           "or copy .epub and .txt files to the folder /books on the SD card."),
         &g_font_14, COLOR_SUB);
     lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(l, s_bk_body_w - 24);
@@ -831,6 +870,7 @@ static void booksItemCb(lv_event_t* e) {
     return;
   }
   if (s_bk_count >= kBkMaxBooks) { if (g_lv.task) g_lv.task->showAlert(TR("The shelf is full"), 1600); return; }
+  if (!booksFs()) { if (g_lv.task) g_lv.task->showAlert(TR("Insert an SD card to download books"), 2000); return; }
   bkCopy(s_bk_job_arg, sizeof s_bk_job_arg, it.id);
   bkCopy(s_bk_job_arg2, sizeof s_bk_job_arg2, it.title);
   if (booksStartJob(BkJob::Download)) booksSetStatus(TR("Downloading\xe2\x80\xa6"));
@@ -1123,6 +1163,7 @@ static void booksCloseReader(bool to_shelf) {
   }
   if (s_bk_epub) { s_bk_epub->close(); delete s_bk_epub; s_bk_epub = nullptr; }
   if (s_bk_file) s_bk_file.close();
+  s_bk_sd_busy = false;
   if (s_bk_text) { bkFree(s_bk_text); s_bk_text = nullptr; }
   s_bk_text_len = 0; s_bk_page_count = 0; s_bk_open = -1;
   s_bk_text_lbl = s_bk_foot = s_bk_menu = nullptr;
@@ -1244,8 +1285,15 @@ static void booksBuildReader() {
 static void booksOpenReader(int idx) {
   if (idx < 0 || idx >= s_bk_count) return;
   BkBook& b = s_bk_books[idx];
-  s_bk_file = SPIFFS.open(b.file, FILE_READ);
-  if (!s_bk_file) { if (g_lv.task) g_lv.task->showAlert(TR("Cannot open this book"), 1600); return; }
+  fs::FS* fs = booksFs();
+  if (!fs) { if (g_lv.task) g_lv.task->showAlert(TR("Insert the SD card with your books"), 1800); return; }
+  s_bk_sd_busy = true;   // until the reader closes the book
+  s_bk_file = fs->open(b.file, FILE_READ);
+  if (!s_bk_file) {
+    s_bk_sd_busy = false;
+    if (g_lv.task) g_lv.task->showAlert(TR("Cannot open this book"), 1600);
+    return;
+  }
   s_bk_file_size = (uint32_t)s_bk_file.size();
   const char* dot = strrchr(b.file, '.');
   s_bk_is_txt = dot && strcasecmp(dot, ".txt") == 0;
@@ -1255,6 +1303,7 @@ static void booksOpenReader(int idx) {
     s_bk_epub = new EpubBook::Book();
     if (!s_bk_epub->open(bkFileRead, &s_bk_file, s_bk_file_size, kBkHooks)) {
       delete s_bk_epub; s_bk_epub = nullptr; s_bk_file.close();
+      s_bk_sd_busy = false;
       if (g_lv.task) g_lv.task->showAlert(TR("This EPUB could not be read"), 1800);
       return;
     }
