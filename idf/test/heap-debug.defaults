@@ -1,0 +1,5 @@
+# Test fragment: catch heap corruption where it happens. Every block gets canaries and
+# is filled on alloc/free; a damaged one aborts with its address ("CORRUPT HEAP").
+CONFIG_HEAP_POISONING_COMPREHENSIVE=y
+CONFIG_HEAP_TASK_TRACKING=y
+CONFIG_FREERTOS_WATCHPOINT_END_OF_STACK=y
