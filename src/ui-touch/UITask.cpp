@@ -63783,7 +63783,13 @@ static void updateGlobalStatusBar() {
         lv_area_t ba; lv_obj_get_coords(g_statusbar.root, &ba);
         const lv_coord_t x = left_edge - kGap - lv_area_get_width(&ca)
                            - (ba.x1 + lv_obj_get_style_pad_left(g_statusbar.root, LV_PART_MAIN));
-        const lv_coord_t y = ca.y1 - (ba.y1 + lv_obj_get_style_pad_top(g_statusbar.root, LV_PART_MAIN));
+        lv_coord_t y = ca.y1 - (ba.y1 + lv_obj_get_style_pad_top(g_statusbar.root, LV_PART_MAIN));
+#if defined(HAS_TDECK_MAX)
+        // The coordinates include the tall bar's per-tick lift (translate_y), which is
+        // applied again on top of this align: without taking it out the clock sat half
+        // a row too high, cut off at the panel's top edge (app pages, signal bars shown).
+        y -= lv_obj_get_style_translate_y(g_statusbar.clock, LV_PART_MAIN);
+#endif
         lv_obj_align(g_statusbar.clock, LV_ALIGN_TOP_LEFT, x, y);
       }
       // Park the async-request spinner just LEFT of the clock wherever it lands,
