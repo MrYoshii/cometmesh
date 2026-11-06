@@ -247,8 +247,17 @@ void MultiTransportCompanionInterface::enableBle() {
     // already-created stack below this threshold is allocation-free and must
     // not be rejected (UITask used to gate both cases identically, trapping the
     // user with BLE resident-but-off and neither radio enableable).
+#if defined(HAS_TDECK_MAX)
+    // The Max keeps its Wi-Fi driver loaded when Wi-Fi is off (see main.cpp), and
+    // its NimBLE host lives in PSRAM: measured, a cold start costs ~35-39 KB of
+    // internal RAM, with ~49 KB free and a ~41 KB block before it. 50 KB refused
+    // Bluetooth outright; 44 KB still leaves the margin a boot with both radios has.
+    const size_t BLE_COEXIST_MIN_FREE  = 44u * 1024u;
+    const size_t BLE_COEXIST_MIN_BLOCK = 24u * 1024u;
+#else
     const size_t BLE_COEXIST_MIN_FREE  = 50u * 1024u;
     const size_t BLE_COEXIST_MIN_BLOCK = 20u * 1024u;
+#endif
     const uint32_t internal_caps = MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT;
     const size_t internal_free = heap_caps_get_free_size(internal_caps);
     const size_t internal_max  = heap_caps_get_largest_free_block(internal_caps);
