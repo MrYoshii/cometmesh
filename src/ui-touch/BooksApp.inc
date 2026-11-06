@@ -1536,11 +1536,10 @@ static bool booksSaveStep() {
 
 static bool s_bk_save_active_fwd() { return s_bk_save_active; }
 static void booksTimerCb(lv_timer_t*) {
-  // Reading is long stretches without input: keep the idle timeout from blanking and
-  // locking the page while a book is open. Locking by hand (hold Space) still works,
+  // Reading and listening are long stretches without input: keep the idle timeout from
+  // blanking and locking the page while Books is open. Locking by hand (hold Space) still works,
   // and once locked or dark this stops pushing, so the device sleeps as usual.
-  if (s_bk_root && s_bk_view == BkView::Reader && g_lv.task && !g_lv.task->isScreenOff() &&
-      !g_lv.task->isManualLock())
+  if (s_bk_root && g_lv.task && !g_lv.task->isScreenOff() && !g_lv.task->isManualLock())
     g_lv.task->noteUserInput();
   if (s_bk_save_active) { booksSaveStep(); return; }
   if (s_bk_job == BkJob::None) return;

@@ -4,24 +4,35 @@
 // minimp3 decoder it shares; the session it plays comes from BooksApp.inc. A track is
 // either a server URL (streamed) or a file on the SD card (downloaded for offline).
 //
-// One task does it all: it streams the current track over HTTP(S) with a Range request,
-// decodes MP3 frames and writes them to the sink, which paces it. Every change of
-// position (play, seek, pause/resume) restarts it at a time: a time inside a track maps
-// to a byte offset in proportion (exact for CBR, close for VBR), and minimp3 finds the
-// next frame from there. The track's size comes from the first reply's Content-Range.
+// Two tasks. The reader (core 0, beside Wi-Fi) fetches the tracks, over HTTP(S) with a
+// Range request or from the card, skips their ID3 tags and fills a ring buffer in PSRAM
+// several seconds deep. The decoder (core 1, above the UI) takes MP3 frames from it and
+// writes them to the sink, which paces it. With both in one task, a slow TLS read or a
+// reconnect starved the codec's few milliseconds of DMA and the audio stuttered.
+// Every change of position (play, seek, pause/resume) restarts both at a time: a time
+// inside a track maps to a byte offset in proportion (exact for CBR, close for VBR),
+// and minimp3 finds the next frame from there. A track's size comes from the first
+// reply's Content-Range; a dropped connection resumes at the exact byte.
 #if defined(CAP_BOOKS) && CAP_LUA_AUDIO
 
 struct BkaWork {
   mp3dec_t decoder;
   mp3dec_scratch_t scratch;
-  uint8_t input[32 * 1024];
+  uint8_t input[16 * 1024];
   mp3d_sample_t pcm[MINIMP3_MAX_SAMPLES_PER_FRAME];
   int16_t out[512];
 };
 
-static TaskHandle_t   s_bka_task = nullptr;
-static volatile bool  s_bka_stop = false;       // ask the task to end
-static volatile bool  s_bka_alive = false;      // the task is running
+// The ring between the two tasks: one writer, one reader, so plain indices will do.
+static const size_t   kBkaRing = 384 * 1024;    // ~48 s at 64 kbit/s, ~12 s at 256
+static uint8_t*       s_bka_ring = nullptr;     // PSRAM, kept once allocated
+static volatile size_t s_bka_head = 0, s_bka_tail = 0;   // written / read, ever-growing
+static volatile bool  s_bka_eof = false;        // the reader has put in everything
+static volatile bool  s_bka_reader_alive = false;
+
+static TaskHandle_t   s_bka_task = nullptr;     // the decoder
+static volatile bool  s_bka_stop = false;       // ask both tasks to end
+static volatile bool  s_bka_alive = false;      // the decoder is running
 static volatile bool  s_bka_buffering = false;
 static volatile bool  s_bka_ended = false;
 static volatile double s_bka_pos = 0;
@@ -78,171 +89,230 @@ static bool bkaOpen(HTTPClient& http, WiFiClientSecure& tls, WiFiClient& plain, 
   return true;
 }
 
-static void bkaTaskFn(void*) {
-  BkaWork* w = (BkaWork*)heap_caps_malloc(sizeof(BkaWork), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-  LuaAudioSinkSession sink;
-  uint32_t sink_rate = 0;
+static size_t bkaRingUsed() { return s_bka_head - s_bka_tail; }
+
+// Reader side: blocks while the ring is full; false when asked to stop.
+static bool bkaRingPut(const uint8_t* data, size_t n) {
+  while (n) {
+    while (!s_bka_stop && bkaRingUsed() >= kBkaRing) vTaskDelay(pdMS_TO_TICKS(20));
+    if (s_bka_stop) return false;
+    size_t room = kBkaRing - bkaRingUsed();
+    if (room > n) room = n;
+    const size_t at = s_bka_head % kBkaRing;
+    const size_t first = room < kBkaRing - at ? room : kBkaRing - at;
+    memcpy(s_bka_ring + at, data, first);
+    if (room > first) memcpy(s_bka_ring, data + first, room - first);
+    __sync_synchronize();
+    s_bka_head += room;
+    data += room; n -= room;
+  }
+  return true;
+}
+
+// Decoder side: up to n bytes, never blocking.
+static size_t bkaRingGet(uint8_t* out, size_t n) {
+  size_t have = bkaRingUsed();
+  if (have > n) have = n;
+  const size_t at = s_bka_tail % kBkaRing;
+  const size_t first = have < kBkaRing - at ? have : kBkaRing - at;
+  memcpy(out, s_bka_ring + at, first);
+  if (have > first) memcpy(out + first, s_bka_ring, have - first);
+  __sync_synchronize();
+  s_bka_tail += have;
+  return have;
+}
+
+static void bkaReaderFn(void*) {
   int track = bkaTrackAt(s_bka_start_t);
   double t_in_track = s_bka_start_t - s_bka_tracks[track].start;
+  uint32_t resume_at = UINT32_MAX;   // a dropped connection: the exact byte to go on from
   int failures = 0;
-  if (!w) { snprintf(s_bka_err, sizeof s_bka_err, "Not enough memory to play"); goto done; }
-  s_wada_mp3_scratch = &w->scratch;
+  uint8_t* chunk = (uint8_t*)heap_caps_malloc(4096, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  if (!chunk) { snprintf(s_bka_err, sizeof s_bka_err, "Not enough memory to play"); goto done; }
 
   while (!s_bka_stop && track < s_bka_track_count) {
     BkaTrack& tr = s_bka_tracks[track];
-    // Where in the file: in proportion to the time, once the size is known.
     uint32_t from = 0;
-    if (t_in_track > 0.5 && tr.size && tr.dur > 0)
-      from = (uint32_t)((double)tr.size * (t_in_track / tr.dur));
+    if (resume_at != UINT32_MAX) from = resume_at;
+    else if (t_in_track > 0.5 && tr.size && tr.dur > 0) from = (uint32_t)((double)tr.size * (t_in_track / tr.dur));
     HTTPClient http; WiFiClientSecure tls; WiFiClient plain;
     uint32_t total = 0;
     int code = 0;
-    s_bka_buffering = true;
-    // A downloaded track plays from the card: size known up front, exact offsets.
     File lf;
-    if (tr.local) {
+    if (tr.local) {   // a downloaded track: size known up front, exact offsets
       fs::FS* fs = booksFs();
       lf = fs ? fs->open(tr.url, FILE_READ) : File();
       if (!lf) { snprintf(s_bka_err, sizeof s_bka_err, "Track missing on the SD card"); break; }
       total = tr.size = (uint32_t)lf.size();
-      if (t_in_track > 0.5 && tr.dur > 0) from = (uint32_t)((double)total * (t_in_track / tr.dur));
-      if (from >= total) from = total;
+      if (resume_at == UINT32_MAX && t_in_track > 0.5 && tr.dur > 0) from = (uint32_t)((double)total * (t_in_track / tr.dur));
+      if (from > total) from = total;
       lf.seek(from);
     } else if (!bkaOpen(http, tls, plain, tr, from, &total, &code)) {
       if (code == 401 && failures++ == 0 && bkRefresh()) continue;   // token expired: renew once
-      if (++failures >= 4) {
+      if (++failures >= 5) {
         if (code == 401) snprintf(s_bka_err, sizeof s_bka_err, "Signed out by the server: sign in again");
         else snprintf(s_bka_err, sizeof s_bka_err, "Cannot reach the audio (%d)", code);
         break;
       }
       vTaskDelay(pdMS_TO_TICKS(1500 * failures));
       continue;
-    }
-    if (!tr.local && total && !tr.size) {
+    } else if (total && !tr.size) {
       tr.size = total;
-      if (from == 0 && t_in_track > 0.5) {   // now the offset can be worked out: reopen there
+      if (from == 0 && t_in_track > 0.5 && resume_at == UINT32_MAX) {   // now the offset can be worked out
         http.end();
         continue;
       }
     }
     WiFiClient* stream = tr.local ? nullptr : http.getStreamPtr();
-    // One reader over either source.
-    auto srcAvail = [&]() -> int {
-      if (tr.local) { const uint32_t p = (uint32_t)lf.position(); return p < total ? (int)(total - p > 8192 ? 8192 : total - p) : 0; }
-      return stream ? stream->available() : 0;
-    };
-    auto srcRead = [&](uint8_t* b, size_t n) -> int { return tr.local ? lf.read(b, n) : stream->read(b, n); };
-    auto srcOpen = [&]() -> bool { return tr.local ? (uint32_t)lf.position() < total : (stream && stream->connected()); };
-    mp3dec_init(&w->decoder);
-    size_t in_start = 0, in_count = 0;
-    uint32_t file_pos = from;                 // bytes of the file received so far
-    uint32_t skip = 0;                        // an ID3v2 tag still to skip
+    uint32_t file_pos = from;
+    uint32_t skip = 0;                 // an ID3v2 tag still to skip
     bool checked_id3 = from != 0;
-    uint64_t samples_out = 0;
-    uint32_t hz = 0;
-    size_t out_n = 0;
+    uint8_t id3[10];
+    size_t id3_have = 0;
     uint32_t idle_since = millis();
-    bool track_done = false, reconnect = false;
-    const double base = tr.start + (from && tr.size ? tr.dur * ((double)from / tr.size) : 0);
-    s_bka_pos = base;
-
+    bool done_track = false, dropped = false;
     while (!s_bka_stop) {
-      // Keep the input topped up from the network (never blocking for long).
-      if (in_count < sizeof w->input / 2 && file_pos < (total ? total : UINT32_MAX)) {
-        if (in_start) { memmove(w->input, w->input + in_start, in_count); in_start = 0; }
-        const int avail = srcAvail();
-        if (avail > 0) {
-          size_t room = sizeof w->input - in_count;
-          if ((size_t)avail < room) room = (size_t)avail;
-          const int n = srcRead(w->input + in_count, room);
-          if (n > 0) { in_count += (size_t)n; file_pos += (uint32_t)n; idle_since = millis(); }
-          else if (tr.local) { snprintf(s_bka_err, sizeof s_bka_err, "SD card read failed"); s_bka_stop = true; break; }
-        } else if (!srcOpen()) {
-          // Closed. Without a known size that is the end of the track; with one, a
-          // close short of it is a dropped connection, picked up again below.
-          if (!total) total = file_pos;
-          else if (file_pos < total && in_count == 0) { reconnect = true; break; }
-        } else if (millis() - idle_since > 15000) {
-          reconnect = true; break;
+      int n = 0;
+      if (tr.local) {
+        if ((uint32_t)lf.position() >= total) { done_track = true; break; }
+        n = lf.read(chunk, 4096);
+        if (n <= 0) { snprintf(s_bka_err, sizeof s_bka_err, "SD card read failed"); s_bka_stop = true; break; }
+      } else {
+        const int avail = stream ? stream->available() : 0;
+        if (avail <= 0) {
+          if (total && file_pos >= total) { done_track = true; break; }
+          if (!stream || !stream->connected()) {
+            if (!total) { done_track = true; break; }    // no size given: the close is the end
+            dropped = true; break;
+          }
+          if (millis() - idle_since > 15000) { dropped = true; break; }
+          vTaskDelay(pdMS_TO_TICKS(5));
+          continue;
         }
+        n = stream->read(chunk, avail < 4096 ? avail : 4096);
+        if (n <= 0) continue;
+        idle_since = millis();
       }
-      if (!checked_id3 && in_count >= 10) {
+      file_pos += (uint32_t)n;
+      const uint8_t* p = chunk;
+      size_t len = (size_t)n;
+      if (!checked_id3) {   // the first 10 bytes of the file decide whether a tag comes first
+        while (len && id3_have < 10) { id3[id3_have++] = *p++; --len; }
+        if (id3_have < 10) continue;
         checked_id3 = true;
-        if (!memcmp(w->input + in_start, "ID3", 3)) {
-          const uint8_t* h = w->input + in_start;
-          skip = 10u + (((uint32_t)h[6] & 0x7F) << 21 | ((uint32_t)h[7] & 0x7F) << 14 |
-                        ((uint32_t)h[8] & 0x7F) << 7 | ((uint32_t)h[9] & 0x7F));
+        if (!memcmp(id3, "ID3", 3)) {
+          skip = (((uint32_t)id3[6] & 0x7F) << 21 | ((uint32_t)id3[7] & 0x7F) << 14 |
+                  ((uint32_t)id3[8] & 0x7F) << 7 | ((uint32_t)id3[9] & 0x7F));
+        } else if (!bkaRingPut(id3, 10)) {
+          break;
         }
       }
       if (skip) {
-        const size_t n = skip < in_count ? skip : in_count;
-        in_start += n; in_count -= n; skip -= (uint32_t)n;
-        if (!in_count) in_start = 0;
-        continue;
+        const size_t k = skip < len ? skip : len;
+        p += k; len -= k; skip -= (uint32_t)k;
       }
-      const bool all_in = total && file_pos >= total;
-      if (in_count < 2048 && !all_in) {    // starved: wait for the network
-        s_bka_buffering = in_count == 0;
-        if (sink.open && in_count == 0) {   // keep the codec fed with silence while it refills
-          memset(w->out, 0, sizeof w->out);
-          luaAudioSinkWrite(&sink, w->out, 256);
-        } else {
-          vTaskDelay(pdMS_TO_TICKS(10));
-        }
-        continue;
-      }
-      if (!in_count) { track_done = true; break; }
-
-      mp3dec_frame_info_t info = {};
-      const int samples = mp3dec_decode_frame(&w->decoder, w->input + in_start, (int)in_count, w->pcm, &info);
-      if (info.frame_bytes <= 0) {
-        if (all_in) { track_done = true; break; }
-        // No frame in what we have: drop all but the tail and read on.
-        const size_t keep = in_count > 4 ? 4 : in_count;
-        in_start += in_count - keep; in_count = keep;
-        continue;
-      }
-      in_start += (size_t)info.frame_bytes; in_count -= (size_t)info.frame_bytes;
-      if (!in_count) in_start = 0;
-      if (samples <= 0 || info.hz < 8000 || info.hz > 48000) continue;
-      s_bka_buffering = false;
-      if (!sink.open || sink_rate != (uint32_t)info.hz) {
-        if (sink.open) luaAudioSinkEnd(&sink);
-        const char* err = nullptr;
-        if (!luaAudioSinkBegin((uint32_t)info.hz, &sink, &err)) {
-          snprintf(s_bka_err, sizeof s_bka_err, "Audio unavailable (%s)", err ? err : "?");
-          s_bka_stop = true;
-          break;
-        }
-        sink_rate = (uint32_t)info.hz;
-      }
-      hz = (uint32_t)info.hz;
-      for (int i = 0; i < samples; ++i) {
-        int32_t v = info.channels == 2 ? ((int32_t)w->pcm[2 * i] + w->pcm[2 * i + 1]) / 2 : w->pcm[i];
-        v = (int32_t)((float)v * sink.gain);
-        w->out[out_n++] = (int16_t)(v > 32767 ? 32767 : v < -32768 ? -32768 : v);
-        if (out_n == sizeof w->out / sizeof w->out[0]) {
-          if (!luaAudioSinkWrite(&sink, w->out, out_n)) { snprintf(s_bka_err, sizeof s_bka_err, "Audio output failed"); s_bka_stop = true; break; }
-          out_n = 0;
-        }
-      }
-      samples_out += (uint64_t)samples;
-      s_bka_pos = base + (double)samples_out / hz;
+      if (len && !bkaRingPut(p, len)) break;
       failures = 0;
+      resume_at = UINT32_MAX;
     }
     if (tr.local) lf.close(); else http.end();
     if (s_bka_stop) break;
-    if (reconnect) {   // dropped mid-track: pick up where it stopped
-      t_in_track = s_bka_pos - tr.start;
-      if (++failures >= 4) { snprintf(s_bka_err, sizeof s_bka_err, "The connection keeps dropping"); break; }
+    if (dropped) {
+      resume_at = file_pos;
+      if (++failures >= 5) { snprintf(s_bka_err, sizeof s_bka_err, "The connection keeps dropping"); break; }
       vTaskDelay(pdMS_TO_TICKS(1000 * failures));
       continue;
     }
-    if (track_done) { ++track; t_in_track = 0; }
+    if (done_track) { ++track; t_in_track = 0; resume_at = UINT32_MAX; }
   }
-  if (!s_bka_stop && !s_bka_err[0] && track >= s_bka_track_count) s_bka_ended = true;
 
 done:
+  if (chunk) heap_caps_free(chunk);
+  s_bka_eof = true;
+  s_bka_reader_alive = false;
+  vTaskDelete(nullptr);
+}
+
+// Waiting for data: silence to an open sink (it paces the wait and keeps the DMA
+// from replaying its last buffer as a buzz), else a short sleep.
+static void bkaIdle(LuaAudioSinkSession* sink, BkaWork* w) {
+  if (sink->open) {
+    memset(w->out, 0, 256 * sizeof(int16_t));
+    luaAudioSinkWrite(sink, w->out, 256);
+  } else {
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+}
+
+static void bkaTaskFn(void*) {
+  BkaWork* w = (BkaWork*)heap_caps_malloc(sizeof(BkaWork), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  LuaAudioSinkSession sink;
+  uint32_t sink_rate = 0;
+  size_t in_start = 0, in_count = 0, out_n = 0;
+  uint64_t samples_out = 0;
+  bool primed = false;                 // enough buffered to start (or start again)
+  if (!w) { snprintf(s_bka_err, sizeof s_bka_err, "Not enough memory to play"); s_bka_stop = true; goto done; }
+  s_wada_mp3_scratch = &w->scratch;
+  mp3dec_init(&w->decoder);
+  s_bka_pos = s_bka_start_t;
+
+  while (!s_bka_stop) {
+    if (in_count < sizeof w->input / 2) {   // top up from the ring
+      if (in_start) { memmove(w->input, w->input + in_start, in_count); in_start = 0; }
+      in_count += bkaRingGet(w->input + in_count, sizeof w->input - in_count);
+    }
+    const bool eof = s_bka_eof && bkaRingUsed() == 0;
+    if (!primed) {   // a second or two in hand before sound starts, after a stall too
+      if (eof || bkaRingUsed() + in_count >= 16 * 1024) { primed = true; s_bka_buffering = false; }
+      else { s_bka_buffering = true; bkaIdle(&sink, w); continue; }
+    }
+    if (in_count < 2048 && !eof) {
+      if (in_count == 0) primed = false;   // ran dry: buffer up again
+      bkaIdle(&sink, w);
+      continue;
+    }
+    if (!in_count) break;   // everything played
+    mp3dec_frame_info_t info = {};
+    const int samples = mp3dec_decode_frame(&w->decoder, w->input + in_start, (int)in_count, w->pcm, &info);
+    if (info.frame_bytes <= 0) {
+      if (eof) break;
+      const size_t keep = in_count > 4 ? 4 : in_count;   // no frame in it: keep the tail, read on
+      in_start += in_count - keep; in_count = keep;
+      continue;
+    }
+    in_start += (size_t)info.frame_bytes; in_count -= (size_t)info.frame_bytes;
+    if (!in_count) in_start = 0;
+    if (samples <= 0 || info.hz < 8000 || info.hz > 48000) continue;
+    if (!sink.open || sink_rate != (uint32_t)info.hz) {
+      if (sink.open) luaAudioSinkEnd(&sink);
+      const char* err = nullptr;
+      if (!luaAudioSinkBegin((uint32_t)info.hz, &sink, &err)) {
+        snprintf(s_bka_err, sizeof s_bka_err, "Audio unavailable (%s)", err ? err : "?");
+        s_bka_stop = true;
+        break;
+      }
+      // A new rate (a track encoded differently): the clock goes on from here.
+      if (sink_rate) { s_bka_start_t = s_bka_pos; samples_out = 0; }
+      sink_rate = (uint32_t)info.hz;
+    }
+    for (int i = 0; i < samples; ++i) {
+      int32_t v = info.channels == 2 ? ((int32_t)w->pcm[2 * i] + w->pcm[2 * i + 1]) / 2 : w->pcm[i];
+      v = (int32_t)((float)v * sink.gain);
+      w->out[out_n++] = (int16_t)(v > 32767 ? 32767 : v < -32768 ? -32768 : v);
+      if (out_n == sizeof w->out / sizeof w->out[0]) {
+        if (!luaAudioSinkWrite(&sink, w->out, out_n)) { snprintf(s_bka_err, sizeof s_bka_err, "Audio output failed"); s_bka_stop = true; break; }
+        out_n = 0;
+      }
+    }
+    samples_out += (uint64_t)samples;
+    s_bka_pos = s_bka_start_t + (double)samples_out / sink_rate;
+  }
+  if (!s_bka_stop && sink.open && out_n) luaAudioSinkWrite(&sink, w->out, out_n);
+  if (!s_bka_stop && !s_bka_err[0]) s_bka_ended = true;
+
+done:
+  s_bka_stop = true;                                   // the reader too
+  for (int i = 0; i < 500 && s_bka_reader_alive; ++i) vTaskDelay(pdMS_TO_TICKS(10));
   if (sink.open) luaAudioSinkEnd(&sink);
   s_wada_mp3_scratch = nullptr;
   if (w) heap_caps_free(w);
@@ -255,14 +325,20 @@ done:
 }
 
 static void booksAudioStop() {
-  if (!s_bka_alive) return;
+  if (!s_bka_alive && !s_bka_reader_alive) return;
   s_bka_stop = true;
-  for (int i = 0; i < 300 && s_bka_alive; ++i) vTaskDelay(pdMS_TO_TICKS(10));   // ends within one frame
+  // The decoder ends within a frame; it waits for the reader, which can sit in a
+  // connect for a few seconds.
+  for (int i = 0; i < 600 && (s_bka_alive || s_bka_reader_alive); ++i) vTaskDelay(pdMS_TO_TICKS(10));
 }
 
 static bool booksAudioPlayFrom(double t) {
   booksAudioStop();
-  if (s_bka_alive) { snprintf(s_bka_err, sizeof s_bka_err, "Audio is still stopping"); return false; }
+  if (s_bka_alive || s_bka_reader_alive) { snprintf(s_bka_err, sizeof s_bka_err, "Audio is still stopping"); return false; }
+  if (!s_bka_ring) s_bka_ring = (uint8_t*)heap_caps_malloc(kBkaRing, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  if (!s_bka_ring) { snprintf(s_bka_err, sizeof s_bka_err, "Not enough memory to play"); return false; }
+  s_bka_head = s_bka_tail = 0;
+  s_bka_eof = false;
   s_bka_err[0] = 0;
   s_bka_ended = false;
   if (!s_bka_track_count) { snprintf(s_bka_err, sizeof s_bka_err, "Nothing to play"); return false; }
@@ -279,9 +355,23 @@ static bool booksAudioPlayFrom(double t) {
   s_bka_buffering = true;
   s_bka_sd_busy = s_bka_tracks[0].local;   // reading the card: hold off unmounting it
   __atomic_store_n(&s_lua_audio_active, true, __ATOMIC_RELEASE);   // notification chimes stand aside
-  // TLS and the HTTP client want a deep stack; internal RAM, so only while playing.
-  if (xTaskCreatePinnedToCore(bkaTaskFn, "bkaudio", 12288, nullptr, 5, &s_bka_task, 0) != pdPASS) {
+  // The reader: TLS and the HTTP client want a deep stack (internal RAM, only while
+  // playing), on core 0 with Wi-Fi. The decoder: a small stack (minimp3's scratch is in
+  // PSRAM), on core 1 above the UI so a panel refresh cannot starve the codec.
+  s_bka_reader_alive = true;
+  if (xTaskCreatePinnedToCore(bkaReaderFn, "bkaread", 12288, nullptr, 4, nullptr, 0) != pdPASS) {
+    s_bka_reader_alive = false;
     s_bka_alive = false;
+    s_bka_sd_busy = false;
+    __atomic_store_n(&s_lua_audio_active, false, __ATOMIC_RELEASE);
+    snprintf(s_bka_err, sizeof s_bka_err, "Not enough memory to play");
+    return false;
+  }
+  if (xTaskCreatePinnedToCore(bkaTaskFn, "bkaudio", 6144, nullptr, 6, &s_bka_task, 1) != pdPASS) {
+    s_bka_stop = true;
+    for (int i = 0; i < 600 && s_bka_reader_alive; ++i) vTaskDelay(pdMS_TO_TICKS(10));
+    s_bka_alive = false;
+    s_bka_sd_busy = false;
     __atomic_store_n(&s_lua_audio_active, false, __ATOMIC_RELEASE);
     snprintf(s_bka_err, sizeof s_bka_err, "Not enough memory to play");
     return false;
