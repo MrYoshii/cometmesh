@@ -77,8 +77,8 @@ jobs:
         working-directory: lb
         run: |
           H=out/tools/sdk/esp32s3/qio_qspi/include/sdkconfig.h
-          grep -E "TCP_WND_DEFAULT|TCP_SND_BUF_DEFAULT|TCP_RECVMBOX_SIZE|DYNAMIC_TX_BUFFER|STATIC_TX_BUFFER|ALLOW_BSS_SEG" "$H"
-          grep -q "CONFIG_LWIP_TCP_WND_DEFAULT 32768" "$H"
+          grep -E "TCP_WND_DEFAULT|TCP_SND_BUF_DEFAULT|TCP_RECVMBOX_SIZE|DYNAMIC_RX_BUFFER_NUM|ALLOW_BSS_SEG" "$H"
+          grep -q "CONFIG_LWIP_TCP_WND_DEFAULT 65535" "$H"
 
       - name: Package the framework
         run: |

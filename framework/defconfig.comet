@@ -2,22 +2,28 @@
 # on top of the lib-builder's own defconfigs for the ESP32-S3. Built by
 # .github/workflows/framework.yml; see framework/README.md for why each is here.
 
-# TCP receive window and send buffer: 5760 bytes (4 segments) capped any download
-# over the internet at ~130 KB/s. 32 KB lets 22 segments be in flight. The pbufs
-# come from PSRAM (CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP, already on).
-CONFIG_LWIP_TCP_WND_DEFAULT=32768
-CONFIG_LWIP_TCP_SND_BUF_DEFAULT=16384
-CONFIG_LWIP_TCP_RECVMBOX_SIZE=32
+# TCP as in Espressif's own ESP32-S3 throughput example (esp-idf
+# examples/wifi/iperf/sdkconfig.defaults.esp32s3). The stock 5760-byte TCP buffers
+# (4 segments) capped any download over the internet at ~130 KB/s; a user report on
+# the ESP32-S3 saw 3 -> 22 Mbit/s from this change alone. The pbufs and the dynamic
+# RX buffers come from PSRAM (CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP, already on), so
+# the larger numbers cost PSRAM, not internal RAM.
+CONFIG_LWIP_TCP_WND_DEFAULT=65535
+CONFIG_LWIP_TCP_SND_BUF_DEFAULT=65535
+CONFIG_LWIP_TCP_RECVMBOX_SIZE=64
+CONFIG_LWIP_UDP_RECVMBOX_SIZE=64
 CONFIG_LWIP_TCPIP_RECVMBOX_SIZE=64
-CONFIG_ESP32_WIFI_DYNAMIC_RX_BUFFER_NUM=32
-CONFIG_ESP32_WIFI_RX_BA_WIN=16
+CONFIG_ESP32_WIFI_DYNAMIC_RX_BUFFER_NUM=64
 
-# Wi-Fi TX buffers allocated when sent (from PSRAM) instead of 8 static ones held in
-# internal RAM all the time (~13 KB).
-# CONFIG_ESP32_WIFI_STATIC_TX_BUFFER is not set
-CONFIG_ESP32_WIFI_DYNAMIC_TX_BUFFER=y
-CONFIG_ESP32_WIFI_DYNAMIC_TX_BUFFER_NUM=32
+# Left as they are, on purpose:
+# - The 8 static RX buffers (internal RAM, ~1.6 KB each) and the RX block-ack window
+#   of 16: Espressif's example uses 16 static buffers, which would cost another
+#   ~13 KB of internal RAM.
+# - The TX buffers: dynamic ones cannot be chosen while SPIRAM_USE_MALLOC is on
+#   (esp_wifi Kconfig), and Arduino needs that; with TRY_ALLOCATE_WIFI_LWIP the
+#   frames already go out by reference from PSRAM.
+# - Wi-Fi and lwIP IRAM optimisations: throughput bought with internal RAM.
 
 # Let big zero-initialised globals live in PSRAM (EXT_RAM_BSS_ATTR): the UI keeps
-# tens of KB of tables there that never need internal RAM.
+# tens of KB of tables that never need internal RAM.
 CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y

@@ -14,11 +14,17 @@ environments in `platformio.ini` then use through `platform_packages`.
 
 | Setting | Stock 2.0.17 | Comet | Why |
 |---|---|---|---|
-| `LWIP_TCP_WND_DEFAULT` | 5760 | 32768 | ~130 KB/s cap on downloads over the internet |
-| `LWIP_TCP_SND_BUF_DEFAULT` | 5760 | 16384 | uploads, the same |
-| `LWIP_TCP_RECVMBOX_SIZE` | 6 | 32 | room for the larger window |
-| Wi-Fi TX buffers | 8 static, internal | dynamic, PSRAM | ~13 KB internal RAM back |
+| `LWIP_TCP_WND_DEFAULT` / `LWIP_TCP_SND_BUF_DEFAULT` | 5760 | 65535 | ~130 KB/s cap on transfers over the internet |
+| `LWIP_TCP_RECVMBOX_SIZE` / `TCPIP_RECVMBOX_SIZE` | 6 / 32 | 64 / 64 | room for the larger window |
+| Wi-Fi dynamic RX buffers | 32 | 64 | in PSRAM |
 | `SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY` | off | on | big globals can move to PSRAM |
+
+The TCP numbers follow Espressif's ESP32-S3 throughput example
+(`esp-idf/examples/wifi/iperf/sdkconfig.defaults.esp32s3`). Kept as they are: the 8
+static RX buffers and the block-ack windows (more would cost internal RAM), the
+static TX buffers (dynamic ones are not selectable with `SPIRAM_USE_MALLOC`, which
+Arduino needs), and the Wi-Fi IRAM optimisations (throughput bought with internal
+RAM).
 
 Already on in the stock framework and kept: Wi-Fi and lwIP buffers in PSRAM
 (`SPIRAM_TRY_ALLOCATE_WIFI_LWIP`). mbedTLS allocates internally in the stock
