@@ -62929,12 +62929,23 @@ static void statusBarPackRight() {
 #else
     { g_statusbar.batt_pct,     0 },
 #endif
+#if defined(HAS_TDECK_MAX)
+    // Closer together on the 240 px bar: with the signal bars, Wi-Fi and Bluetooth
+    // all shown the cluster reached the centred clock.
+    { g_statusbar.sig_box,      SBX(5) },
+    { g_statusbar.conn_icon,    SBX(5) },
+    { g_statusbar.ble_icon,     SBX(5) },
+    { g_statusbar.gps_icon,     SBX(4) },
+    { g_statusbar.dnd_icon,     SBX(5) },
+    { g_statusbar.layout_label, SBX(8) },
+#else
     { g_statusbar.sig_box,      SBX(8) },
     { g_statusbar.conn_icon,    SBX(7) },
     { g_statusbar.ble_icon,     SBX(7) },
     { g_statusbar.gps_icon,     SBX(6) },
     { g_statusbar.dnd_icon,     SBX(7) },
     { g_statusbar.layout_label, SBX(10) },
+#endif
   };
   lv_coord_t x = 2;   // the battery's margin from the edge
   bool first = true;
