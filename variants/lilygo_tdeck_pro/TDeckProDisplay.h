@@ -127,6 +127,7 @@ private:
   uint16_t _color = 0x0000;
   uint32_t _last_refresh_ms = 0;
   uint8_t _partial_refreshes = 0;
+  uint32_t _last_full_ms = 0;   // the Max: a full refresh at least this often while partials run
   uint8_t _brightness = 255;
   bool _refresh_pending = false;
   bool _full_refresh_pending = true;

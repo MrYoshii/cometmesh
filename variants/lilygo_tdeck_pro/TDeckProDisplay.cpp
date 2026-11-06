@@ -227,7 +227,14 @@ bool TDeckProDisplay::isDark(uint16_t color) {
 #if defined(HAS_TDECK_MAX)
   // A little more of each anti-aliased glyph edge counts as ink: the Max's e-paper
   // look sets its text a shade heavier, which reads better on the one-bit panel.
-  return ((red * 54u + green * 183u + blue * 19u) >> 8) < 176u;
+  const uint16_t lum = (uint16_t)((red * 54u + green * 183u + blue * 19u) >> 8);
+  if (lum < 176u) return true;
+  // Colour is ink too. Status colours, badges and accents (amber, green, cyan, …) are
+  // light by luminance alone and would vanish from the panel; anything clearly
+  // coloured prints black. Pale tints (selection fills) stay white.
+  uint16_t hi = red > green ? red : green;  if (blue > hi) hi = blue;
+  uint16_t lo = red < green ? red : green;  if (blue < lo) lo = blue;
+  return hi - lo >= 80u && lum < 240u;
 #else
   return ((red * 54u + green * 183u + blue * 19u) >> 8) < 144u;
 #endif
@@ -459,7 +466,12 @@ void TDeckProDisplay::serviceRefresh(bool force) {
   // A full refresh (the black-white flash that clears any ghosting) after 29
   // partials rather than 9: the Max's panel showed no ghosting at that pace, and
   // the flash every few taps read as the screen going black.
-  const bool full = _full_refresh_pending || _partial_refreshes >= 29 || _epd.epd2.needsInitialFull();
+  // Partial updates only drive the pixels that change, and the rest of the image
+  // slowly pales under them: a screen where only a few digits change (a clock, the
+  // current draw) could run on partials for a long time. So also a full refresh once
+  // partials have run for three minutes since the last full one.
+  const bool full = _full_refresh_pending || _partial_refreshes >= 29 || _epd.epd2.needsInitialFull() ||
+                    (_partial_refreshes > 0 && now - _last_full_ms >= 180000u);
   if (!_full_refresh_pending && _sent_valid && memcmp(_mono, _sent, MONO_BYTES) == 0) {
     _refresh_pending = false;
     return;
@@ -494,6 +506,7 @@ void TDeckProDisplay::serviceRefresh(bool force) {
   _refresh_pending = false;
   _full_refresh_pending = false;
   _partial_refreshes = full ? 0 : (uint8_t)(_partial_refreshes + 1);
+  if (full) _last_full_ms = _epd_start_ms;
   if (force) finishUpdate(true);
 }
 #else
