@@ -2218,7 +2218,16 @@ static bool maxAudioInstall() { return maxAudioInstallRate(kI2sSampleRate); }
 static void maxSetVolume(int pct) {
   if (pct < 0) pct = 0;
   if (pct > 100) pct = 100;
-  s_max_codec.setVolumePercent((uint8_t)((pct * 77 + 50) / 100));   // measured: 100% was still clipping, 90% clean
+  if (pct == 0) { s_max_codec.setVolumePercent(0); return; }
+  // The codec's volume register is 0.5 dB a step (setVolumePercent: 0x60 + 0x9F*p%).
+  // 100% stays where it was measured clean (codec 77%, register 0xDA); below it the
+  // attenuation follows (1 - pct)^1.5 down to 30 dB, so the steps sound even: a
+  // straight line in percent left 30% some 39 dB down, next to inaudible.
+  const float frac = 1.0f - (float)pct / 100.0f;
+  const int atten_steps = (int)(60.0f * frac * sqrtf(frac) + 0.5f);   // 60 steps = 30 dB
+  const int reg = 0xDA - atten_steps;
+  const int codec_pct = ((reg - 0x60) * 100 + 0x9F - 1) / 0x9F;        // setVolumePercent's inverse
+  s_max_codec.setVolumePercent((uint8_t)(codec_pct < 1 ? 1 : codec_pct > 100 ? 100 : codec_pct));
 }
 static void maxAudioUninstall() {
   s_max_codec.setMute(true);

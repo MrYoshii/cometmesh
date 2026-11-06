@@ -994,50 +994,113 @@ static char s_bkd_msg[64] = "";
 static char s_bkd_dir[40] = "";
 static char s_bkd_item[48] = "";
 
+// The card is written by the UI task only, like an EPUB download: written from this
+// task, the card's writes failed part-way (read as "card full"). So the task fetches
+// into a ring in PSRAM and asks the UI task, through s_bkd_fstate, to open, fill,
+// close and rename the files; booksDownloadPump() does that on a 50 ms timer.
+enum BkdFile : uint8_t { BkdIdle, BkdOpenReq, BkdOpen, BkdSkip, BkdCloseReq, BkdClosed, BkdFailed };
+static const size_t kBkdRing = 256 * 1024;
+static uint8_t* s_bkd_ring = nullptr;
+static volatile size_t s_bkd_head = 0, s_bkd_tail = 0;
+static volatile uint8_t s_bkd_fstate = BkdIdle;
+static char s_bkd_fpath[72] = "";     // the file to open (a .part, or book.json)
+static char s_bkd_final[72] = "";     // on close: rename to this ("" = keep the name)
+static bool s_bkd_fappend = false;    // open to continue (a .part) instead of anew
+static volatile uint32_t s_bkd_fsize = 0;   // the size the open file had
+static File s_bkd_file;                // UI task only
+static lv_timer_t* s_bkd_timer = nullptr;
+
+static bool bkdWait(uint8_t a, uint8_t b, uint32_t ms) {   // until the UI side moved on
+  const uint32_t t0 = millis();
+  while (s_bkd_fstate != a && s_bkd_fstate != b) {
+    if (s_bkd_cancel || millis() - t0 > ms) return false;
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+  return true;
+}
+
+static bool bkdPut(const uint8_t* d, size_t n) {   // into the ring, waiting while it is full
+  while (n) {
+    while (s_bkd_head - s_bkd_tail >= kBkdRing) {
+      if (s_bkd_cancel || s_bkd_fstate == BkdFailed) return false;
+      vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    size_t room = kBkdRing - (s_bkd_head - s_bkd_tail);
+    if (room > n) room = n;
+    const size_t at = s_bkd_head % kBkdRing;
+    const size_t first = room < kBkdRing - at ? room : kBkdRing - at;
+    memcpy(s_bkd_ring + at, d, first);
+    if (room > first) memcpy(s_bkd_ring, d + first, room - first);
+    __sync_synchronize();
+    s_bkd_head += room;
+    d += room; n -= room;
+  }
+  return true;
+}
+
+// Open (or skip) a file through the UI task; *have: its size when continuing.
+static uint8_t bkdOpen(const char* path, const char* final_name, bool append, uint32_t* have) {
+  bkCopy(s_bkd_fpath, sizeof s_bkd_fpath, path);
+  bkCopy(s_bkd_final, sizeof s_bkd_final, final_name);
+  s_bkd_fappend = append;
+  s_bkd_head = s_bkd_tail = 0;
+  __sync_synchronize();
+  s_bkd_fstate = BkdOpenReq;
+  if (!bkdWait(BkdOpen, BkdSkip, 15000) && s_bkd_fstate != BkdFailed) return BkdFailed;
+  if (have) *have = s_bkd_fsize;
+  return s_bkd_fstate;
+}
+
+static bool bkdClose(bool rename_it) {   // drained, closed, renamed by the UI task
+  if (!rename_it) s_bkd_final[0] = 0;
+  __sync_synchronize();
+  s_bkd_fstate = BkdCloseReq;
+  return bkdWait(BkdClosed, BkdFailed, 60000) && s_bkd_fstate == BkdClosed;
+}
+
 static bool bkaOpen(HTTPClient& http, WiFiClientSecure& tls, WiFiClient& plain, const BkaTrack& tr,
                     uint32_t from, uint32_t* total, int* code_out);   // BooksAudio.inc
 static void bkdTaskFn(void*) {
   uint8_t* buf = (uint8_t*)heap_caps_malloc(4096, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-  fs::FS* fs = buf ? booksFs() : nullptr;
+  if (!s_bkd_ring) s_bkd_ring = (uint8_t*)heap_caps_malloc(kBkdRing, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   const int n = s_bkd_tracks;
-  bool ok = fs != nullptr;
-  if (!ok) snprintf(s_bkd_msg, sizeof s_bkd_msg, "Insert an SD card to download");
-  if (ok) { fs->mkdir("/books"); fs->mkdir("/books/audio"); fs->mkdir(s_bkd_dir); }
+  bool ok = buf && s_bkd_ring;
+  if (!ok) snprintf(s_bkd_msg, sizeof s_bkd_msg, "Not enough memory to download");
   for (int i = 0; ok && i < n && !s_bkd_cancel; ++i) {
     s_bkd_track = i;
-    char path[64];
+    char path[64], part[72];
     snprintf(path, sizeof path, "%s/%03d.mp3", s_bkd_dir, i + 1);
-    if (fs->exists(path)) {   // a finished track from an earlier attempt
-      File e = fs->open(path, FILE_READ);
-      const size_t have = e ? e.size() : 0;
-      if (e) e.close();
-      if (have > 0) continue;
-    }
-    char part[72];
     snprintf(part, sizeof part, "%s.part", path);
-    // Fetched the way the player streams (a Range request, which the server and any
-    // proxy in front of it answer at once), into a .part that a retry continues.
-    uint32_t have = 0;
-    if (fs->exists(part)) { File e = fs->open(part, FILE_READ); if (e) { have = (uint32_t)e.size(); e.close(); } }
     bool track_ok = false;
+    bool append = true;
     for (int attempt = 0; attempt < 6 && !s_bkd_cancel && !track_ok; ++attempt) {
       if (attempt) vTaskDelay(pdMS_TO_TICKS(1500 * attempt));
+      uint32_t have = 0;
+      const uint8_t st = bkdOpen(part, path, append, &have);
+      if (st == BkdSkip) { track_ok = true; break; }   // finished in an earlier attempt
+      if (st != BkdOpen) { ok = false; break; }        // the UI side said why
+      // Fetched the way the player streams (a Range request, which the server and any
+      // proxy in front of it answer at once), continuing a .part where it stopped.
       HTTPClient http; WiFiClientSecure tls; WiFiClient plain;
       uint32_t total = 0;
       int code = 0;
       if (!bkaOpen(http, tls, plain, s_bka_tracks[i], have, &total, &code)) {
+        bkdClose(false);
         if (code == 401) bkRefresh();
         snprintf(s_bkd_msg, sizeof s_bkd_msg, "Track %d failed (%d)", i + 1, code);
         Serial.printf("[books] download track %d: open failed %d (from %u)\n", i + 1, code, (unsigned)have);
         continue;
       }
-      if (code == 200 && have) have = 0;   // the range was ignored: from the start
-      File f = fs->open(part, have ? FILE_APPEND : FILE_WRITE);
-      if (!f) { http.end(); snprintf(s_bkd_msg, sizeof s_bkd_msg, "Cannot write to the SD card"); attempt = 99; break; }
+      if (code == 200 && have) {   // the range was ignored: start the file again
+        http.end();
+        bkdClose(false);
+        append = false;
+        continue;
+      }
       WiFiClient* stream = http.getStreamPtr();
       uint32_t pos = have, idle_since = millis();
       s_bk_dl_total = total; s_bk_dl_got = pos;
-      bool write_failed = false;
+      bool put_failed = false;
       while (!s_bkd_cancel) {
         if (total && pos >= total) break;
         const int avail = stream ? stream->available() : 0;
@@ -1047,27 +1110,27 @@ static void bkdTaskFn(void*) {
           vTaskDelay(pdMS_TO_TICKS(5));
           continue;
         }
-        const int n = stream->read(buf, avail < 4096 ? avail : 4096);
-        if (n <= 0) continue;
-        if (f.write(buf, (size_t)n) != (size_t)n) { write_failed = true; break; }
-        pos += (uint32_t)n;
+        const int r = stream->read(buf, avail < 4096 ? avail : 4096);
+        if (r <= 0) continue;
+        if (!bkdPut(buf, (size_t)r)) { put_failed = true; break; }
+        pos += (uint32_t)r;
         s_bk_dl_got = pos;
         idle_since = millis();
       }
-      f.close();
       http.end();
-      if (write_failed) { snprintf(s_bkd_msg, sizeof s_bkd_msg, "The SD card is full"); attempt = 99; break; }
-      have = pos;
-      if ((total && pos >= total) || (!total && pos > 0)) track_ok = true;
+      const bool complete = (total && pos >= total) || (!total && pos > 0 && !put_failed);
+      if (!bkdClose(complete && !s_bkd_cancel)) { ok = false; break; }   // a write failed: the UI said why
+      append = true;
+      if (complete) track_ok = true;
       else Serial.printf("[books] download track %d: broke off at %u of %u, retrying\n", i + 1, (unsigned)pos, (unsigned)total);
     }
+    if (!ok) break;
     if (!track_ok) {
       if (!s_bkd_msg[0]) snprintf(s_bkd_msg, sizeof s_bkd_msg, "Track %d failed", i + 1);
       ok = false;
       break;
     }
     s_bkd_msg[0] = 0;
-    fs->rename(part, path);
   }
   if (ok && s_bkd_cancel) { snprintf(s_bkd_msg, sizeof s_bkd_msg, "Download stopped"); ok = false; }
   if (ok) {   // the manifest last: its presence means "complete"
@@ -1086,11 +1149,17 @@ static void bkdTaskFn(void*) {
       JsonObject c = ca.add<JsonObject>();
       c["s"] = s_bka_chapters[i].start; c["e"] = s_bka_chapters[i].end; c["t"] = s_bka_chapters[i].title;
     }
+    const size_t len = measureJson(doc);
+    char* js = (char*)bkAlloc(len + 1);
     char path[64];
     snprintf(path, sizeof path, "%s/book.json", s_bkd_dir);
-    File m = fs->open(path, FILE_WRITE);
-    if (m) { serializeJson(doc, m); m.close(); }
-    else { snprintf(s_bkd_msg, sizeof s_bkd_msg, "Cannot write to the SD card"); ok = false; }
+    ok = js && bkdOpen(path, "", false, nullptr) == BkdOpen;
+    if (ok) {
+      serializeJson(doc, js, len + 1);
+      ok = bkdPut((const uint8_t*)js, len) && bkdClose(false);
+    }
+    bkFree(js);
+    if (!ok && !s_bkd_msg[0]) snprintf(s_bkd_msg, sizeof s_bkd_msg, "Cannot write to the SD card");
   }
   if (ok) snprintf(s_bkd_msg, sizeof s_bkd_msg, "On the SD card: plays offline");
   if (buf) heap_caps_free(buf);
@@ -1099,6 +1168,75 @@ static void bkdTaskFn(void*) {
   s_bkd_active = false;
   s_bkd_task = nullptr;
   vTaskDelete(nullptr);
+}
+
+// The UI half of the download (50 ms timer): opens, writes, closes, renames.
+static void booksDownloadPump(lv_timer_t*) {
+  const uint8_t st = s_bkd_fstate;
+  fs::FS* fs = (st == BkdOpenReq || st == BkdOpen || st == BkdCloseReq) ? booksFs() : nullptr;
+  if (st == BkdOpenReq) {
+    if (!fs) { snprintf(s_bkd_msg, sizeof s_bkd_msg, "Insert an SD card to download"); s_bkd_fstate = BkdFailed; return; }
+    s_bk_sd_busy = true;
+    fs->mkdir("/books"); fs->mkdir("/books/audio"); fs->mkdir(s_bkd_dir);
+    if (s_bkd_final[0] && fs->exists(s_bkd_final)) {   // done before (a resumed download)
+      File e = fs->open(s_bkd_final, FILE_READ);
+      const size_t have = e ? e.size() : 0;
+      if (e) e.close();
+      if (have > 0) { s_bk_sd_busy = false; s_bkd_fstate = BkdSkip; return; }
+    }
+    // What is there already, read before opening (an appending handle's size is not
+    // reliable everywhere).
+    uint32_t have = 0;
+    if (s_bkd_fappend && fs->exists(s_bkd_fpath)) {
+      File r = fs->open(s_bkd_fpath, FILE_READ);
+      if (r) { have = (uint32_t)r.size(); r.close(); }
+    }
+    s_bkd_file = fs->open(s_bkd_fpath, have ? FILE_APPEND : FILE_WRITE);
+    if (!s_bkd_file) {
+      s_bk_sd_busy = false;
+      snprintf(s_bkd_msg, sizeof s_bkd_msg, "Cannot write to the SD card");
+      s_bkd_fstate = BkdFailed;
+      return;
+    }
+    s_bkd_fsize = have;
+    __sync_synchronize();
+    s_bkd_fstate = BkdOpen;
+    return;
+  }
+  if (st != BkdOpen && st != BkdCloseReq) return;
+  // Up to 32 KB a tick: well above the link's rate, short enough to keep the UI going.
+  size_t budget = 32 * 1024;
+  while (budget && s_bkd_head != s_bkd_tail) {
+    const size_t at = s_bkd_tail % kBkdRing;
+    size_t n = s_bkd_head - s_bkd_tail;
+    if (n > kBkdRing - at) n = kBkdRing - at;
+    if (n > budget) n = budget;
+    const size_t w = s_bkd_file.write(s_bkd_ring + at, n);
+    if (w != n) {
+      Serial.printf("[books] download write %u of %u at %u: errno %d\n", (unsigned)w, (unsigned)n,
+                    (unsigned)s_bkd_file.size(), errno);
+      s_bkd_file.close();
+#if CAP_SD && !defined(WADA_WEB)
+      const uint64_t free_b = SD.totalBytes() > SD.usedBytes() ? SD.totalBytes() - SD.usedBytes() : 0;
+      if (free_b < 1024u * 1024u) snprintf(s_bkd_msg, sizeof s_bkd_msg, "The SD card is full");
+      else
+#endif
+      snprintf(s_bkd_msg, sizeof s_bkd_msg, "Writing to the SD card failed");
+      s_bk_sd_busy = false;
+      s_bkd_fstate = BkdFailed;
+      return;
+    }
+    __sync_synchronize();
+    s_bkd_tail += n;
+    budget -= n;
+  }
+  if (st == BkdCloseReq && s_bkd_head == s_bkd_tail) {
+    s_bkd_file.close();
+    if (fs && s_bkd_final[0]) { fs->remove(s_bkd_final); fs->rename(s_bkd_fpath, s_bkd_final); }
+    s_bk_sd_busy = false;
+    __sync_synchronize();
+    s_bkd_fstate = BkdClosed;
+  }
 }
 
 static void booksAudioPause();
@@ -1119,7 +1257,9 @@ static void booksAudioDownloadStart() {
   s_bkd_cancel = false;
   s_bkd_done = false;
   s_bkd_msg[0] = 0;
+  s_bkd_fstate = BkdIdle;
   s_bkd_active = true;
+  if (!s_bkd_timer) s_bkd_timer = lv_timer_create(booksDownloadPump, 50, nullptr);
   if (xTaskCreatePinnedToCore(bkdTaskFn, "bkdl", 12288, nullptr, 3, &s_bkd_task, 0) != pdPASS) {
     s_bkd_active = false;
     if (g_lv.task) g_lv.task->showAlert(TR("Not enough memory to download"), 1800);
@@ -2279,6 +2419,9 @@ static void booksAudioTimerCb(lv_timer_t*) {
   if (running && now - s_bka_last_sync_ms >= 60000u) booksAudioSyncSoon(false);
   if (s_bkd_done) {   // an offline download finished (or stopped)
     s_bkd_done = false;
+    if (s_bkd_file) s_bkd_file.close();
+    s_bk_sd_busy = false;
+    if (s_bkd_timer) { lv_timer_del(s_bkd_timer); s_bkd_timer = nullptr; }
     if (g_lv.task) g_lv.task->showAlert(s_bkd_msg, 2200);
     if (s_bkd_ok) {
       booksScanAudio();

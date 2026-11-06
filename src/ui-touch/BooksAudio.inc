@@ -258,6 +258,9 @@ static void bkaTaskFn(void*) {
   // the codec (a long one means something held the CPU or the flash cache).
   uint32_t log_at = millis(), underruns = 0, slow_writes = 0, max_write_ms = 0, max_dec_ms = 0;
   uint32_t kbps = 0;
+  // The codec's DMA holds ~12 ms (4 x 128 frames at 44.1 kHz): a longer pause between
+  // two writes means it ran dry and the sound broke. Counted in microseconds.
+  uint32_t last_write_end_us = 0, dry = 0, max_gap_us = 0;
   if (!w) { snprintf(s_bka_err, sizeof s_bka_err, "Not enough memory to play"); s_bka_stop = true; goto done; }
   s_wada_mp3_scratch = &w->scratch;
   mp3dec_init(&w->decoder);
@@ -266,12 +269,15 @@ static void bkaTaskFn(void*) {
   while (!s_bka_stop) {
     if (millis() - log_at >= 10000) {
       const uint32_t dt = millis() - log_at;
-      Serial.printf("[bka] fetch %u KB/s (book %u kbit/s), ring %u KB, underruns %u, slow writes %u (max %u ms), decode max %u ms, int free %u\n",
+      Serial.printf("[bka] fetch %u KB/s (book %u kbit/s), ring %u KB, underruns %u, slow writes %u (max %u ms), "
+                    "decode max %u ms, dry %u (longest gap %u.%u ms), int free %u\n",
                     (unsigned)(s_bka_fetched / (dt ? dt : 1)), (unsigned)kbps, (unsigned)(bkaRingUsed() / 1024),
                     (unsigned)underruns, (unsigned)slow_writes, (unsigned)max_write_ms, (unsigned)max_dec_ms,
+                    (unsigned)dry, (unsigned)(max_gap_us / 1000), (unsigned)(max_gap_us % 1000 / 100),
                     (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
       s_bka_fetched = 0; log_at = millis();
       underruns = slow_writes = max_write_ms = max_dec_ms = 0;
+      dry = max_gap_us = 0;
     }
     if (in_count < sizeof w->input / 2) {   // top up from the ring
       if (in_start) { memmove(w->input, w->input + in_start, in_count); in_start = 0; }
@@ -283,7 +289,7 @@ static void bkaTaskFn(void*) {
       else { s_bka_buffering = true; bkaIdle(&sink, w); continue; }
     }
     if (in_count < 2048 && !eof) {
-      if (in_count == 0) { primed = false; ++underruns; }   // ran dry: buffer up again
+      if (in_count == 0) { primed = false; ++underruns; last_write_end_us = 0; }   // ran dry: buffer up again
       bkaIdle(&sink, w);
       continue;
     }
@@ -320,7 +326,14 @@ static void bkaTaskFn(void*) {
       w->out[out_n++] = (int16_t)(v > 32767 ? 32767 : v < -32768 ? -32768 : v);
       if (out_n == sizeof w->out / sizeof w->out[0]) {
         const uint32_t t_w = millis();
+        const uint32_t t_wus = (uint32_t)esp_timer_get_time();
+        if (last_write_end_us) {
+          const uint32_t gap = t_wus - last_write_end_us;
+          if (gap > max_gap_us) max_gap_us = gap;
+          if (gap > 11000) ++dry;
+        }
         if (!luaAudioSinkWrite(&sink, w->out, out_n)) { snprintf(s_bka_err, sizeof s_bka_err, "Audio output failed"); s_bka_stop = true; break; }
+        last_write_end_us = (uint32_t)esp_timer_get_time();
         // 512 frames are ~12 ms of sound at 44.1 kHz: a write blocks for about that
         // when it keeps pace; much longer means the codec's DMA ran dry first.
         const uint32_t wt = millis() - t_w;
