@@ -282,6 +282,10 @@ void halt() {
 /* WIFI RECONNECT TRACKERS */
 #if defined(ESP32) && defined(WIFI_SSID)
   bool wifi_needs_reconnect = false;
+  // When setup() last started an association. The loop's first begin() must not land on
+  // top of it while it is still running: on IDF 5 that fails ("sta is connecting, cannot
+  // set config") and resets the attempt, which kept a weak link from joining for a minute.
+  uint32_t g_boot_wifi_begin_ms = 0;
   unsigned long last_wifi_reconnect_attempt = 0;
 #endif
 #if defined(ESP32)
@@ -1653,12 +1657,6 @@ void setup() {
         else if (event == ARDUINO_EVENT_WIFI_STA_GOT_IP)    wifi_needs_reconnect = false;
     });
     const bool wifi_mode_ready = WiFi.mode(WIFI_STA);
-#if ESP_ARDUINO_VERSION_MAJOR >= 3
-    // Join the strongest access point of the network, not the first one the scan meets:
-    // with several (a mesh, a repeater) the fast scan could settle on one at -80 dBm.
-    WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
-    WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
-#endif
 #if defined(WADA_ORDERED_WIFI_BLE)
     if (!wifi_mode_ready) {
       pagerWifiEnterBleFallback("boot STA initialization failed");
@@ -1689,6 +1687,7 @@ void setup() {
       if (ssid[0]) {
         wifiConfigSetPagerWifiBlePhase(PagerWifiBlePhase::Associating);
         const uint32_t assoc_start_ms = millis();
+        g_boot_wifi_begin_ms = assoc_start_ms ? assoc_start_ms : 1;
         WiFi.begin(ssid, pwd[0] ? pwd : nullptr);
         while (WiFi.status() != WL_CONNECTED &&
                (uint32_t)(millis() - assoc_start_ms) < 6000UL) {
@@ -2072,12 +2071,15 @@ void loop() {
         char pwd[WIFI_CONFIG_PWD_MAX];
         wifiConfigGetSsid(ssid, sizeof(ssid));
         wifiConfigGetPwd(pwd, sizeof(pwd));
-        if (strlen(ssid) > 0 && WiFi.status() != WL_CONNECTED) {
+        const bool boot_assoc_running = g_boot_wifi_begin_ms != 0 &&
+            (uint32_t)(millis() - g_boot_wifi_begin_ms) < 20000UL;
+        if (strlen(ssid) > 0 && WiFi.status() != WL_CONNECTED && !boot_assoc_running) {
 #if defined(WADA_ORDERED_WIFI_BLE) && defined(BLE_PIN_CODE)
           wifiConfigSetPagerWifiBlePhase(PagerWifiBlePhase::Associating);
 #endif
           WiFi.begin(ssid, pwd[0] ? pwd : nullptr);
         }
+        g_boot_wifi_begin_ms = 0;   // one grace period, for the boot association only
         last_wifi_retry_ms = millis();
         wifi_rejoin.noteAttempt(last_wifi_retry_ms);
 #if defined(WADA_ORDERED_WIFI_BLE) && defined(BLE_PIN_CODE)
