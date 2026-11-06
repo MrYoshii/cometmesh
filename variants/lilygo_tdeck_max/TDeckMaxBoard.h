@@ -141,6 +141,14 @@ public:
   // 50 ms for the controller to come out of reset.
   void touchReset();
   void keyboardReset();
+  // Hold the CST3530 (glass and front pads) in reset while the screen is locked, so
+  // nothing in a pocket presses anything and the controller draws next to nothing;
+  // release it (and let it boot, 50 ms) on unlock.
+  void setTouchPower(bool on) {
+    if (!expander_ready_) return;
+    xlWrite(TDMAX_XL_TOUCH_RST, on);
+    if (on) delay(50);
+  }
 
   // The SX1262's supply off and on again (LoRa EN, line 1), for a radio that does
   // not answer at boot: a clean power-on reset however this boot was reached.

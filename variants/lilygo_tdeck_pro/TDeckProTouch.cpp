@@ -159,9 +159,20 @@ bool heltecV4CapTouchPopSwipe(int8_t* out_x, int8_t* out_y) {
   return true;
 }
 #if defined(HAS_TDECK_MAX)
+static volatile bool s_paused = false;   // controller held in reset (screen locked)
+void maxTouchSetPaused(bool paused) {
+  s_paused = paused;
+  if (paused) {   // forget any touch in flight
+    TOUCH_LOCK();
+    down = live = tap_pending = swipe_pending = swiping = false;
+    release_misses = 0;
+    TOUCH_UNLOCK();
+  }
+}
 static void touchPollTaskFn(void* arg) {
   const TickType_t period = pdMS_TO_TICKS((uint32_t)(uintptr_t)arg);
   for (;;) {
+    if (s_paused) { vTaskDelay(pdMS_TO_TICKS(100)); continue; }   // nothing to read, nothing to burn
     poll();
     vTaskDelay(period ? period : 1);
   }

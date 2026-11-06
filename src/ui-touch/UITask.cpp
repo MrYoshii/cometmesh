@@ -50406,6 +50406,7 @@ static void updatePagerTabHold(uint32_t now) {
 // which must NOT act while off) it can't be skipped the same way.
 #if defined(HAS_TDECK_MAX)
 static bool s_max_frontlight_on = false;   // the front-light as the heart pad left it
+void maxTouchSetPaused(bool paused);         // TDeckProTouch.cpp (sim: a no-op)
 static bool s_max_kb_reading = false;   // heart pad held: screen light on, keys dark
 static bool s_max_sleep_dim = false;    // screen off on USB with the light dimmed (not out)
 static bool s_max_relight_on_wake = false;   // the light was on when the screen went off
@@ -84094,6 +84095,16 @@ void UITask::loop() {
       // together, bubble = Home, send = the chats (Meck's ids 0, 1, 2).
     uint8_t key_id = 0;
     bool key0_long = false;
+    {   // Locked: the touch controller (glass + pads) is held in reset; unlocked: running.
+      static int8_t s_touch_on = -1;
+      const int8_t want = (!_manual_lock || s_pin_root) ? 1 : 0;   // the PIN pad needs the glass
+      if (want != s_touch_on) {
+        s_touch_on = want;
+        maxTouchSetPaused(!want);
+        board.setTouchPower(want != 0);
+        Serial.printf("[TOUCH] controller %s (locked=%d)\n", want ? "on" : "off", (int)_manual_lock);
+      }
+    }
     if (display.takeFrontKey0Release(key0_long)) {
       Serial.printf("[PAD] heart release long=%d light=%d -> ", (int)key0_long, (int)s_max_frontlight_on);   // TEST ONLY
       // Heart pad, on release. Tap: the light on/off (keys as Settings > Keyboard
