@@ -612,84 +612,158 @@ static void bkJobProgress() {
   s_bk_job_ok = code == 200;
 }
 
-// An audiobook: ask the server for a playback session. Direct play only (the files as
-// they are), so the device decodes them itself: MP3 for now.
+// A JSON reply read straight off the connection, a buffer at a time, so a reply of any
+// size goes through ArduinoJson's filter without being held in memory.
+class BkBufStream : public Stream {
+ public:
+  explicit BkBufStream(WiFiClient* c) : c_(c) {}
+  int available() override { return (n_ > i_) ? (int)(n_ - i_) : (fill() ? (int)(n_ - i_) : 0); }
+  int read() override { return (i_ < n_ || fill()) ? buf_[i_++] : -1; }
+  int peek() override { return (i_ < n_ || fill()) ? buf_[i_] : -1; }
+  size_t readBytes(char* out, size_t len) override {
+    size_t got = 0;
+    while (got < len && (i_ < n_ || fill())) {
+      size_t k = n_ - i_;
+      if (k > len - got) k = len - got;
+      memcpy(out + got, buf_ + i_, k);
+      i_ += k; got += k;
+    }
+    return got;
+  }
+  size_t write(uint8_t) override { return 0; }
+  void flush() override {}
+  size_t total() const { return total_; }
+ private:
+  bool fill() {
+    if (!c_) return false;
+    const uint32_t t0 = millis();
+    for (;;) {
+      const int a = c_->available();
+      if (a > 0) {
+        const int r = c_->read(buf_, a < (int)sizeof buf_ ? (size_t)a : sizeof buf_);
+        if (r > 0) { n_ = (size_t)r; i_ = 0; total_ += (size_t)r; return true; }
+      }
+      if (!c_->connected() && c_->available() <= 0) return false;
+      if (millis() - t0 > 20000) return false;
+      vTaskDelay(pdMS_TO_TICKS(2));
+    }
+  }
+  WiFiClient* c_;
+  uint8_t buf_[1024];
+  size_t n_ = 0, i_ = 0, total_ = 0;
+};
+
+// GET a server path and parse its reply through a filter. Returns the HTTP status (or
+// a negative error); a parse error comes back as HTTPC_ERROR_CONNECTION_LOST.
+static int bkGetJson(const char* path, JsonDocument& filter, JsonDocument& doc) {
+  for (int attempt = 0; attempt < 2; ++attempt) {
+    char url[200];
+    bkUrl(url, sizeof url, path);
+    HTTPClient http;
+    http.setReuse(false);
+    http.setConnectTimeout(9000);
+    http.setTimeout(20000);
+    http.useHTTP10(true);
+    http.setUserAgent("wadamesh-books");
+    WiFiClientSecure tls; WiFiClient plain;
+    const bool https = strncasecmp(url, "https://", 8) == 0;
+    if (https) { tls.setInsecure(); if (!http.begin(tls, url)) return HTTPC_ERROR_CONNECTION_REFUSED; }
+    else if (!http.begin(plain, url)) return HTTPC_ERROR_CONNECTION_REFUSED;
+    http.addHeader("Accept-Encoding", "identity");
+    if (s_abs_token[0]) http.addHeader("Authorization", String("Bearer ") + s_abs_token);
+    const int code = http.GET();
+    if (code == 401 && attempt == 0) { http.end(); if (bkRefresh()) continue; return 401; }
+    if (code != 200) { http.end(); return code; }
+    BkBufStream in(http.getStreamPtr());
+    const DeserializationError err = deserializeJson(doc, in, DeserializationOption::Filter(filter));
+    Serial.printf("[books] %s: %u bytes read, json %s\n", path, (unsigned)in.total(), err.c_str());
+    http.end();
+    return err ? HTTPC_ERROR_CONNECTION_LOST : 200;
+  }
+  return 401;
+}
+
+// An audiobook from the server: its audio files (in order), chapters and length from
+// the library item, read with a filter (a long book's item runs to megabytes), and the
+// listening position from the user's media progress. Its tracks stream straight from
+// the item's files; MP3 only for now.
 static void bkJobOpenSession() {
   char path[120];
-  snprintf(path, sizeof path, "/api/items/%s/play", s_bk_job_arg);
-  static const char kBody[] =
-      "{\"deviceInfo\":{\"clientName\":\"wadamesh\",\"deviceId\":\"wadamesh-max\"},"
-      "\"forceDirectPlay\":true,\"forceTranscode\":false,\"mediaPlayer\":\"wadamesh\","
-      "\"supportedMimeTypes\":[\"audio/mpeg\"]}";
-  // The reply carries the whole library item (every audio file with its tags), easily
-  // past the usual limit for a long book: allow what PSRAM has.
-  size_t room = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-  room = room > 1024u * 1024u ? room - 1024u * 1024u : kBkJsonCap;
-  if (room > 6u * 1024u * 1024u) room = 6u * 1024u * 1024u;
-  if (room < kBkJsonCap) room = kBkJsonCap;
-  s_bk_body_cap = room;
-  uint8_t* body = nullptr; size_t len = 0;
-  const int code = bkAuthed("POST", path, kBody, &body, &len, nullptr);
-  s_bk_body_cap = kBkJsonCap;
-  Serial.printf("[books] play session: HTTP %d, %u bytes\n", code, (unsigned)len);
-  if (code != 200 || !body) { bkJobMsgForCode(code); bkFree(body); return; }
+  snprintf(path, sizeof path, "/api/items/%s", s_bk_job_arg);
   JsonDocument filter(&s_bk_json_alloc);
-  filter["id"] = true;
-  filter["displayTitle"] = true;
-  filter["displayAuthor"] = true;
-  filter["duration"] = true;
-  filter["currentTime"] = true;
-  JsonObject fc = filter["chapters"][0].to<JsonObject>();
+  JsonObject fm = filter["media"].to<JsonObject>();
+  fm["duration"] = true;
+  fm["metadata"]["title"] = true;
+  fm["metadata"]["authorName"] = true;
+  JsonObject fc = fm["chapters"][0].to<JsonObject>();
   fc["start"] = true; fc["end"] = true; fc["title"] = true;
-  JsonObject ft = filter["audioTracks"][0].to<JsonObject>();
-  ft["startOffset"] = true; ft["duration"] = true; ft["contentUrl"] = true;
-  ft["mimeType"] = true; ft["codec"] = true;
+  JsonObject fa = fm["audioFiles"][0].to<JsonObject>();
+  fa["index"] = true; fa["ino"] = true; fa["duration"] = true; fa["mimeType"] = true;
+  fa["codec"] = true; fa["exclude"] = true; fa["invalid"] = true;
+  fa["metadata"]["ext"] = true;
   JsonDocument doc(&s_bk_json_alloc);
-  const bool bad = (bool)deserializeJson(doc, (const char*)body, len, DeserializationOption::Filter(filter));
-  bkFree(body);
-  if (bad) { snprintf(s_bk_job_msg, sizeof s_bk_job_msg, "Unexpected reply from the server"); return; }
+  const int code = bkGetJson(path, filter, doc);
+  if (code != 200) { bkJobMsgForCode(code); return; }
   if (!s_bka_tracks) s_bka_tracks = (BkaTrack*)psAlloc(sizeof(BkaTrack) * kBkaMaxTracks);
   if (!s_bka_chapters) s_bka_chapters = (BkaChapter*)psAlloc(sizeof(BkaChapter) * kBkaMaxChapters);
   if (!s_bka_tracks || !s_bka_chapters) { snprintf(s_bk_job_msg, sizeof s_bk_job_msg, "Not enough memory"); return; }
-  int tracks = 0;
+  JsonObject media = doc["media"];
+  // The files in playing order (their index), skipping excluded and broken ones.
+  struct Pick { int index; JsonObject f; };
+  static Pick picks[kBkaMaxTracks];
+  int np = 0;
   char codec[16] = "";
-  for (JsonObject t : doc["audioTracks"].as<JsonArray>()) {
-    if (tracks >= kBkaMaxTracks) break;
-    const char* mime = t["mimeType"] | "";
-    const char* cdc = t["codec"] | "";
+  for (JsonObject f : media["audioFiles"].as<JsonArray>()) {
+    if ((f["exclude"] | false) || (f["invalid"] | false)) continue;
+    if (np >= kBkaMaxTracks) break;
+    const char* mime = f["mimeType"] | "";
+    const char* cdc = f["codec"] | "";
+    const char* ext = f["metadata"]["ext"] | "";
     const bool mp3 = strcasecmp(mime, "audio/mpeg") == 0 || strcasecmp(mime, "audio/mp3") == 0 ||
-                     strcasecmp(cdc, "mp3") == 0;
-    if (!mp3) { bkCopy(codec, sizeof codec, cdc[0] ? cdc : mime); break; }
-    BkaTrack& o = s_bka_tracks[tracks++];
-    bkCopy(o.url, sizeof o.url, t["contentUrl"] | "");
-    o.start = t["startOffset"] | 0.0;
-    o.dur = t["duration"] | 0.0;
-    o.size = 0;
-    o.local = false;
+                     strcasecmp(cdc, "mp3") == 0 || strcasecmp(ext, ".mp3") == 0;
+    if (!mp3) { bkCopy(codec, sizeof codec, cdc[0] ? cdc : (ext[0] ? ext + (ext[0] == '.') : mime)); break; }
+    picks[np++] = { f["index"] | np, f };
   }
-  if (codec[0] || tracks == 0) {
-    snprintf(s_bk_job_msg, sizeof s_bk_job_msg, "%s audio is not supported yet: MP3 only",
-             codec[0] ? codec : "This");
+  if (codec[0] || np == 0) {
+    snprintf(s_bk_job_msg, sizeof s_bk_job_msg, "%s audio is not supported yet: MP3 only", codec[0] ? codec : "This");
     if (codec[0]) for (char* c = s_bk_job_msg; *c && *c != ' '; ++c) if (*c >= 'a' && *c <= 'z') *c -= 32;
     return;
   }
-  s_bka_track_count = tracks;
+  for (int i = 1; i < np; ++i)
+    for (int j = i; j > 0 && picks[j].index < picks[j - 1].index; --j) { Pick t = picks[j]; picks[j] = picks[j - 1]; picks[j - 1] = t; }
+  double at = 0;
+  for (int i = 0; i < np; ++i) {
+    BkaTrack& o = s_bka_tracks[i];
+    snprintf(o.url, sizeof o.url, "/api/items/%s/file/%s", s_bk_job_arg, (const char*)(picks[i].f["ino"] | ""));
+    o.start = at;
+    o.dur = picks[i].f["duration"] | 0.0;
+    o.size = 0;
+    o.local = false;
+    at += o.dur;
+  }
+  s_bka_track_count = np;
   s_bka_chapter_count = 0;
-  for (JsonObject c : doc["chapters"].as<JsonArray>()) {
+  for (JsonObject c : media["chapters"].as<JsonArray>()) {
     if (s_bka_chapter_count >= kBkaMaxChapters) break;
     BkaChapter& o = s_bka_chapters[s_bka_chapter_count++];
     o.start = c["start"] | 0.0;
     o.end = c["end"] | 0.0;
     bkCopy(o.title, sizeof o.title, c["title"] | "");
   }
-  bkCopy(s_bka_session, sizeof s_bka_session, doc["id"] | "");
+  s_bka_session[0] = 0;   // no server session: progress goes to /api/me/progress
   bkCopy(s_bka_item, sizeof s_bka_item, s_bk_job_arg);
-  bkCopy(s_bka_title, sizeof s_bka_title, doc["displayTitle"] | s_bk_job_arg2);
-  bkCopy(s_bka_author, sizeof s_bka_author, doc["displayAuthor"] | "");
-  s_bka_duration = doc["duration"] | 0.0;
-  if (s_bka_duration <= 0 && tracks) s_bka_duration = s_bka_tracks[tracks - 1].start + s_bka_tracks[tracks - 1].dur;
-  s_bka_time = doc["currentTime"] | 0.0;
-  if (s_bka_time >= s_bka_duration - 1) s_bka_time = 0;   // finished before: from the start
+  bkCopy(s_bka_title, sizeof s_bka_title, media["metadata"]["title"] | s_bk_job_arg2);
+  bkCopy(s_bka_author, sizeof s_bka_author, media["metadata"]["authorName"] | "");
+  s_bka_duration = media["duration"] | at;
+  if (s_bka_duration <= 0) s_bka_duration = at;
+  // Where this user is in it.
+  s_bka_time = 0;
+  snprintf(path, sizeof path, "/api/me/progress/%s", s_bk_job_arg);
+  JsonDocument pf(&s_bk_json_alloc);
+  pf["currentTime"] = true; pf["isFinished"] = true;
+  JsonDocument pd(&s_bk_json_alloc);
+  if (bkGetJson(path, pf, pd) == 200 && !(pd["isFinished"] | false)) s_bka_time = pd["currentTime"] | 0.0;
+  if (s_bka_time >= s_bka_duration - 1) s_bka_time = 0;
   s_bk_job_ok = true;
 }
 
@@ -2013,7 +2087,7 @@ static int booksAudioChapterAt(double t) {
 static double booksAudioNow() { return booksAudioRunning() ? booksAudioPos() : s_bka_time; }
 
 static void booksAudioSyncSoon(bool close) {
-  if (s_bka_local) {   // a card copy: remember here, report when the server is reachable
+  if (s_bka_local || !s_bka_session[0]) {   // the user's media progress (card copy: also kept there)
     s_bka_time = booksAudioNow();
     if (WiFi.status() != WL_CONNECTED || s_bk_job != BkJob::None || !s_abs_token[0]) {
       s_bka_dirty = true;
