@@ -4,9 +4,7 @@
 #include <helpers/ArduinoSerialInterface.h>
 #include "TCPCompanionServer.h"
 #include "WebSocketCompanionServer.h"
-#if defined(HAS_TDECK_MAX)
-#include "WifiRuntimeStore.h"   // WADA_ORDERED_WIFI_BLE: the Max uses the Pager's ordered handoff
-#endif
+#include "WifiRuntimeStore.h"   // WADA_ORDERED_WIFI_BLE (Pager, Max): the ordered Wi-Fi/BLE handoff API
 #ifdef BLE_PIN_CODE
 #include <helpers/esp32/SerialBLEInterface.h>
 #endif
