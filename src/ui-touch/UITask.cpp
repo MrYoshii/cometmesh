@@ -162,6 +162,7 @@ static void* wadaMp3Scratch() { return s_wada_mp3_scratch; }
 #include "PasteHexKey.h"        // host-tested key extraction for pasted key fields (#526)
 #include "NavSpatial.h"         // host-tested keypad spatial step (navMoveDir)
 #include "SdThreat.h"           // SD-card malware rules: the mount-time warning + wada.sd.remove
+#include "../CometHosts.h"     // the servers the firmware talks to (Comet: no update or report server yet)
 #include "UsbFilesSession.h"    // USB Files: files.wadamesh.com over the USB cable
 #include "UsbFilesPaint.h"      // host-tested: how often the USB Files screen repaints (e-paper)
 #include "SenderExtField.h"   // host-tested split/rejoin of a sender across the two on-disk fields
@@ -5788,8 +5789,8 @@ static bool s_remote_landscape = false;   // remote orientation: true=800x480 la
 RTC_NOINIT_ATTR static uint32_t s_rmt_boot_guard;
 
 #if !defined(HAS_TANMATSU)
-#define WADAMESH_MARK_DEFINE        // the one copy of the pixels (main.cpp's boot screen uses it too)
-#include "../wadamesh_mark_rgb.h"   // anti-aliased mesh mark (RGB565), same artwork as the boot splash
+#define COMET_MARK_DEFINE        // the one copy of the pixels (main.cpp's boot screen uses it too)
+#include "../comet_mark_rgb.h"   // anti-aliased mesh mark (RGB565), same artwork as the boot splash
 // Physical-panel placeholder shown while remote mode renders the UI off-screen. Drawn
 // on the first loop pass (IP sentinel) then refreshed when the IP appears (Wi-Fi up).
 // Uses the DisplayDriver text API (same path as the boot splash), not LVGL.
@@ -5805,8 +5806,8 @@ static void drawRemotePlaceholder(bool exit_armed = false) {
   // underneath a 98 px logo. The outlined control is actionable with the
   // encoder knob; SPACE twice remains the keyboard fallback.
   if (W >= H) {
-    display.writePixelsRGB565(18, (H - WADAMESH_MARK_H) / 2,
-                              WADAMESH_MARK_W, WADAMESH_MARK_H, WADAMESH_MARK_RGB565);
+    display.writePixelsRGB565(18, (H - COMET_MARK_H) / 2,
+                              COMET_MARK_W, COMET_MARK_H, COMET_MARK_RGB565);
     const int panel_x = 190;
     const int panel_w = W - panel_x - 14;
     display.setColor((ColorVal)0xFFFF);
@@ -5836,8 +5837,8 @@ static void drawRemotePlaceholder(bool exit_armed = false) {
     display.setColor((ColorVal)0xFFE0);
     display.drawTextCentered(panel_x + panel_w / 2, 180, "or press SPACE twice within 3s");
   } else {
-    display.writePixelsRGB565((W - WADAMESH_MARK_W) / 2, 18,
-                              WADAMESH_MARK_W, WADAMESH_MARK_H, WADAMESH_MARK_RGB565);
+    display.writePixelsRGB565((W - COMET_MARK_W) / 2, 18,
+                              COMET_MARK_W, COMET_MARK_H, COMET_MARK_RGB565);
     display.setColor((ColorVal)0xFFFF);
     display.setTextSize(2);
     display.drawTextCentered(W / 2, 130, "REMOTE UI");
@@ -5869,8 +5870,8 @@ static void drawRemotePlaceholder(bool exit_armed = false) {
   // the UI's 2x scale (size 1 = 28 px, size 2 = 56 px), so the spacing is laid out for that,
   // not for the ~8 px text the generic layout below assumes. writePixelsRGB565 upscales 2x on
   // these panels, so the mark is placed in half-resolution coordinates and lands centred at 2x.
-  display.writePixelsRGB565((W / 2 - WADAMESH_MARK_W) / 2, 80,
-                            WADAMESH_MARK_W, WADAMESH_MARK_H, WADAMESH_MARK_RGB565);
+  display.writePixelsRGB565((W / 2 - COMET_MARK_W) / 2, 80,
+                            COMET_MARK_W, COMET_MARK_H, COMET_MARK_RGB565);
   display.setColor((ColorVal)0xFFFF);
   display.setTextSize(2);
   display.drawTextCentered(W / 2, 400, "REMOTE MODE");
@@ -5902,9 +5903,9 @@ static void drawRemotePlaceholder(bool exit_armed = false) {
   // wadamesh mesh mark up top (same white-on-black artwork as the boot splash). The
   // touch DisplayDriver runs at scale 1.0, so writePixelsRGB565 shares text coords.
   const int ly = (H >= 288) ? 46 : 14;   // portrait panels have room to breathe; landscape sits high
-  display.writePixelsRGB565((W - WADAMESH_MARK_W) / 2, ly,
-                            WADAMESH_MARK_W, WADAMESH_MARK_H, WADAMESH_MARK_RGB565);
-  int y = ly + WADAMESH_MARK_H + 18;
+  display.writePixelsRGB565((W - COMET_MARK_W) / 2, ly,
+                            COMET_MARK_W, COMET_MARK_H, COMET_MARK_RGB565);
+  int y = ly + COMET_MARK_H + 18;
   // Prominent title (the logo already carries the brand — no redundant "wadamesh" line).
   display.setColor(RPH_INK(0xFFFF));
   display.setTextSize(2);
@@ -9664,7 +9665,7 @@ static void otaPollTimerCb(lv_timer_t* t) {
     Serial.printf("[OTA] update failed: %s\n", s_ota_msg[0] ? s_ota_msg : "unknown");
     if (s_ota_status_lbl) {
       char b[112];
-      snprintf(b, sizeof b, "Update failed: %s\nUse flasher.wadamesh.com instead.",
+      snprintf(b, sizeof b, "Update failed: %s\nFlash it with esptool instead.",
                s_ota_msg[0] ? s_ota_msg : "unknown");
       otaStatusText(b);
     }
@@ -9678,7 +9679,7 @@ static void otaPollTimerCb(lv_timer_t* t) {
 // (target = latest) and the "reinstall an earlier version" buttons (target = a chosen older N).
 static void otaStartInstall(int target_n) {
   if (!touchHasOtaUpdateSlot()) {   // Launcher / no spare slot — the button shouldn't even be here
-    if (g_lv.task) g_lv.task->showAlert(TR("Update via the Launcher / flasher.wadamesh.com"), 3000);
+    if (g_lv.task) g_lv.task->showAlert(TR("Update with esptool or the Launcher"), 3000);
     return;
   }
   if (WiFi.status() != WL_CONNECTED) {
@@ -9971,7 +9972,7 @@ static void otaInstallLatestCb(lv_event_t* e) {
 #else
   // Launcher / Tanmatsu: no spare OTA slot to write into — update out-of-band.
   if (s_ota_status_lbl) {
-    otaStatusText(TR("Update via the Launcher / flasher.wadamesh.com."));
+    otaStatusText(TR("Update with esptool or the Launcher."));
     lv_obj_set_style_text_color(s_ota_status_lbl, lightSurfaceTextColor(0xE2A23A), LV_PART_MAIN);
   }
   if (g_lv.task) g_lv.task->showAlert(TR("Update via the Launcher"), 3000);
@@ -10025,7 +10026,7 @@ static void versionCheckService(unsigned long now) {
     if (g_lv.task) {
       if (s_report_result > 0) {
         touchPrefsSetReportedBeta((uint16_t)firmwareReleaseN());
-        g_lv.task->showAlert(TR("Thank you. Your report is on wadamesh.com/beta"), 2600);
+        g_lv.task->showAlert(TR("Thank you."), 2600);
       } else {
         g_lv.task->showAlert(TR("Could not send the report. Try again later."), 2600);
       }
@@ -17411,7 +17412,7 @@ static void sysInfoTextRest(char* buf, size_t cap) {
     p += snprintf(buf + p, cap - p, "\n");
   }
   p += snprintf(buf + p, cap - p,
-                "Build\n  %s\n  %s\n  on meshcomod %s (MeshCore)\n  WADAMESH TOUCH\n",
+                "Build\n  %s\n  %s\n  on meshcomod %s (MeshCore)\n  COMET\n",
                 FIRMWARE_VERSION, FIRMWARE_BUILD_DATE, FIRMWARE_CORE_VERSION);
 #if defined(WADAMESH_FORK_BUILD)
   // Defined in platformio.ini for this fork's builds; absent upstream.
@@ -26516,7 +26517,7 @@ static struct { fs::FS* fs; char path[200]; char name[64]; bool isdir; bool is_c
   s_fm_clip = {};
 
 static const char* k_term_banner =
-  "WADAMESH terminal - CLI + chat on this node.\n"
+  "COMET terminal - CLI + chat on this node.\n"
   "Type a command or tap the list icon for the picker.\n"
   "Chat: 'to <name>' joins a contact/channel, then just\n"
   "      type to send. 'exit' leaves. list / channels.\n"
@@ -31189,7 +31190,7 @@ static bool trackStart() {
   if (!f) { sdNoteIoFailure(); if (g_lv.task) g_lv.task->showAlert(TR("Could not write to the SD card"), 2000); return false; }
   const char* name = strrchr(s_trk_path, '/') + 1;
   f.printf("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-           "<gpx version=\"1.1\" creator=\"wadamesh\" xmlns=\"http://www.topografix.com/GPX/1/1\">\n"
+           "<gpx version=\"1.1\" creator=\"comet\" xmlns=\"http://www.topografix.com/GPX/1/1\">\n"
            "<trk><name>%.*s</name><trkseg>\n%s", (int)(strlen(name) - 4), name, kTrkTail);
   f.close();
   s_trk_on = true;
@@ -36321,9 +36322,13 @@ static int verchkFetchLatest(WiFiClient& client, HTTPClient& http) {
   http.setReuse(false);
   http.setConnectTimeout(8000);
   http.setTimeout(12000);
+#if !COMET_HAS_UPDATE_SERVER
+  (void)client; (void)http;
+  return -1;   // no Comet update server yet: never offer wadamesh's firmware
+#endif
   http.setUserAgent("wadamesh-touch");
   char listurl[72];
-  snprintf(listurl, sizeof listurl, "http://firmware.wadamesh.com/releases/%s", updChannelArchive());
+  snprintf(listurl, sizeof listurl, "http://" COMET_FIRMWARE_HOST "/releases/%s", updChannelArchive());
   if (!http.begin(client, listurl)) {
     return -1;
   }
@@ -36493,7 +36498,7 @@ static void luaStoreFetchCatalogWorker(WiFiClient& client, HTTPClient& http) {
     s_luacat_buf = (char*)heap_caps_malloc(kLuaCatBufMax, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   if (!s_luacat_buf) { return; }
   s_luacat_buf[0] = 0;
-  luaStoreHttpGet(client, http, "http://firmware.wadamesh.com/apps/apps.json",
+  luaStoreHttpGet(client, http, "http://" COMET_FIRMWARE_HOST "/apps/apps.json",
                   s_luacat_buf, kLuaCatBufMax);
 }
 
@@ -36570,7 +36575,7 @@ static bool luaStoreFetchAppFiles(WiFiClient& client, HTTPClient& http, fs::FS* 
       char name[33], url[160], path[160];
       memcpy(name, p, len);
       name[len] = 0;
-      snprintf(url, sizeof url, "http://firmware.wadamesh.com/apps/%s/%s/%s", id, ver, name);
+      snprintf(url, sizeof url, "http://" COMET_FIRMWARE_HOST "/apps/%s/%s/%s", id, ver, name);
       snprintf(path, sizeof path, "%s/%s", dir, name);
       if (!luaStoreHttpToFile(client, http, url, fs, path, kAppFileMaxBytes)) return false;
       ++n;
@@ -36603,7 +36608,7 @@ static bool luaStoreDownloadWorker(WiFiClient& client, HTTPClient& http,
     char* buf = (char*)heap_caps_malloc(kCap[e], MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!buf) return false;
     char url[128];
-    snprintf(url, sizeof url, "http://firmware.wadamesh.com/apps/%s/%s/%s.%s", id, ver, id, kExt[e]);
+    snprintf(url, sizeof url, "http://" COMET_FIRMWARE_HOST "/apps/%s/%s/%s.%s", id, ver, id, kExt[e]);
     int n = luaStoreHttpGet(client, http, url, buf, kCap[e]);
     if (n <= 0) { heap_caps_free(buf); return false; }
     char rel[40], path[64], tmp[72];
@@ -36657,7 +36662,7 @@ static void luaStoreFetchLangCatalogWorker(WiFiClient& client, HTTPClient& http)
     s_langcat_buf = (char*)heap_caps_malloc(kCap, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   if (!s_langcat_buf) return;
   s_langcat_buf[0] = 0;
-  luaStoreHttpGet(client, http, "http://firmware.wadamesh.com/apps/langs.json",
+  luaStoreHttpGet(client, http, "http://" COMET_FIRMWARE_HOST "/apps/langs.json",
                   s_langcat_buf, kCap);
 }
 
@@ -36764,9 +36769,9 @@ static bool luaStoreLangDownloadWorker(WiFiClient& client, HTTPClient& http,
   fs->mkdir(dir);
   char url[112];
   if (ver && ver[0])
-    snprintf(url, sizeof url, "http://firmware.wadamesh.com/apps/lang/%s/%s.lang", ver, code);
+    snprintf(url, sizeof url, "http://" COMET_FIRMWARE_HOST "/apps/lang/%s/%s.lang", ver, code);
   else
-    snprintf(url, sizeof url, "http://firmware.wadamesh.com/apps/lang/%s.lang", code);
+    snprintf(url, sizeof url, "http://" COMET_FIRMWARE_HOST "/apps/lang/%s.lang", code);
   // Written to a TEMP file and renamed over the real one only once every byte is there:
   // a truncated direct write used to leave a file whose '# ver:' header (at the TOP)
   // already claimed the new version while the rows at the END were missing.
@@ -37161,8 +37166,12 @@ static void reportBuildPing() {
 // HTTPClient, like the version check: a second pair on that ~8 KB stack overflows it.
 static bool reportPostWorker(WiFiClient& client, HTTPClient& http,
                              const char* path, const char* body) {
+#if !COMET_HAS_REPORT_SERVER
+  (void)client; (void)http; (void)path; (void)body;
+  return false;   // no Comet report server yet
+#endif
   char url[64];
-  snprintf(url, sizeof url, "http://firmware.wadamesh.com/report/%s", path);
+  snprintf(url, sizeof url, "http://" COMET_FIRMWARE_HOST "/report/%s", path);
   char reply[96];
   return luaStoreHttpReq(client, http, url, reply, sizeof reply,
                          reinterpret_cast<const uint8_t*>(body), strlen(body),
@@ -37190,8 +37199,14 @@ static const char* const OTA_BIN_NAME = "wadamesh-" WADA_BOARD_ID;
 // cache on the mutable bin. esp_https_ota isn't usable here (no on-device TLS — see tile notes).
 static void otaWorkerRun(WiFiClient& client, HTTPClient& http) {
   s_ota_pct = 0;
+#if !COMET_HAS_UPDATE_SERVER
+  (void)client; (void)http;
+  snprintf(s_ota_msg, sizeof s_ota_msg, "No Comet update server yet");
+  s_ota_state = 3;   // failed
+  return;
+#endif
   char url[176];
-  snprintf(url, sizeof url, "http://firmware.wadamesh.com/releases/%s/beta_%d/%s.bin",
+  snprintf(url, sizeof url, "http://" COMET_FIRMWARE_HOST "/releases/%s/beta_%d/%s.bin",
            updChannelArchive(), s_ota_target_n, OTA_BIN_NAME);
   http.setReuse(false);
   http.setConnectTimeout(8000);
@@ -37260,6 +37275,10 @@ static void otaWorkerRun(WiFiClient& client, HTTPClient& http) {
 // a label the teardown never nulled. Change all seven or none.
 static void sdFwWorkerRun(WiFiClient& client, HTTPClient& http) {
   s_sdfw_pct = 0;
+#if !COMET_HAS_UPDATE_SERVER
+  (void)client; (void)http;
+  snprintf(s_sdfw_msg, sizeof s_sdfw_msg, "No Comet update server yet"); s_sdfw_state = 3; return;
+#endif
   if (SD.cardType() == CARD_NONE) { snprintf(s_sdfw_msg, sizeof s_sdfw_msg, "no SD card"); s_sdfw_state = 3; return; }
   if (!SD.exists("/BINS") && !SD.mkdir("/BINS")) {
     snprintf(s_sdfw_msg, sizeof s_sdfw_msg, "can't create /BINS"); s_sdfw_state = 3; return;
@@ -37268,7 +37287,7 @@ static void sdFwWorkerRun(WiFiClient& client, HTTPClient& http) {
   snprintf(path, sizeof path, "/BINS/wadamesh-beta_%d-%s.bin",
            s_sdfw_target_n, touchPrefsGetBetaUpdates() ? "beta" : "stable");
   char url[176];
-  snprintf(url, sizeof url, "http://firmware.wadamesh.com/releases/%s/beta_%d/%s.bin",
+  snprintf(url, sizeof url, "http://" COMET_FIRMWARE_HOST "/releases/%s/beta_%d/%s.bin",
            updChannelArchive(), s_sdfw_target_n, OTA_BIN_NAME);
   http.setReuse(false);
   http.setConnectTimeout(8000);
@@ -43699,7 +43718,7 @@ static bool crashDumpExport(char* out_path, size_t out_cap) {
     char tpath[96]; snprintf(tpath, sizeof tpath, "%s.txt", path);
     File tf = dst->open(tpath, "w");
     if (tf) {
-      tf.printf("wadamesh crash report\n");
+      tf.printf("comet crash report\n");
 #ifdef FIRMWARE_RELEASE_TAG
       tf.printf("firmware: %s\n", FIRMWARE_RELEASE_TAG);
 #endif
@@ -43736,7 +43755,7 @@ static void crashReportConfirmCb() {
     char msg[200];
     snprintf(msg, sizeof msg,
              "Crash report saved:\n%s\n\nShare this file with the developers\n"
-             "(open a GitHub issue at ALLFATHER-BV/wadamesh)\nso the bug can be fixed. Thank you!", path);
+             "(open a GitHub issue at MrYoshii/cometmesh)\nso the bug can be fixed. Thank you!", path);
     if (g_lv.task) g_lv.task->showAlert(msg, 6000);
   } else if (g_lv.task) {
     g_lv.task->showAlert(TR("Could not save the crash report"), 2500);
@@ -44015,7 +44034,7 @@ static void reportBugQrCb(lv_event_t* e) {
   if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
   char url[240];
   snprintf(url, sizeof url,
-           "https://github.com/ALLFATHER-BV/wadamesh/issues/new?template=bug.yml"
+           COMET_ISSUES_URL "/new"
            "&board=%s&version=%s&diag=heap%%20%uk%%20store%%20%s",
            WADA_BOARD_ID, FIRMWARE_RELEASE_TAG,
            (unsigned)(ESP.getFreeHeap() / 1024),
@@ -57389,7 +57408,7 @@ static void maxOffScreenShow(bool on_usb) {
 
   lv_obj_t* n = lv_label_create(scr);
   const char* nm = g_lv.task ? g_lv.task->getNodeNameCstr() : nullptr;
-  lv_label_set_text(n, nm && nm[0] ? nm : "WADAMESH");
+  lv_label_set_text(n, nm && nm[0] ? nm : "COMET");
   lv_label_set_long_mode(n, LV_LABEL_LONG_DOT);
   lv_obj_set_width(n, sw - 40);
   lv_obj_set_style_text_align(n, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
@@ -57420,8 +57439,8 @@ static void maxOffScreenShow(bool on_usb) {
   lv_obj_t* f = lv_label_create(scr);
   char foot[48];
   const int soc = board.getBattStateOfCharge();
-  if (soc >= 0) snprintf(foot, sizeof foot, "WADAMESH  \xC2\xB7  %d%%", soc);
-  else          snprintf(foot, sizeof foot, "WADAMESH");
+  if (soc >= 0) snprintf(foot, sizeof foot, "COMET  \xC2\xB7  %d%%", soc);
+  else          snprintf(foot, sizeof foot, "COMET");
   lv_label_set_text(f, foot);
   lv_obj_set_style_text_font(f, &g_font_semi_12, LV_PART_MAIN);
   lv_obj_set_style_text_letter_space(f, 2, LV_PART_MAIN);
@@ -59739,7 +59758,7 @@ static void luaStoreRebuildList() {
     } else {
       lv_label_set_text(h, s_lua_cat_n < 0
           ? TR("Turn Wi-Fi on, then tap refresh. Apps already installed still work.")
-          : TR("Fetching the app list from firmware.wadamesh.com"));
+          : TR("Fetching the app list from " COMET_FIRMWARE_HOST));
     }
     lv_obj_set_style_text_font(h, &g_font_12, LV_PART_MAIN);
     lv_obj_set_style_text_color(h, lv_color_hex(COLOR_SUB), LV_PART_MAIN);
@@ -60369,7 +60388,7 @@ static void openUsbFilesPage() {
   text(TR("1. Connect this device to the computer with a USB cable.\n"
           "2. Open this address in Chrome or Edge:"),
        &g_font_12, COLOR_SUB);
-  text("files.wadamesh.com", &g_font_16, COLOR_ACCENT);
+  text(COMET_FILES_HOST, &g_font_16, COLOR_ACCENT);
   text(TR("3. Click Connect and choose this device."), &g_font_12, COLOR_SUB);
 
   s_usbfiles_status = text("", &g_font_14, COLOR_TEXT);
@@ -62124,7 +62143,7 @@ static void buildGlobalStatusBar() {
   // Left zone — dynamic per-tab. Default to "MESHCOMOD"; updateGlobal-
   // StatusBar() swaps to the envelope+count on non-home tabs.
   g_statusbar.left_label = lv_label_create(g_statusbar.root);
-  lv_label_set_text(g_statusbar.left_label, TR("WADAMESH"));
+  lv_label_set_text(g_statusbar.left_label, "COMET");
   lv_obj_set_style_text_color(g_statusbar.left_label, lv_color_hex(COLOR_TEXT), LV_PART_MAIN);
   lv_obj_set_style_text_font(g_statusbar.left_label, sbFixed(&g_font_semi_14), LV_PART_MAIN);
   lv_obj_align(g_statusbar.left_label, LV_ALIGN_LEFT_MID, 6, 0);
@@ -63441,7 +63460,7 @@ static void updateGlobalStatusBar() {
       // it, so it never runs into the clock or the status icons. Reconfigured only
       // when the name changes (re-setting the scroll every tick would restart it).
       const char* nm = g_lv.task->getNodeNameCstr();
-      if (!nm || !nm[0]) nm = "WADAMESH";
+      if (!nm || !nm[0]) nm = "COMET";
       if (strncmp(s_left_home_name, nm, sizeof(s_left_home_name)) != 0) {
         strncpy(s_left_home_name, nm, sizeof(s_left_home_name) - 1);
         s_left_home_name[sizeof(s_left_home_name) - 1] = '\0';
@@ -68518,12 +68537,12 @@ static void showUnder(UnderHidden& h) {
 
 // ============================================================
 // Boot splash
-// The wadamesh mark comes alive once LVGL is up. It starts as the exact white
-// mark the pre-LVGL boot screen painted (same artwork, same place, so the
-// hand-off does not flash), then the strokes settle into a dim teal mesh while
-// light runs along them, the seven nodes light up one after the other with a
-// ring each, and the wordmark rises in beneath. About 2.4 s, then a fade; a tap
-// dismisses it. The e-paper Pro keeps one still frame.
+// The Comet mark comes alive once LVGL is up. It starts as the exact white comet
+// the pre-LVGL boot screen painted (same geometry, same place, so the hand-off
+// does not flash), then the ion tail and the coma turn green, light breathes out
+// along the tails, grains stream back from the head, and the wordmark rises in
+// beneath. About 2.4 s, then a fade; a tap dismisses it. The e-paper Pro and Max
+// keep one still frame.
 //
 // It keeps its own clock, advanced by the frames it gets: the first loop passes
 // after boot can stall for seconds (the UI is built, but storage and the radio
@@ -68544,15 +68563,12 @@ static UnderHidden s_splash_under;               // the UI, hidden while the spl
 
 // Brand colours, not the theme's: the splash continues the pre-LVGL screen,
 // which looks the same whatever theme or accent the user picked.
-static constexpr uint32_t kSplashTeal = 0x15B6A6;
-static constexpr uint32_t kSplashGlow = 0x19D6C2;
+static constexpr uint32_t kSplashGreen = 0x2BFF88;   // Comet's accent
+static constexpr uint32_t kSplashDeep  = 0x0E8A4C;
 
-// The mark's artwork (140 x 84; the pre-LVGL bitmap adds a 7 px margin): two
-// zigzags and seven nodes, left to right, with the step each node lights up in.
-static const lv_point_t s_wmark_top[5]  = {{0,42},{35,0},{70,42},{105,0},{140,42}};
-static const lv_point_t s_wmark_bot[5]  = {{0,42},{35,84},{70,42},{105,84},{140,42}};
-static const lv_point_t s_wmark_dots[7] = {{0,42},{35,0},{35,84},{70,42},{105,0},{105,84},{140,42}};
-static const uint8_t    s_wmark_step[7] = {0, 1, 1, 2, 3, 3, 4};
+// The comet's strands (tails) and head, the same geometry the pre-LVGL bitmap was
+// rendered from (scripts/gen_comet_mark.py), in the bitmap's box.
+#include "CometMarkGeom.h"
 
 static void splashRemove() {
   if (s_splash_timer) { lv_timer_del(s_splash_timer); s_splash_timer = nullptr; }
@@ -68585,124 +68601,111 @@ static void splashDisc(lv_draw_ctx_t* dc, lv_draw_rect_dsc_t* d, lv_coord_t cx, 
   lv_draw_rect(dc, d, &da);
 }
 
+// A point on a strand's quadratic curve, t in 0..1000.
+static lv_point_t cometAt(const CometStrand& st, lv_coord_t ox, lv_coord_t oy, int32_t t) {
+  const int32_t u = 1000 - t;
+  const int32_t x = (u * u * st.x0 + 2 * u * t * st.cx + t * t * st.x1) / 1000000;
+  const int32_t y = (u * u * st.y0 + 2 * u * t * st.cy + t * t * st.y1) / 1000000;
+  return lv_point_t{ (lv_coord_t)(ox + x), (lv_coord_t)(oy + y) };
+}
+
 static void splashMarkDrawCb(lv_event_t* e) {
   lv_draw_ctx_t* dc = lv_event_get_draw_ctx(e);
   lv_obj_t* obj = lv_event_get_target(e);
   if (!dc) return;
   lv_area_t a;
   lv_obj_get_coords(obj, &a);
-  const lv_coord_t ox = a.x1 + 7, oy = a.y1 + 7;   // the artwork's origin inside the bitmap's margin
-  auto legs = [&](lv_draw_line_dsc_t* ld) {
-    for (int z = 0; z < 2; ++z) {
-      const lv_point_t* pts = z ? s_wmark_bot : s_wmark_top;
-      for (int i = 0; i < 4; ++i) {
-        const lv_point_t p1 = { (lv_coord_t)(ox + pts[i].x), (lv_coord_t)(oy + pts[i].y) };
-        const lv_point_t p2 = { (lv_coord_t)(ox + pts[i + 1].x), (lv_coord_t)(oy + pts[i + 1].y) };
-        lv_draw_line(dc, ld, &p1, &p2);
-      }
-    }
-  };
+  const lv_coord_t ox = a.x1, oy = a.y1;   // the bitmap's box
+  const lv_coord_t hx = ox + kCometHeadX, hy = oy + kCometHeadY;
   lv_draw_line_dsc_t ld;
   lv_draw_line_dsc_init(&ld);
-  ld.width = 5;
-  ld.round_start = ld.round_end = 1;
+  ld.round_start = ld.round_end = 0;   // butt ends: round caps overlap and bead the fading tail
   lv_draw_rect_dsc_t rd;
   lv_draw_rect_dsc_init(&rd);
   rd.radius = LV_RADIUS_CIRCLE;
+  const int kSeg = 10;   // segments per strand: width and light fall off along it
 
 #if defined(HAS_TDECK_PRO)
+  // E-paper: one still frame in ink. The tails as tapering lines (the panel has no
+  // grey, so the fade is in the width), the head a dot with a ring of coma.
   ld.color = lv_color_black();
-  legs(&ld);
-  rd.bg_color = lv_color_black();
-  for (int n = 0; n < 7; ++n) splashDisc(dc, &rd, ox + s_wmark_dots[n].x, oy + s_wmark_dots[n].y, 6);
-#else
-  const uint32_t t = s_splash_clock;
-  const float fade = (float)lv_obj_get_style_opa_recursive(obj, LV_PART_MAIN) / 255.0f;   // the fade-out
-  auto opa = [&](float v) { return (lv_opa_t)(v * fade); };
-  const lv_color_t white = lv_color_white();
-  const lv_color_t teal = lv_color_hex(kSplashTeal), glow = lv_color_hex(kSplashGlow);
-
-  // The strokes: white as the boot screen left them, settling into the dim mesh.
-  const float settle = splashClamp01(((float)t - 150.0f) / 550.0f);
-  ld.color = lv_color_mix(teal, white, (uint8_t)(255.0f * settle));
-  ld.opa = opa(255.0f - 175.0f * settle);
-  legs(&ld);
-
-  // Light running left to right along both zigzags: three short dashes each, a
-  // lap every 1.4 s. Positions are in 1/400 of a leg, so a dash can span a joint.
-  const float light = splashClamp01(((float)t - 350.0f) / 350.0f);
-  if (light > 0.0f) {
-    ld.color = lv_color_mix(white, glow, 110);
-    ld.opa = opa(240.0f * light);
-    for (int z = 0; z < 2; ++z) {
-      const lv_point_t* pts = z ? s_wmark_bot : s_wmark_top;
-      auto at = [&](int32_t v) {
-        const int lg = v >= 1600 ? 3 : (int)(v / 400);
-        const int32_t f = v - lg * 400;
-        return lv_point_t{ (lv_coord_t)(ox + pts[lg].x + (pts[lg + 1].x - pts[lg].x) * f / 400),
-                           (lv_coord_t)(oy + pts[lg].y + (pts[lg + 1].y - pts[lg].y) * f / 400) };
-      };
-      const int32_t shift = (int32_t)(((t % 1400u) * 1600u / 1400u + (z ? 800u : 0u)) % 1600u);
-      for (int d = 0; d < 3; ++d) {
-        const int32_t u = (d * 533 + shift) % 1600;
-        const int32_t ua = u > 40 ? u - 40 : 0, ub = u + 40 < 1600 ? u + 40 : 1600;
-        if (s_look_rainbow) ld.color = lv_color_hex(lookRainbow((int)u, 1600));   // Taste the rainbow: hue by place
-        const int32_t joint = (ua / 400 + 1) * 400;   // the next vertex after the dash's tail
-        const lv_point_t p1 = at(ua);
-        if (ub > joint) {
-          const lv_point_t pj = at(joint), p2 = at(ub);
-          lv_draw_line(dc, &ld, &p1, &pj);
-          lv_draw_line(dc, &ld, &pj, &p2);
-        } else {
-          const lv_point_t p2 = at(ub);
-          lv_draw_line(dc, &ld, &p1, &p2);
-        }
-      }
+  for (const CometStrand& st : kCometStrands) {
+    for (int k = 0; k < kSeg; ++k) {
+      const int32_t t0 = k * 1000 / kSeg, t1 = (k + 1) * 1000 / kSeg;
+      const int32_t keep = st.kind ? 1000 : 700;   // the dust fades out sooner
+      if (t0 > keep) break;
+      ld.width = (lv_coord_t)LV_MAX(1, (st.width_x10 * (1000 - t0 * 8 / 10)) / 10000);
+      const lv_point_t p0 = cometAt(st, ox, oy, t0), p1 = cometAt(st, ox, oy, t1);
+      lv_draw_line(dc, &ld, &p0, &p1);
     }
   }
-
-  // The nodes light up in turn (a pop, a halo and a ring), then a ring wave
-  // crosses the mark every 2.4 s while it holds.
+  rd.bg_color = lv_color_black();
+  splashDisc(dc, &rd, hx, hy, 6);
   lv_draw_rect_dsc_t rr;
   lv_draw_rect_dsc_init(&rr);
   rr.radius = LV_RADIUS_CIRCLE;
   rr.bg_opa = LV_OPA_TRANSP;
-  rr.border_width = 2;
-  rr.border_color = glow;
-  for (int n = 0; n < 7; ++n) {
-    const lv_coord_t cx = ox + s_wmark_dots[n].x, cy = oy + s_wmark_dots[n].y;
-    const int32_t step = s_wmark_step[n];
-    const int32_t on = 250 + 110 * step;
-    const float f = splashClamp01(((float)t - (float)on) / 280.0f);
-    // Taste the rainbow: each node lights in its own colour, left to right round the wheel.
-    const lv_color_t node_glow = s_look_rainbow ? lv_color_hex(lookRainbow(n, 7)) : glow;
-    const lv_color_t node_rest = s_look_rainbow ? node_glow : teal;
-    rr.border_color = node_glow;
-    if (f > 0.0f) {
-      rd.bg_color = node_glow;
-      rd.bg_opa = opa(55.0f * splashClamp01(f * 2.0f));
-      splashDisc(dc, &rd, cx, cy, 11);
-    }
-    float r = 6.0f;
-    if (f > 0.0f && f < 1.0f) r *= 1.0f + 0.45f * sinf(3.14159265f * f);
-    rd.bg_color = lv_color_mix(node_rest, white, (uint8_t)(255.0f * splashClamp01(f * 2.0f)));
-    rd.bg_opa = opa(255.0f);
-    splashDisc(dc, &rd, cx, cy, (lv_coord_t)lroundf(r));
-    int32_t since = (int32_t)t - on;
-    if (since >= 900) {
-      const int32_t w = (int32_t)t - 1600 - 110 * step;
-      since = w >= 0 ? w % 2400 : 900;
-    }
-    if (since >= 0 && since < 900) {
-      const float q = (float)since / 900.0f;
-      rr.border_opa = opa(190.0f * (1.0f - q));
-      splashDisc(dc, &rr, cx, cy, (lv_coord_t)(6.0f + 14.0f * q));
+  rr.border_width = 1;
+  rr.border_color = lv_color_black();
+  splashDisc(dc, &rr, hx, hy, 11);
+#else
+  const uint32_t t = s_splash_clock;
+  const float fade = (float)lv_obj_get_style_opa_recursive(obj, LV_PART_MAIN) / 255.0f;   // the fade-out
+  auto opa = [&](float v) { return (lv_opa_t)LV_MIN(255.0f, v * fade); };
+  const lv_color_t white = lv_color_white();
+  const lv_color_t green = lv_color_hex(kSplashGreen), deep = lv_color_hex(kSplashDeep);
+  // White as the boot screen left it, then the ion tail and the coma turn green.
+  const float settle = splashClamp01(((float)t - 150.0f) / 650.0f);
+  // The tail breathes: a slow wave of light running out from the head.
+  for (size_t n = 0; n < sizeof kCometStrands / sizeof kCometStrands[0]; ++n) {
+    const CometStrand& st = kCometStrands[n];
+    const lv_color_t base = st.kind ? lv_color_mix(green, white, (uint8_t)(255.0f * settle))
+                                    : lv_color_mix(lv_color_hex(0xDFFFEB), white, (uint8_t)(160.0f * settle));
+    for (int k = 0; k < kSeg; ++k) {
+      const int32_t t0 = k * 1000 / kSeg, t1 = (k + 1) * 1000 / kSeg;
+      const float tm = (float)(t0 + t1) / 2000.0f;
+      const float wave = 0.80f + 0.20f * sinf(6.2832f * (tm * 1.6f - (float)t / 1600.0f) + (float)n);
+      const float fall = powf(1.0f - tm, 1.4f);
+      ld.color = base;
+      ld.width = (lv_coord_t)LV_MAX(1.0f, (float)st.width_x10 / 10.0f * (1.0f - 0.75f * tm));
+      ld.opa = opa((float)st.alpha * fall * wave);
+      const lv_point_t p0 = cometAt(st, ox, oy, t0), p1 = cometAt(st, ox, oy, t1);
+      lv_draw_line(dc, &ld, &p0, &p1);
     }
   }
+  // Grains streaming back along the ion tail.
+  if (settle > 0.0f) {
+    for (int g = 0; g < 7; ++g) {
+      const CometStrand& st = kCometStrands[(g * 3) % (sizeof kCometStrands / sizeof kCometStrands[0])];
+      const int32_t along = (int32_t)(((t + (uint32_t)g * 230u) % 1400u) * 1000u / 1400u);
+      const lv_point_t p = cometAt(st, ox, oy, along);
+      rd.bg_color = st.kind ? green : white;
+      rd.bg_opa = opa(200.0f * settle * (1.0f - (float)along / 1000.0f));
+      splashDisc(dc, &rd, p.x, p.y, 1);
+    }
+  }
+  // The head: the coma as a soft glow (a blurred shadow, no rings), breathing a
+  // little, then the bright core.
+  const float pulse = 1.0f + 0.10f * sinf(6.2832f * (float)t / 1200.0f);
+  const lv_color_t coma = lv_color_mix(green, white, (uint8_t)(255.0f * settle));
+  lv_draw_rect_dsc_t gd;
+  lv_draw_rect_dsc_init(&gd);
+  gd.radius = LV_RADIUS_CIRCLE;
+  gd.bg_color = lv_color_mix(lv_color_hex(0xE6FFF0), white, (uint8_t)(255.0f * settle));
+  gd.bg_opa = opa(255.0f);
+  gd.shadow_color = coma;
+  gd.shadow_width = (lv_coord_t)lroundf(40.0f * pulse);
+  gd.shadow_spread = 4;
+  gd.shadow_opa = opa(200.0f);
+  splashDisc(dc, &gd, hx, hy, 6);
+  (void)deep;
+  rd.bg_color = white;
+  rd.bg_opa = opa(255.0f);
+  splashDisc(dc, &rd, hx, hy, 3);
 #endif
 }
 
-static void splashMarkExtCb(lv_event_t* e) { lv_event_set_ext_draw_size(e, 24); }   // halos and rings reach past the box
+static void splashMarkExtCb(lv_event_t* e) { lv_event_set_ext_draw_size(e, 48); }   // the coma glow reaches past the box
 
 // A label's entrance: it fades in over 450 ms and rises 8 px into place.
 static void splashLabelAt(lv_obj_t* l, uint32_t t, uint32_t from) {
@@ -68774,11 +68777,11 @@ static void buildBootSplash() {
   lv_obj_move_foreground(s_splash_root);
   lv_obj_add_event_cb(s_splash_root, splashTapDismissCb, LV_EVENT_CLICKED, nullptr);
 
-  // The mark: the pre-LVGL bitmap's box (154 x 98), centred to the same pixel.
+  // The mark: the pre-LVGL bitmap's box, centred to the same pixel.
   s_splash_mark = lv_obj_create(s_splash_root);
   lv_obj_remove_style_all(s_splash_mark);
   lv_obj_clear_flag(s_splash_mark, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_size(s_splash_mark, 154, 98);
+  lv_obj_set_size(s_splash_mark, COMET_MARK_W, COMET_MARK_H);
   lv_obj_align(s_splash_mark, LV_ALIGN_CENTER, 0, 0);
   lv_obj_add_event_cb(s_splash_mark, splashMarkDrawCb, LV_EVENT_DRAW_MAIN_END, nullptr);
   lv_obj_add_event_cb(s_splash_mark, splashMarkExtCb, LV_EVENT_REFR_EXT_DRAW_SIZE, nullptr);
@@ -68787,26 +68790,25 @@ static void buildBootSplash() {
   s_splash_born = s_splash_last = millis();
   s_splash_timer = lv_timer_create(splashTickCb, 30, nullptr);
 
-  // Wordmark: "WADA" in ink, "MESH" in the brand teal, spaced SemiBold capitals.
+  // Wordmark: "COMET" in spaced SemiBold capitals.
   lv_obj_t* wm = s_splash_wm = lv_label_create(s_splash_root);
-  lv_label_set_recolor(wm, true);
-  char wordmark[48];
-  snprintf(wordmark, sizeof wordmark, "%s", TR("WADA#15B6A6 MESH#"));
-  normalizeLightSurfaceRecolor(wordmark);
-  lv_label_set_text(wm, wordmark);
+  lv_label_set_text(wm, "COMET");
   lv_obj_set_style_text_font(wm, &g_font_semi_16, LV_PART_MAIN);
   lv_obj_set_style_text_color(wm, ink, LV_PART_MAIN);
-  lv_obj_set_style_text_letter_space(wm, 5, LV_PART_MAIN);
+  lv_obj_set_style_text_letter_space(wm, 8, LV_PART_MAIN);
   lv_obj_align(wm, LV_ALIGN_CENTER, 0, 71);
 
-  // The build channel, quiet, under it.
+  // The tagline under it: in the accent on colour panels, quiet on e-paper.
   lv_obj_t* sub = s_splash_sub = lv_label_create(s_splash_root);
-  char subu[32];
-  uiUpperUtf8(subu, sizeof subu, TR("TOUCH BETA"));
-  lv_label_set_text(sub, subu);
+  lv_label_set_text(sub, "one radio \xC2\xB7 every mesh");
   lv_obj_set_style_text_font(sub, &g_font_12, LV_PART_MAIN);
+#if defined(HAS_TDECK_PRO)
   lv_obj_set_style_text_color(sub, quiet, LV_PART_MAIN);
-  lv_obj_set_style_text_letter_space(sub, 3, LV_PART_MAIN);
+#else
+  (void)quiet;
+  lv_obj_set_style_text_color(sub, lv_color_hex(kSplashGreen), LV_PART_MAIN);
+#endif
+  lv_obj_set_style_text_letter_space(sub, 1, LV_PART_MAIN);
   lv_obj_align(sub, LV_ALIGN_CENTER, 0, 92);
 
 #if !defined(HAS_TDECK_PRO)
@@ -69099,7 +69101,7 @@ static void setupShowStep(int step) {
   const lv_coord_t btn_y = sh - kSetupBtnH - 10;
 
   if (step == 0) {
-    const int header_bottom = setupHeader(TR("Welcome to WADAMESH"), nullptr, nullptr);
+    const int header_bottom = setupHeader(TR("Welcome to COMET"), nullptr, nullptr);
     lv_obj_t* m = lv_label_create(s_setup_root);
     lv_label_set_text(m,
         TR("Let's set up your device.\n\n"

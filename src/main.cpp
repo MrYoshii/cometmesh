@@ -48,7 +48,7 @@ static SntpClockPush s_sntp_push;
 #include "helpers/esp32/BootTimeSync.h"      // opt-in cold-boot clock sync over saved Wi-Fi (#383)
 #include "helpers/WifiRejoinPolicy.h"         // when the loop rejoins a dropped/failed Wi-Fi link (#685)
 #include "ui-touch/i18n.h"                    // translated Pager transport-state alerts
-#include "wadamesh_mark_rgb.h"               // anti-aliased mesh-mark (RGB565) for the pre-LVGL boot screen
+#include "comet_mark_rgb.h"               // anti-aliased mesh-mark (RGB565) for the pre-LVGL boot screen
 #include "ui-touch/TouchSleep.h"             // idle light-sleep controller (loopEnd called at end of loop())
 #include "ui-touch/device_caps.h"            // CAP_BLE_KEYBOARD: keyboard mode keeps the phone link paused from boot
 #endif
@@ -821,10 +821,19 @@ void setup() {
 #else
   delay(200);
 #endif
+  // The boot comet, for whoever has the serial console open.
+  Serial.print(
+      "\n"
+      "                   .                       *\n"
+      "        .   -  -  --  ---  ====  ======@@)\n"
+      "     .  -  -  --  ---  ====  ========@@@@@)      C O M E T\n"
+      "        .   -  -  --  ---  ====  ======@@)       one radio, every mesh\n"
+      "                   *                 .\n"
+      "\n");
   Serial.println("[BOOT] setup start");
   heap_caps_register_failed_alloc_callback(memAllocFailed);
   memTrace("setup start");
-  Serial.printf("[BOOT] %s on meshcomod %s\n", FIRMWARE_VERSION, FIRMWARE_CORE_VERSION);
+  Serial.printf("[BOOT] Comet %s on meshcomod %s\n", FIRMWARE_VERSION, FIRMWARE_CORE_VERSION);
   // The SDK ships CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096: every allocation
   // under 4 KB is forced into internal DRAM even when PSRAM is free. On the V4
   // that is why internal sat at ~99% while 800+ KB of PSRAM went unused. Lower
@@ -932,21 +941,21 @@ void setup() {
     // The mesh mark, still: the white-on-black artwork inverted a row at a time,
     // centred where the LVGL splash draws its mark, the word under it.
     {
-      const int mx = (display.width()  - WADAMESH_MARK_W) / 2;
-      const int my = (display.height() - WADAMESH_MARK_H) / 2;
-      uint16_t row[WADAMESH_MARK_W];
-      for (int y = 0; y < WADAMESH_MARK_H; ++y) {
-        const uint16_t* src = &WADAMESH_MARK_RGB565[(size_t)y * WADAMESH_MARK_W];
-        for (int x = 0; x < WADAMESH_MARK_W; ++x) row[x] = (uint16_t)~src[x];
-        display.writePixelsRGB565(mx, my + y, WADAMESH_MARK_W, 1, row);
+      const int mx = (display.width()  - COMET_MARK_W) / 2;
+      const int my = (display.height() - COMET_MARK_H) / 2;
+      uint16_t row[COMET_MARK_W];
+      for (int y = 0; y < COMET_MARK_H; ++y) {
+        const uint16_t* src = &COMET_MARK_RGB565[(size_t)y * COMET_MARK_W];
+        for (int x = 0; x < COMET_MARK_W; ++x) row[x] = (uint16_t)~src[x];
+        display.writePixelsRGB565(mx, my + y, COMET_MARK_W, 1, row);
       }
     }
     display.setColor((ColorVal)0x0000);
     display.setTextSize(2);
-    display.drawTextCentered(display.width() / 2, display.height() / 2 + 71 - 8, "WADAMESH");
+    display.drawTextCentered(display.width() / 2, display.height() / 2 + 71 - 8, "COMET");
     display.endFrame();
 #else
-    // Paint the WADAMESH mesh mark the instant the panel is up, so the logo is on
+    // Paint the Comet mark the instant the panel is up, so the logo is on
     // screen from power-on — before LVGL is ready. Blitted as an anti-aliased
     // RGB565 bitmap via the full-res LVGL path (writePixelsRGB565), so the
     // diagonals are smooth, not 1-bit jagged. White-on-black here; the teal dots
@@ -957,9 +966,9 @@ void setup() {
     // whose DISPLAY_CLASS is a core driver the 1.17 core's palette makes that WHITE
     // (the boot logo grew a white border). Graphical pre-LVGL screens stay dark.
     display.startFrame((ColorVal)0x0000);
-    display.writePixelsRGB565((display.width()  - WADAMESH_MARK_W) / 2,
-                              (display.height() - WADAMESH_MARK_H) / 2,
-                              WADAMESH_MARK_W, WADAMESH_MARK_H, WADAMESH_MARK_RGB565);
+    display.writePixelsRGB565((display.width()  - COMET_MARK_W) / 2,
+                              (display.height() - COMET_MARK_H) / 2,
+                              COMET_MARK_W, COMET_MARK_H, COMET_MARK_RGB565);
     display.endFrame();
 #endif
   }
@@ -1011,7 +1020,7 @@ void setup() {
       display.setColor((ColorVal)0xF800);     // red
       display.drawTextCentered(display.width() / 2, display.height() / 2 - 20, "LoRa radio not detected");
       display.setColor((ColorVal)0xFFFF);     // white
-      display.drawTextCentered(display.width() / 2, display.height() / 2 + 2,  "wadamesh needs the LoRa module.");
+      display.drawTextCentered(display.width() / 2, display.height() / 2 + 2,  "Comet needs the LoRa module.");
       display.drawTextCentered(display.width() / 2, display.height() / 2 + 16, "Check it is fitted, then power-cycle.");
       display.endFrame();
     }

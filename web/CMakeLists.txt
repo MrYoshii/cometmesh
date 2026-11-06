@@ -151,19 +151,20 @@ endforeach()
 
 # The map tile server the web board may reach (compat/src/http_host.cpp, wada_http.h):
 # the firmware's own default, read from its one definition so the two never drift.
-file(STRINGS ${SRC}/helpers/esp32/TouchPrefsStore.cpp _tile_srv REGEX "DEFAULT_TILE_SERVER = \"")
-string(REGEX REPLACE ".*DEFAULT_TILE_SERVER = (\"[^\"]+\").*" "\\1" WADA_TILE_SERVER "${_tile_srv}")
+file(STRINGS ${SRC}/CometHosts.h _tile_srv REGEX "#define COMET_TILE_SERVER +\"")
+string(REGEX REPLACE ".*#define COMET_TILE_SERVER +(\"[^\"]+\").*" "\\1" WADA_TILE_SERVER "${_tile_srv}")
 if(NOT WADA_TILE_SERVER MATCHES "^\"http://")
-  message(FATAL_ERROR "DEFAULT_TILE_SERVER not found (or not http://) in TouchPrefsStore.cpp: ${_tile_srv}")
+  message(FATAL_ERROR "COMET_TILE_SERVER not found (or not http://) in CometHosts.h: ${_tile_srv}")
 endif()
 
 # The Store's base (catalogs, app and language files): the URLs are literals in
 # UITask.cpp; this fails the configure when they move, so the proxy path never drifts.
-file(STRINGS ${UI}/UITask.cpp _store_url REGEX "\"http://firmware\\.wadamesh\\.com/apps/apps\\.json\"")
-if(NOT _store_url)
-  message(FATAL_ERROR "the Store catalog URL http://firmware.wadamesh.com/apps/apps.json is gone from UITask.cpp: update WADA_STORE_BASE")
+file(STRINGS ${SRC}/CometHosts.h _fw_host REGEX "#define COMET_FIRMWARE_HOST +\"")
+string(REGEX REPLACE ".*#define COMET_FIRMWARE_HOST +\"([^\"]+)\".*" "\\1" _fw_host "${_fw_host}")
+if(NOT _fw_host)
+  message(FATAL_ERROR "COMET_FIRMWARE_HOST not found in CometHosts.h: update WADA_STORE_BASE")
 endif()
-set(WADA_STORE_BASE "\"http://firmware.wadamesh.com/apps\"")
+set(WADA_STORE_BASE "\"http://${_fw_host}/apps\"")
 
 set(WADA_APP_DEFS
   ESP32=1                    # the UI's ESP32 code paths ARE the device code paths; compat/ backs them

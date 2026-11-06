@@ -29,9 +29,9 @@ TILE_PATH = re.compile(r'^/tiles(/(?:[a-z]+/)?\d{1,2}/\d{1,7}/\d{1,7}\.(?:jpg|pn
 
 
 def default_tile_server():
-    src = os.path.join(HERE, '..', '..', 'src', 'helpers', 'esp32', 'TouchPrefsStore.cpp')
+    src = os.path.join(HERE, '..', '..', 'src', 'CometHosts.h')
     try:
-        m = re.search(r'DEFAULT_TILE_SERVER = "([^"]+)"', open(src, encoding='utf-8').read())
+        m = re.search(r'#define COMET_TILE_SERVER +"([^"]+)"', open(src, encoding='utf-8').read())
         if m:
             return m.group(1).rstrip('/')
     except OSError:

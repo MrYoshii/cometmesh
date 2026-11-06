@@ -76,7 +76,7 @@ static bool bkaOpen(HTTPClient& http, WiFiClientSecure& tls, WiFiClient& plain, 
   http.setTimeout(15000);
   http.useHTTP10(true);
   http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-  http.setUserAgent("wadamesh-books");
+  http.setUserAgent("comet-books");
   const bool https = strncasecmp(url, "https://", 8) == 0;
   if (https) { tls.setInsecure(); if (!http.begin(tls, url)) return false; }
   else if (!http.begin(plain, url)) return false;

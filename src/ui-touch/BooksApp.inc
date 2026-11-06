@@ -350,7 +350,7 @@ static int bkHttp(const char* method, const char* url, const char* payload, bool
   http.setConnectTimeout(9000);
   http.setTimeout(20000);
   http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-  http.setUserAgent("wadamesh-books");
+  http.setUserAgent("comet-books");
   http.useHTTP10(true);   // no chunked replies: the body is read straight off the stream
   WiFiClientSecure tls; WiFiClient plain;
   const bool https = strncasecmp(url, "https://", 8) == 0;
@@ -667,7 +667,7 @@ static int bkReqJson(const char* method, const char* path, const char* payload,
     http.setConnectTimeout(9000);
     http.setTimeout(20000);
     http.useHTTP10(true);
-    http.setUserAgent("wadamesh-books");
+    http.setUserAgent("comet-books");
     WiFiClientSecure tls; WiFiClient plain;
     const bool https = strncasecmp(url, "https://", 8) == 0;
     if (https) { tls.setInsecure(); if (!http.begin(tls, url)) return HTTPC_ERROR_CONNECTION_REFUSED; }
@@ -695,8 +695,8 @@ static void bkJobOpenSession() {
   char path[120];
   snprintf(path, sizeof path, "/api/items/%s/play", s_bk_job_arg);
   static const char kBody[] =
-      "{\"deviceInfo\":{\"clientName\":\"wadamesh\",\"deviceId\":\"wadamesh-max\"},"
-      "\"forceDirectPlay\":true,\"forceTranscode\":false,\"mediaPlayer\":\"wadamesh\","
+      "{\"deviceInfo\":{\"clientName\":\"Comet\",\"deviceId\":\"comet-max\"},"
+      "\"forceDirectPlay\":true,\"forceTranscode\":false,\"mediaPlayer\":\"Comet\","
       "\"supportedMimeTypes\":[\"audio/mpeg\"]}";
   JsonDocument filter(&s_bk_json_alloc);
   filter["id"] = true;

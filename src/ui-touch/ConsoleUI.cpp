@@ -530,7 +530,7 @@ void drawInputLine(bool cursor_on) {
   // to is exactly what a shell prompt is for.
   char prompt[48];
   snprintf(prompt, sizeof prompt, "%s:%s$ ",
-           s_node[0] ? s_node : "wadamesh", s_to[0] ? s_to : "~");
+           s_node[0] ? s_node : "comet", s_to[0] ? s_to : "~");
   s_disp->setColor(colourFor(CC_OK));
   s_disp->setCursor(0, iy);
   s_disp->print(prompt);
