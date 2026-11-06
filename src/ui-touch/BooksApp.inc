@@ -612,6 +612,13 @@ static void booksClosePage() {
 
 static bool booksReaderOpen() { return s_bk_root && s_bk_view == BkView::Reader && s_bk_text_lbl; }
 
+// Back from the reader goes to the shelf; from the shelf or the server tab it closes Books.
+static bool booksBackStep() {
+  if (!s_bk_root || s_bk_view != BkView::Reader) return false;
+  booksCloseReader(true);
+  return true;
+}
+
 static lv_obj_t* booksLabel(lv_obj_t* parent, const char* text, const lv_font_t* font, uint32_t color) {
   lv_obj_t* l = lv_label_create(parent);
   lv_label_set_text(l, text);
@@ -995,7 +1002,7 @@ static void booksSaveBegin() {
   fs->mkdir(kBkDir);
   s_bk_save_file = fs->open(s_bk_save_path, FILE_WRITE);
   if (!s_bk_save_file) { booksSaveFail(TR("Cannot write to the SD card")); return; }
-  booksSetStatus(TR("Saving to the SD card\xe2\x80\xa6"));
+  booksSetStatus(TR("Saving\xe2\x80\xa6"));
 }
 
 // One slice; true when finished (either way).
@@ -1031,9 +1038,10 @@ static void booksTimerCb(lv_timer_t*) {
   if (!s_bk_job_done) {
     if (s_bk_job == BkJob::Download && s_bk_view == BkView::Server) {
       char st[64];
-      if (s_bk_dl_total) snprintf(st, sizeof st, "%s %u%% (%u KB)", TR("Downloading"),
-                                  (unsigned)(s_bk_dl_got * 100ull / s_bk_dl_total), (unsigned)(s_bk_dl_total / 1024));
-      else snprintf(st, sizeof st, "%s %u KB", TR("Downloading"), (unsigned)(s_bk_dl_got / 1024));
+      // Short enough for the status line beside the buttons: "45% of 612 KB".
+      if (s_bk_dl_total) snprintf(st, sizeof st, "%u%% %s %u KB",
+                                  (unsigned)(s_bk_dl_got * 100ull / s_bk_dl_total), TR("of"), (unsigned)(s_bk_dl_total / 1024));
+      else snprintf(st, sizeof st, "%u KB", (unsigned)(s_bk_dl_got / 1024));
       booksSetStatus(st);
     }
     return;
@@ -1234,21 +1242,27 @@ static void booksMenuClose() {
   s_bk_menu = nullptr;
 }
 
+// Text size: kept for every book (in the shelf index), the reading position held.
+static void booksSetFont(int nf) {
+  if (nf < 0 || nf >= kBkFontCount || nf == s_bk_font || !s_bk_text_lbl) return;
+  const uint32_t off = s_bk_page_count ? s_bk_pages[s_bk_page] : 0;
+  s_bk_font = nf;
+  lv_obj_set_style_text_font(s_bk_text_lbl, booksFont(s_bk_font), LV_PART_MAIN);
+  booksPaginate();
+  s_bk_page = booksPageForOffset(off);
+  booksRenderPage();
+  booksSaveIndex();
+}
+
+static void booksSizeBtnCb(lv_event_t* e) {
+  if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+  booksSetFont(s_bk_font + (int)(intptr_t)lv_event_get_user_data(e));
+}
+
 static void booksMenuCb(lv_event_t* e) {
   if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
   const int act = (int)(intptr_t)lv_event_get_user_data(e);
-  if (act == 1 || act == 2) {   // font smaller / bigger: keep the reading position
-    const int nf = s_bk_font + (act == 2 ? 1 : -1);
-    if (nf < 0 || nf >= kBkFontCount) return;
-    const uint32_t off = s_bk_page_count ? s_bk_pages[s_bk_page] : 0;
-    s_bk_font = nf;
-    lv_obj_set_style_text_font(s_bk_text_lbl, booksFont(s_bk_font), LV_PART_MAIN);
-    booksPaginate();
-    s_bk_page = booksPageForOffset(off);
-    booksRenderPage();
-    booksSaveIndex();
-    return;
-  }
+  if (act == 1 || act == 2) { booksSetFont(s_bk_font + (act == 2 ? 1 : -1)); return; }
   if (act == 3 || act == 4) {   // previous / next chapter
     const int ch = s_bk_chapter + (act == 4 ? 1 : -1);
     if (ch >= 0 && ch < s_bk_chapter_count && booksLoadChapter(ch)) { s_bk_page = 0; booksRenderPage(); }
@@ -1307,14 +1321,10 @@ static bool booksReaderKey(int key) {
     case 'b': case 'B': case 'p': case 'P': case 'k': case 'K': case LV_KEY_BACKSPACE:
     case LV_KEY_LEFT: case LV_KEY_UP:
       booksTurn(-1); return true;
-    case '+': case '=': {
-        const uint32_t off = s_bk_page_count ? s_bk_pages[s_bk_page] : 0;
-        if (s_bk_font + 1 < kBkFontCount) { ++s_bk_font; lv_obj_set_style_text_font(s_bk_text_lbl, booksFont(s_bk_font), LV_PART_MAIN); booksPaginate(); s_bk_page = booksPageForOffset(off); booksRenderPage(); booksSaveIndex(); }
-      } return true;
-    case '-': {
-        const uint32_t off = s_bk_page_count ? s_bk_pages[s_bk_page] : 0;
-        if (s_bk_font > 0) { --s_bk_font; lv_obj_set_style_text_font(s_bk_text_lbl, booksFont(s_bk_font), LV_PART_MAIN); booksPaginate(); s_bk_page = booksPageForOffset(off); booksRenderPage(); booksSaveIndex(); }
-      } return true;
+    case '+': case '=':
+      booksSetFont(s_bk_font + 1); return true;
+    case '-':
+      booksSetFont(s_bk_font - 1); return true;
     case 'm': case 'M':
       booksMenuOpen(); return true;
     default:
@@ -1324,7 +1334,7 @@ static bool booksReaderKey(int key) {
 
 static void booksBuildReader() {
   const lv_coord_t w = s_bk_body_w, h = s_bk_body_h;
-  const lv_coord_t foot_h = 16;
+  const lv_coord_t foot_h = 26;   // the size buttons and the position line
   s_bk_text_w = w - 16;
   s_bk_text_h = h - foot_h - 8;
   s_bk_text_lbl = lv_label_create(s_bk_body);
@@ -1336,7 +1346,12 @@ static void booksBuildReader() {
   lv_obj_set_style_text_line_space(s_bk_text_lbl, kBkLineSpace, LV_PART_MAIN);
   lv_obj_clear_flag(s_bk_text_lbl, LV_OBJ_FLAG_CLICKABLE);
   s_bk_foot = booksLabel(s_bk_body, "", &g_font_12, COLOR_SUB);
-  lv_obj_align(s_bk_foot, LV_ALIGN_BOTTOM_MID, 0, -2);
+  lv_obj_align(s_bk_foot, LV_ALIGN_BOTTOM_MID, 0, -6);
+  // Text size, one tap away at the bottom corners.
+  lv_obj_t* smaller = booksButton(s_bk_body, "A-", booksSizeBtnCb, (void*)(intptr_t)-1, 38, 22);
+  lv_obj_align(smaller, LV_ALIGN_BOTTOM_LEFT, 4, -2);
+  lv_obj_t* bigger = booksButton(s_bk_body, "A+", booksSizeBtnCb, (void*)(intptr_t)1, 38, 22);
+  lv_obj_align(bigger, LV_ALIGN_BOTTOM_RIGHT, -4, -2);
   lv_obj_add_flag(s_bk_body, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(s_bk_body, booksPageTapCb, LV_EVENT_CLICKED, nullptr);
 }

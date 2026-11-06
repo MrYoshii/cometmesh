@@ -31002,6 +31002,22 @@ static void openReaderPage(const char* initial_url = nullptr) {
 
 #include "BooksApp.inc"   // Apps > Books: the T-Deck Max e-reader (EPUB/TXT + Audiobookshelf)
 
+// Back on an app page (the bar's chevron, Esc/Back keys): normally closes the page, but
+// a page with levels of its own steps back one level first (Books: reader -> shelf).
+// Jumps elsewhere (Home, the chats) still call s_apppage_close() and close it whole.
+static void appPageBack() {
+  // One tap can arrive here twice (the bar's PRESSED fallback, then its CLICKED): with
+  // levels, the second would step back again and close the page. One step per tap.
+  static uint32_t s_last_ms = 0;
+  const uint32_t now = millis();
+  if (s_last_ms && now - s_last_ms < 700) return;
+  s_last_ms = now | 1u;
+#if defined(CAP_BOOKS)
+  if (booksBackStep()) return;
+#endif
+  if (s_apppage_close) s_apppage_close();
+}
+
 // ===== Discover app (active node-discovery + live signal-ranked list) =====================
 // Fires a zero-hop NODE_DISCOVER_REQ sweep (ALL node types) every few seconds while open and lists
 // every node that answers, ranked by signal. The engine (MyMesh::_discover[] + uiStartDiscoverScan
@@ -34348,7 +34364,7 @@ bool spectrumOwnsRadio() { return s_spectrum_active; }
 // so non-badge left-zone states keep the bar's control-center / Back tap.
 static void statusBarUnreadCb(lv_event_t* e) {
   if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
-  if (s_apppage_close)  { s_apppage_close(); return; }       // tool-page title bar: tap/Enter = back
+  if (s_apppage_close)  { appPageBack(); return; }          // tool-page title bar: tap/Enter = back
   if (s_settings_sheet) { closeSettingsCategory(); return; } // settings detail "‹ Title": tap/Enter = back
   goToTab(CHAT_INBOX_TAB_INDEX);
 }
@@ -49958,7 +49974,7 @@ static void pagerNavGoBack() {
   if (pagerSliderEditCancel()) return;           // editing a slider: Back undoes the edit, nothing else
 #endif
   if (anyPopupOpen() || s_map_pick_active)       hwKeyDismissTopPopup();   // pick mode: a flags=0 registry row
-  else if (s_apppage_close)                      s_apppage_close();
+  else if (s_apppage_close)                      appPageBack();
   else if (LvChatPanel* cp = navOpenChatPanel()) closeChatPanel(cp);
   else if (getActiveTab() != HOME_TAB_INDEX)     navGoToMainTab(HOME_TAB_INDEX);
   else                                           navPushTap(LV_KEY_ESC);
@@ -54479,7 +54495,7 @@ static void bleKbdBack() {
   else if (s_power_menu)                         closePowerMenu();
   else if (s_cc_root)                            closeControlCenter();
   // An app page covers the drawer it came from (a registry row), so close the page first.
-  else if (s_apppage_close && !s_confirm_modal)  s_apppage_close();
+  else if (s_apppage_close && !s_confirm_modal)  appPageBack();
   else if (popupRegistryAnyOver() || s_ct_select_mode || s_map_pick_active) {
     const bool sheet_from_cc = s_settings_sheet && s_settings_from_cc;
     hwKeyDismissTopPopup();
@@ -54710,7 +54726,7 @@ static bool m9HandleNavKey(int key) {
       // to eat that invisible drawer first, so Back looked dead inside every
       // app (reported bug). Close the page itself; the drawer is then the
       // next, visible Back target.
-      else if (s_apppage_close && !s_confirm_modal)  s_apppage_close();
+      else if (s_apppage_close && !s_confirm_modal)  appPageBack();
       else if (popupRegistryAnyOver() || s_ct_select_mode || s_map_pick_active) hwKeyDismissTopPopup();
       else if (LvChatPanel* cp = navOpenChatPanel()) closeChatPanel(cp);
       else if (m9LockedHomeDrawerFrontmost())        { /* configured Home root */ }
@@ -61503,7 +61519,7 @@ static void statusBarTapCb(lv_event_t* e) {
   s_sb_back_ms = 0;
   // A full-screen tool page (RF Monitor / Spectrum) is up: the bar carries its Back
   // chevron + title, so a tap goes back (closes the page) just like settings.
-  if (s_apppage_close) { s_apppage_close(); return; }
+  if (s_apppage_close) { appPageBack(); return; }
   // While a settings detail sheet is open the bar shows its Back chevron + title,
   // so a tap means "go back" rather than opening the control center.
   if (s_settings_sheet) {
@@ -61556,7 +61572,7 @@ static void statusBarReaderBackCb(lv_event_t* e) {
   // then falls through every other branch to the control-center toggle at its end — so exiting any
   // app page by the "‹" also popped the dropdown open. Harmless while this was Reader-only, wrong
   // for every app page since beta_49.
-  if (s_apppage_close) { s_apppage_close(); s_sb_back_ms = millis() | 1u; }   // |1: 0 means "none"
+  if (s_apppage_close) { appPageBack(); s_sb_back_ms = millis() | 1u; }   // |1: 0 means "none"
 }
 
 // Capture the composited screen to a 16-bit BMP on the SD card. BMP (no
