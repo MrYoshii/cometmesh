@@ -77,6 +77,22 @@ PY
 # offered a language file nothing points at any more.
 # Publish from a staging copy whose .lang files are slimmed for the device's download
 # buffer (scripts/build/pack-lang.py); the repo keeps the complete files for translators.
+# pack-lang keeps only the texts the firmware can look up, which it finds by scanning
+# the sources together with LVGL and the MeshCore core. Without a build tree here
+# (.pio or idf/deps), fetch just those two, pinned as in idf/fetch-deps.sh.
+if ! ls "$ROOT"/.pio/libdeps/*/lvgl >/dev/null 2>&1 && [ ! -d "$ROOT/idf/deps/lib/lvgl" ]; then
+  export COMET_LIBDEPS="${COMET_LIBDEPS:-$HOME/.cache/comet-libdeps}"
+  pin() { awk -F'|' -v n="$1" '{gsub(/ /,"")} $1==n {print $2" "$3}' "$ROOT/idf/fetch-deps.sh"; }
+  for lib in lvgl meshcore; do
+    if [ ! -d "$COMET_LIBDEPS/$lib" ]; then
+      read -r repo ref <<<"$(pin "$lib")"
+      [ -n "$repo" ] || { echo "no pin for $lib in idf/fetch-deps.sh"; exit 1; }
+      echo "fetching $lib ($repo $ref) into $COMET_LIBDEPS"
+      git clone -q --depth 1 -b "$ref" "https://github.com/$repo" "$COMET_LIBDEPS/$lib"
+    fi
+  done
+fi
+
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 rsync -a "$SRC" "$STAGE/"

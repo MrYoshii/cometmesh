@@ -278,10 +278,21 @@ def obj_data_sections(d):
 
 # ---- inputs and entry points --------------------------------------------------------
 def _libdeps(root, rel):
-    """First match of rel under any env's .pio/libdeps (the core and LVGL are the same
-    versions in every env)."""
+    """First match of rel in a fetched copy of the libraries: any env's .pio/libdeps (the
+    core and LVGL are the same versions in every env), the IDF build's idf/deps/lib, or
+    $COMET_LIBDEPS (scripts/deploy-apps.sh fetches the two there when neither exists).
+    The last two name the core 'meshcore'."""
     hits = sorted(glob.glob(os.path.join(root, '.pio', 'libdeps', '*', rel)))
-    return hits[0] if hits else None
+    if hits:
+        return hits[0]
+    head, _, tail = rel.partition('/')
+    name = 'meshcore' if head == 'MeshCore' else head
+    for base in (os.path.join(root, 'idf', 'deps', 'lib'), os.environ.get('COMET_LIBDEPS', '')):
+        if base:
+            p = os.path.join(base, name, tail) if tail else os.path.join(base, name)
+            if os.path.exists(p):
+                return p
+    return None
 
 
 def src_files(root):
@@ -327,7 +338,7 @@ def reachable_keys(root, allkeys):
     RuntimeError when an input it depends on is missing, rather than trimming blind."""
     lvsym = _libdeps(root, 'lvgl/src/font/lv_symbol_def.h')
     if not lvsym:
-        raise RuntimeError('lv_symbol_def.h not found under .pio/libdeps (build any env once)')
+        raise RuntimeError('lv_symbol_def.h not found (.pio/libdeps, idf/deps/lib or $COMET_LIBDEPS)')
     macros_raw = {}
     scan_file(file_tokens(lvsym), macros_raw)
     files = src_files(root)
