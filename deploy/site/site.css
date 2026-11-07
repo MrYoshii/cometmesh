@@ -255,9 +255,21 @@ p code { background: var(--paper-edge); padding: 0.05em 0.35em; border-radius: 4
   .doors { grid-template-columns: 1fr; }
 }
 
-/* until esp-web-tools has loaded, its slotted fallbacks are plain children: show only the button */
-esp-web-install-button:not(:defined) [slot="unsupported"],
-esp-web-install-button:not(:defined) [slot="not-allowed"] { display: none; }
+/* the installer: options, progress, and the log a local esptool run would print */
+.installer { display: grid; gap: 0.9rem; justify-items: start; }
+.check { display: inline-flex; align-items: center; gap: 0.6rem; color: var(--body); cursor: pointer; }
+.check input { accent-color: var(--glow); width: 1.05rem; height: 1.05rem; margin: 0; }
+.btn-ink:disabled { opacity: 0.55; cursor: progress; box-shadow: none; }
+.flash { width: 100%; display: grid; gap: 0.55rem; }
+.flash-head { display: flex; justify-content: space-between; gap: 1rem; font-weight: 700; font-size: 0.95rem; }
+.flash-head span:last-child { color: var(--glow); font-variant-numeric: tabular-nums; }
+.bar { height: 0.55rem; border-radius: 999px; background: #0a221a; box-shadow: inset 0 0 0 1px var(--paper-edge); overflow: hidden; }
+.bar span { display: block; height: 100%; width: 0; background: var(--glow); box-shadow: 0 0 12px rgba(43, 255, 136, 0.5); transition: width 200ms linear; }
+@media (prefers-reduced-motion: reduce) { .bar span { transition: none; } }
+.log { margin: 0; height: 15rem; overflow: auto; white-space: pre-wrap; word-break: break-word; font-size: 0.82rem; line-height: 1.45; color: #b9d0c6; }
+.log .log-head { color: var(--starlight); font-weight: 700; }
+.log .log-ok { color: var(--glow); font-weight: 700; }
+.log .log-err { color: #ff9d8a; }
 
 .board-pick { display: grid; gap: 0.6rem; margin-top: 0.6rem; max-width: 560px; }
 .pick { display: flex; align-items: center; gap: 0.8rem; padding: 0.75rem 1rem; border-radius: 12px;

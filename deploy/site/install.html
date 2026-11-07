@@ -40,14 +40,17 @@
       </li>
       <li><h3>Connect it</h3><p>Plug it into your computer with a USB-C data cable. If it does not show up in the next step, hold the BOOT button while you plug it in.</p></li>
       <li><h3>Install</h3>
-        <p>An existing install keeps its settings, contacts and chats; a new one asks whether to erase the device first.</p>
+        <p>An existing Comet keeps its settings, contacts and chats. Coming from other firmware, erase the device first.</p>
         <div class="installer" id="installer" hidden>
-          <esp-web-install-button id="install-btn">
-            <button slot="activate" class="btn btn-ink" id="install-label">Install</button>
-            <span slot="unsupported" class="installer-note">This browser cannot talk to USB devices. Open the page in Chrome or Edge on a computer, or use esptool below.</span>
-            <span slot="not-allowed" class="installer-note">The installer needs the page over HTTPS: open https://cometmesh.org.</span>
-          </esp-web-install-button>
+          <label class="check"><input type="checkbox" id="erase-all"> Erase everything first (settings, contacts, chats)</label>
+          <button type="button" class="btn btn-ink" id="install-go">Install</button>
+          <div class="flash" id="flash" hidden>
+            <div class="flash-head"><span id="flash-step">Connecting</span><span id="flash-pct">0%</span></div>
+            <div class="bar" role="progressbar" aria-labelledby="flash-step" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="flash-bar"><span id="flash-fill"></span></div>
+            <pre class="log" id="flash-log" aria-live="polite"></pre>
+          </div>
         </div>
+        <p class="installer-note" id="install-unsupported" hidden>This browser cannot talk to USB devices. Open the page in Chrome or Edge on a computer, or use esptool below.</p>
         <p class="installer-note" id="install-none" hidden>There is no build for this board yet.</p>
       </li>
       <li id="esptool-step" hidden><h3>Or with esptool</h3><p>Download <a id="app-link" href="#">the app image</a> and write it over an existing install; settings, contacts and chats stay:</p>
@@ -59,12 +62,11 @@
 
 <footer class="sky foot">
   <div class="wrap">
-    <p>Comet is free software under the GPL-3.0. Flashing replaces the firmware on your device; you can always go back by flashing the original one.</p>
+    <p>Comet is free software under the GPL-3.0. Flashing replaces the firmware on your device; you can always go back by flashing the original one. The installer uses <a href="https://github.com/espressif/esptool-js">esptool-js</a> by Espressif (Apache-2.0).</p>
     <p><a href="https://github.com/MrYoshii/cometmesh">Source on GitHub</a> <a href="https://github.com/MrYoshii/cometmesh/issues">Report a problem</a></p>
   </div>
 </footer>
 
-<script type="module" src="https://unpkg.com/esp-web-tools@10.0.1/dist/web/install-button.js?module"></script>
-<script src="install.js?v=dev"></script>
+<script type="module" src="install.js?v=dev"></script>
 </body>
 </html>
