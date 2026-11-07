@@ -1612,6 +1612,14 @@ static void prefsPutUChar(const char* key, uint8_t v);   // standalone keys (def
 // picked the command centre SINCE then (standalone key "home_cmdr"). The config
 // field below still records the choice, but it held everyone's pre-redesign
 // default of "command centre", so it no longer decides what Home shows.
+bool touchPrefsGetLauncherOrbit() {
+  if (!s_begun) touchPrefsBegin();
+  return s_prefs.getUChar("launch_orbit", 1) != 0;
+}
+void touchPrefsSetLauncherOrbit(bool on) {
+  if (!s_begun) touchPrefsBegin();
+  prefsPutUChar("launch_orbit", on ? 1 : 0);
+}
 bool touchPrefsGetHomeIsDrawer() {
   if (!s_begun) touchPrefsBegin();
   return s_prefs.getUChar("home_cmdr", 0) == 0;
@@ -3075,6 +3083,9 @@ static int backupKeys(BkKey* out, int cap) {
 #if defined(TLORA_PAGER) || defined(HAS_TDECK_MAX)
     "vib_in", "vib_str", "vib_pm", "vib_pd", "vib_pn",   // the vibration settings ("vibrate" is above)
     "face_down", "pick_wake",                                     // the Pager's quiet modes
+#endif
+#if defined(TLORA_PAGER)
+    "launch_orbit",                                               // Home: the orbit or the grid
 #endif
 #if defined(TLORA_PAGER) || defined(HAS_TDECK_MAX)
     "chg_care", "low_batt",                                       // battery care and the low-battery guard

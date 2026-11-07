@@ -192,6 +192,10 @@ bool touchPrefsSetMapPmTiles(const char* name);
  * Default false = the compact grid (T-Deck 4 cols / Heltec V4 3 cols). */
 bool touchPrefsGetAppGridLarge();
 bool touchPrefsSetAppGridLarge(bool on);
+// Pager Home launcher: the orbit (apps on an arc, the focused one in the middle;
+// default) or the classic grid.
+bool touchPrefsGetLauncherOrbit();
+void touchPrefsSetLauncherOrbit(bool on);
 /** Idle light-sleep feature: when ON, the device enters light sleep while the
  *  screen is off and all activity gates pass. Default OFF. */
 bool touchPrefsGetSleepIdle();

@@ -50115,14 +50115,30 @@ static void updateTrackball(unsigned long now) {
 #if defined(HAS_PAGER_ENCODER)
 static bool pagerSliderEditCancel();
 #endif
+#if defined(TLORA_PAGER)
+static bool orbitIsHome();             // the orbit is up as Home (defined with it)
+#endif
+static bool popupRegistryAnyOver();    // the popup registry at EOF
 static void pagerNavGoBack() {
 #if defined(HAS_PAGER_ENCODER)
   if (pagerSliderEditCancel()) return;           // editing a slider: Back undoes the edit, nothing else
+#endif
+#if defined(TLORA_PAGER)
+  // The orbit is Home, not a drawer over it: what was opened from it closes first,
+  // and on the orbit itself Back stays put (the widgets have their own Status tile).
+  if (orbitIsHome() && !s_map_pick_active && !popupRegistryAnyOver()) {
+    if (s_apppage_close)                           appPageBack();
+    else if (LvChatPanel* cp = navOpenChatPanel()) closeChatPanel(cp);
+    return;
+  }
 #endif
   if (anyPopupOpen() || s_map_pick_active)       hwKeyDismissTopPopup();   // pick mode: a flags=0 registry row
   else if (s_apppage_close)                      appPageBack();
   else if (LvChatPanel* cp = navOpenChatPanel()) closeChatPanel(cp);
   else if (getActiveTab() != HOME_TAB_INDEX)     navGoToMainTab(HOME_TAB_INDEX);
+#if defined(TLORA_PAGER)
+  else if (!s_home_drawer_mode && touchPrefsGetLauncherOrbit()) setHomeDrawer(true);   // Status -> the orbit
+#endif
   else                                           navPushTap(LV_KEY_ESC);
 }
 #endif
@@ -61239,12 +61255,18 @@ static void addAppTile(lv_obj_t* parent, int x, int y, int w, int h,
 static lv_obj_t* s_appgrid_sheet = nullptr;
 static lv_obj_t* s_appgrid_home[2] = { nullptr, nullptr };   // Widgets, App drawer
 static lv_obj_t* s_appgrid_size[2] = { nullptr, nullptr };   // Compact, Large
+#if defined(TLORA_PAGER)
+static lv_obj_t* s_appgrid_layout[2] = { nullptr, nullptr };   // Orbit, Grid
+#endif
 #if defined(HAS_THINKNODE_M9)
 static lv_obj_t* s_appgrid_keyrow = nullptr;                 // "Lock home to drawer", only with the drawer as Home
 #endif
 static void closeAppGridSheet() {
   if (s_appgrid_sheet) { popupClose(&s_appgrid_sheet); }
   s_appgrid_home[0] = s_appgrid_home[1] = s_appgrid_size[0] = s_appgrid_size[1] = nullptr;
+#if defined(TLORA_PAGER)
+  s_appgrid_layout[0] = s_appgrid_layout[1] = nullptr;
+#endif
 #if defined(HAS_THINKNODE_M9)
   s_appgrid_keyrow = nullptr;
 #endif
@@ -61273,6 +61295,14 @@ static void appGridSync() {
       else                   lv_obj_clear_state(s_appgrid_size[i], LV_STATE_CHECKED);
     }
   }
+#if defined(TLORA_PAGER)
+  const bool orbit = touchPrefsGetLauncherOrbit();
+  for (int i = 0; i < 2; ++i) {
+    if (!s_appgrid_layout[i]) continue;
+    if ((i == 0) == orbit) lv_obj_add_state(s_appgrid_layout[i], LV_STATE_CHECKED);
+    else                   lv_obj_clear_state(s_appgrid_layout[i], LV_STATE_CHECKED);
+  }
+#endif
 #if defined(HAS_THINKNODE_M9)
   if (s_appgrid_keyrow && lv_obj_is_valid(s_appgrid_keyrow)) {
     if (home_drawer) lv_obj_clear_flag(s_appgrid_keyrow, LV_OBJ_FLAG_HIDDEN);
@@ -61294,6 +61324,21 @@ static void appGridChooseCb(lv_event_t* e) {
   }
   appGridSync();
 }
+#if defined(TLORA_PAGER)
+static void appGridLayoutCb(lv_event_t* e) {
+  if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+  const bool grid = (bool)(intptr_t)lv_event_get_user_data(e);
+  if (grid == touchPrefsGetLauncherOrbit()) {
+    touchPrefsSetLauncherOrbit(!grid);
+    if (s_appdrawer_root) {   // the new layout under the sheet
+      popupClose(&s_appdrawer_root);
+      openAppDrawer();
+      if (s_appgrid_sheet) lv_obj_move_foreground(s_appgrid_sheet);
+    }
+  }
+  appGridSync();
+}
+#endif
 static void appGridHomeCb(lv_event_t* e) {
   if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
   const bool on = (bool)(intptr_t)lv_event_get_user_data(e);
@@ -61453,6 +61498,9 @@ static void openAppGridSheet() {
   if (touchPrefsGetHomeKeyKeepsDrawer()) lv_obj_add_state(key_sw, LV_STATE_CHECKED);
   lv_obj_add_event_cb(key_sw, appHomeKeyKeepsDrawerCb, LV_EVENT_VALUE_CHANGED, nullptr);
 #endif
+#if defined(TLORA_PAGER)
+  appGridChoiceRow(card, inner_w, TR("App layout"), TR("Orbit"), TR("Grid"), appGridLayoutCb, s_appgrid_layout);
+#endif
   appGridChoiceRow(card, inner_w, TR("App icons"), TR("Compact"), TR("Large"), appGridChooseCb, s_appgrid_size);
   appGridSync();
   lv_obj_move_foreground(s_appgrid_sheet);
@@ -61491,6 +61539,270 @@ static const char* luaAppIconGlyph(const char* name) {
   for (const auto& e : kMap) if (strcmp(e.name, name) == 0) return e.glyph;
   return LV_SYMBOL_PLAY;
 }
+
+#if defined(TLORA_PAGER)
+// ---- The orbit: Comet's Home launcher on the Pager -----------------------------------
+// The drawer's apps on an arc: the focused one big in the middle, two neighbours on
+// each side, smaller and lower, the rest waiting off screen. A turn of the wheel is a
+// plain focus step (the tiles are ordinary nav stops in a ring), and each focus change
+// slides the arc so the new one is in the middle, with a short comet tail behind it.
+// Under the arc, one line about the focused app (for Chats: the newest unread message).
+struct OrbitItem { lv_obj_t* btn; lv_obj_t* icon; lv_obj_t* name; int act; int badge; int pos; };
+static constexpr int kOrbitMax = 48;
+static OrbitItem s_orbit[kOrbitMax];
+static int       s_orbit_n = 0, s_orbit_focus = 0;
+static lv_obj_t* s_orbit_root = nullptr;
+static lv_obj_t* s_orbit_preview = nullptr;
+static lv_obj_t* s_orbit_pos = nullptr;
+static lv_obj_t* s_orbit_tail = nullptr;
+static lv_coord_t s_orbit_w = 0, s_orbit_h = 0;    // the root's size (known before its layout runs)
+static constexpr uint32_t kOrbitSlideMs = 120;
+
+static const char* orbitBlurb(int act) {
+  switch (act) {
+    case APPACT_CHATS:         return "No new messages";
+    case APPACT_CONTACTS:      return "People, repeaters and rooms you have heard";
+    case APPACT_MENTIONS:      return "Messages that name you";
+    case APPACT_MAP:           return "Where everyone is";
+    case APPACT_ADVERT:        return "Tell the mesh you are here";
+    case APPACT_SIGNAL:        return "Signal and traffic";
+    case APPACT_DISCOVER:      return "Find nodes nearby";
+    case APPACT_SPECTRUM:      return "What is on the air";
+    case APPACT_SETTINGS:      return s_update_available ? "An update is waiting" : "Radio, screen, sound and more";
+    case APPACT_READER:        return "Read the web";
+    case APPACT_BOOKS:         return "Books and audiobooks";
+    case APPACT_FILES:         return "The card and the flash";
+    case APPACT_FILE_TRANSFER: return "Send files from a browser";
+    case APPACT_USB_FILES:     return "Files over the USB cable";
+    case APPACT_STORE:         return "Get more apps";
+    case APPACT_SNAKE:         return "A quick game";
+    case APPACT_CMDCENTER:     return "Battery, radio, GPS and more at a glance";
+    case APPACT_POWER:         return "Turn off or restart";
+    case APPACT_TERMINAL:      return "The mesh command line";
+    case APPACT_VNC:           return "Show this screen in a browser";
+    case APPACT_REMOTE:        return "Use Comet from a browser";
+    default:                   return act >= APPACT_LUA_BASE ? "An installed app" : "";
+  }
+}
+
+// The line under the arc for the focused app.
+static void orbitPreviewUpdate() {
+  if (!s_orbit_preview || s_orbit_n <= 0) return;
+  const OrbitItem& it = s_orbit[s_orbit_focus];
+  char line[160];
+  snprintf(line, sizeof line, "%s", TR(orbitBlurb(it.act)));
+  if (it.act == APPACT_CHATS && g_lv.task) {
+    // The newest thread with something unread, and its last message.
+    int best = -1; uint32_t best_ts = 0; int unread_total = 0;
+    for (int i = 0; i < UITask::MAX_UI_THREADS; i++) {
+      bool ch; uint16_t un; uint32_t ts; char nm[UITask::MAX_THREAD_NAME + 1];
+      if (!g_lv.task->getThreadInfo(i, ch, un, ts, nm, sizeof nm) || un == 0) continue;
+      unread_total += un;
+      if (best < 0 || ts > best_ts) { best = i; best_ts = ts; }
+    }
+    char sender[40] = "", text[96] = "";
+    bool out = false;
+    if (best >= 0 && g_lv.task->getThreadLastMessage(best, sender, sizeof sender, text, sizeof text, &out))
+      snprintf(line, sizeof line, "%d %s · %s%s%s", unread_total, TR("new"), out ? TR("You") : sender,
+               (out || sender[0]) ? ": " : "", text);
+  }
+  lv_label_set_text(s_orbit_preview, line);
+  if (s_orbit_pos) {
+    char p[16];
+    snprintf(p, sizeof p, "%d / %d", it.pos + 1, s_orbit_n);
+    lv_label_set_text(s_orbit_pos, p);
+  }
+}
+
+static void orbitAnim(lv_obj_t* o, lv_anim_exec_xcb_t cb, int32_t from, int32_t to) {
+  lv_anim_del(o, cb);   // a newer place wins over a slide still on its way
+  if (from == to) { cb(o, to); return; }
+  lv_anim_t a;
+  lv_anim_init(&a);
+  lv_anim_set_var(&a, o);
+  lv_anim_set_exec_cb(&a, cb);
+  lv_anim_set_values(&a, from, to);
+  lv_anim_set_time(&a, kOrbitSlideMs);
+  lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+  lv_anim_start(&a);
+}
+static void orbitSetSize(void* o, int32_t v) { lv_obj_set_size((lv_obj_t*)o, (lv_coord_t)v, (lv_coord_t)v); }
+static void orbitSetX(void* o, int32_t v) { lv_obj_set_x((lv_obj_t*)o, (lv_coord_t)v); }
+static void orbitSetY(void* o, int32_t v) { lv_obj_set_y((lv_obj_t*)o, (lv_coord_t)v); }
+static void orbitSetOpa(void* o, int32_t v) { lv_obj_set_style_opa((lv_obj_t*)o, (lv_opa_t)v, LV_PART_MAIN); }
+
+// Put every tile in its place on the arc around the focused one.
+static void orbitPlace(bool anim, int came_from) {
+  if (!s_orbit_root || s_orbit_n <= 0) return;
+  const lv_coord_t W = s_orbit_w, H = s_orbit_h;
+  const lv_coord_t line_h = lv_font_get_line_height(&g_font_14) + 6;
+  const lv_coord_t band = H - line_h;
+  const lv_coord_t s0 = LV_MIN((lv_coord_t)(band - 26), (lv_coord_t)SC(92));
+  const lv_coord_t top = (band - s0) / 2 - (lv_coord_t)(s0 / 10);
+  const int n = s_orbit_n;
+  for (int i = 0; i < n; ++i) {
+    OrbitItem& it = s_orbit[i];
+    int d = ((i - s_orbit_focus) % n + n) % n;
+    if (d > n / 2) d -= n;
+    const int ad = d < 0 ? -d : d;
+    lv_coord_t sz, cx, y;
+    lv_opa_t opa;
+    if (ad == 0)      { sz = s0;            cx = W / 2;                         y = top;               opa = LV_OPA_COVER; }
+    else if (ad == 1) { sz = s0 * 74 / 100; cx = W / 2 + d * (W * 26 / 100);    y = top + s0 * 16 / 100; opa = 215; }
+    else if (ad == 2) { sz = s0 * 58 / 100; cx = W / 2 + (d / 2) * (W * 44 / 100); y = top + s0 * 32 / 100; opa = 130; }
+    else              { sz = s0 * 50 / 100; cx = d < 0 ? -sz : W + sz;          y = top + s0 * 40 / 100; opa = 0; }
+    const lv_coord_t x = cx - sz / 2;
+    const bool mid = ad == 0;
+    lv_obj_set_style_border_width(it.btn, mid ? 3 : 2, LV_PART_MAIN);
+    lv_obj_set_style_border_color(it.btn, lv_color_hex(mid ? COLOR_GLOW : COLOR_BORDER), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(it.btn, lv_color_hex(mid ? rgbMix(COLOR_PANEL, COLOR_GLOW, 26) : COLOR_PANEL), LV_PART_MAIN);
+    lv_obj_set_style_shadow_width(it.btn, mid && !s_theme_high_contrast ? 26 : 0, LV_PART_MAIN);
+    if (it.icon) lv_obj_set_style_text_color(it.icon, lv_color_hex(mid ? COLOR_GLOW : COLOR_SUB), LV_PART_MAIN);
+    if (it.name) {
+      lv_obj_set_style_text_font(it.name, mid ? &g_font_semi_16 : &g_font_12, LV_PART_MAIN);
+      lv_obj_set_style_text_color(it.name, lv_color_hex(mid ? COLOR_TEXT : COLOR_SUB), LV_PART_MAIN);
+      lv_obj_set_width(it.name, sz - 8);
+    }
+    lv_obj_set_style_radius(it.btn, sz * 22 / 100, LV_PART_MAIN);
+    const bool slide = anim && ad <= 3;
+    if (slide) {
+      orbitAnim(it.btn, orbitSetX, lv_obj_get_x(it.btn), x);
+      orbitAnim(it.btn, orbitSetY, lv_obj_get_y(it.btn), y);
+      orbitAnim(it.btn, orbitSetSize, lv_obj_get_width(it.btn), sz);
+      orbitAnim(it.btn, orbitSetOpa, lv_obj_get_style_opa(it.btn, LV_PART_MAIN), opa);
+    } else {
+      lv_anim_del(it.btn, nullptr);
+      lv_obj_set_pos(it.btn, x, y);
+      lv_obj_set_size(it.btn, sz, sz);
+      lv_obj_set_style_opa(it.btn, opa, LV_PART_MAIN);
+    }
+  }
+  // The comet tail: a short fading streak from the side the new one came from.
+  if (s_orbit_tail) {
+    lv_anim_del(s_orbit_tail, nullptr);
+    if (anim && came_from != 0) {
+      const lv_coord_t tw = W * 14 / 100;
+      lv_obj_set_size(s_orbit_tail, tw, 6);
+      lv_obj_set_style_bg_grad_dir(s_orbit_tail, LV_GRAD_DIR_HOR, LV_PART_MAIN);
+      lv_obj_set_style_bg_color(s_orbit_tail, lv_color_hex(came_from > 0 ? COLOR_GLOW : COLOR_BG), LV_PART_MAIN);
+      lv_obj_set_style_bg_grad_color(s_orbit_tail, lv_color_hex(came_from > 0 ? COLOR_BG : COLOR_GLOW), LV_PART_MAIN);
+      const lv_coord_t ty = top + s0 / 2 - 3;
+      lv_obj_set_pos(s_orbit_tail, came_from > 0 ? W / 2 + s0 / 2 - 4 : W / 2 - s0 / 2 - tw + 4, ty);
+      lv_obj_clear_flag(s_orbit_tail, LV_OBJ_FLAG_HIDDEN);
+      lv_anim_t a;
+      lv_anim_init(&a);
+      lv_anim_set_var(&a, s_orbit_tail);
+      lv_anim_set_exec_cb(&a, orbitSetOpa);
+      lv_anim_set_values(&a, 200, 0);
+      lv_anim_set_delay(&a, kOrbitSlideMs);
+      lv_anim_set_time(&a, 420);
+      lv_anim_start(&a);
+    } else {
+      lv_obj_add_flag(s_orbit_tail, LV_OBJ_FLAG_HIDDEN);
+    }
+  }
+  orbitPreviewUpdate();
+}
+
+static void orbitFocusCb(lv_event_t* e) {
+  if (lv_event_get_code(e) != LV_EVENT_FOCUSED) return;
+  lv_obj_t* t = lv_event_get_target(e);
+  for (int i = 0; i < s_orbit_n; ++i) {
+    if (s_orbit[i].btn != t) continue;
+      if (i == s_orbit_focus) return;
+    int d = ((i - s_orbit_focus) % s_orbit_n + s_orbit_n) % s_orbit_n;
+    if (d > s_orbit_n / 2) d -= s_orbit_n;
+    s_orbit_focus = i;
+    orbitPlace(true, d > 0 ? 1 : -1);
+    return;
+  }
+}
+static bool orbitIsHome() { return s_orbit_root != nullptr && getActiveTab() == HOME_TAB_INDEX; }
+static void orbitDeleteCb(lv_event_t* e) {
+  if (lv_event_get_target(e) != s_orbit_root) return;
+  s_orbit_root = s_orbit_preview = s_orbit_pos = s_orbit_tail = nullptr;
+  s_orbit_n = 0;
+  s_orbit_focus = 0;
+}
+
+static void orbitAddTile(lv_obj_t* root, const char* icon, const char* label, int act, int badge, int pos) {
+  if (s_orbit_n >= kOrbitMax) return;
+  lv_obj_t* t = lv_btn_create(root);
+  lv_obj_remove_style_all(t);
+  lv_obj_clear_flag(t, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+  lv_obj_set_style_bg_opa(t, LV_OPA_COVER, LV_PART_MAIN);
+  lv_obj_set_style_border_opa(t, LV_OPA_COVER, LV_PART_MAIN);
+  lv_obj_set_style_shadow_color(t, lv_color_hex(COLOR_GLOW), LV_PART_MAIN);
+  lv_obj_set_style_shadow_opa(t, 90, LV_PART_MAIN);
+  // The middle of the arc is the cursor: no ring on top of it.
+  for (lv_style_selector_t st : { (lv_style_selector_t)(LV_PART_MAIN | LV_STATE_FOCUSED),
+                                  (lv_style_selector_t)(LV_PART_MAIN | LV_STATE_FOCUS_KEY) })
+    lv_obj_set_style_outline_width(t, 0, st);
+  lv_obj_set_style_bg_color(t, lv_color_hex(COLOR_CONTROL_PRESSED), LV_PART_MAIN | LV_STATE_PRESSED);
+  lv_obj_set_flex_flow(t, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(t, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_pad_row(t, 4, LV_PART_MAIN);
+  lv_obj_add_event_cb(t, appTileCb, LV_EVENT_CLICKED, (void*)(intptr_t)act);
+  lv_obj_add_event_cb(t, orbitFocusCb, LV_EVENT_FOCUSED, nullptr);
+#if CAP_LUA_APPS
+  if (act >= APPACT_LUA_BASE || appHideBitFor(act))
+    lv_obj_add_event_cb(t, appTileLongPressCb, LV_EVENT_LONG_PRESSED, (void*)(intptr_t)act);
+#endif
+  lv_obj_t* ic = nullptr;
+  if (icon) {
+    ic = lv_label_create(t);
+    lv_label_set_text(ic, icon);
+    lv_obj_set_style_text_font(ic, isUiIconGlyph(icon) ? &ui_icons_20 : &g_font_16, LV_PART_MAIN);
+  }
+  lv_obj_t* nm = lv_label_create(t);
+  lv_label_set_text(nm, label);
+  lv_label_set_long_mode(nm, LV_LABEL_LONG_DOT);
+  lv_obj_set_style_text_align(nm, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+  if (badge != 0) {
+    lv_obj_t* b = makeCountPill(t, badge);
+    lv_obj_add_flag(b, LV_OBJ_FLAG_IGNORE_LAYOUT);
+    lv_obj_align(b, LV_ALIGN_TOP_RIGHT, -4, 4);
+  }
+  s_orbit[s_orbit_n++] = { t, ic, nm, act, badge, pos };
+}
+
+// Build the orbit into the drawer's root from the drawer's own list (icon, name,
+// action, badge per app, in drawer order).
+struct OrbitSrc { const char* icon; const char* label; int act; int badge; };
+static void orbitBuild(lv_obj_t* root, lv_coord_t w, lv_coord_t h, const OrbitSrc* src, int n) {
+  s_orbit_root = root;
+  s_orbit_w = w; s_orbit_h = h;
+  s_orbit_n = 0;
+  s_orbit_focus = 0;
+  lv_obj_clear_flag(root, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_pad_all(root, 0, LV_PART_MAIN);
+  lv_obj_add_event_cb(root, orbitDeleteCb, LV_EVENT_DELETE, nullptr);
+  s_orbit_tail = lv_obj_create(root);
+  lv_obj_remove_style_all(s_orbit_tail);
+  lv_obj_clear_flag(s_orbit_tail, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_bg_opa(s_orbit_tail, LV_OPA_COVER, LV_PART_MAIN);
+  lv_obj_set_style_radius(s_orbit_tail, 3, LV_PART_MAIN);
+  lv_obj_add_flag(s_orbit_tail, LV_OBJ_FLAG_HIDDEN);
+  // Always in drawer order: the focus memory (per tab, after an app, across a
+  // rebuild) goes by a stop's place in the list.
+  for (int i = 0; i < n; ++i) orbitAddTile(root, src[i].icon, src[i].label, src[i].act, src[i].badge, i);
+  const lv_coord_t line_h = lv_font_get_line_height(&g_font_14) + 6;
+  s_orbit_preview = lv_label_create(root);
+  lv_label_set_long_mode(s_orbit_preview, LV_LABEL_LONG_DOT);
+  lv_obj_set_width(s_orbit_preview, w - SC(90));
+  lv_obj_set_style_text_font(s_orbit_preview, &g_font_14, LV_PART_MAIN);
+  lv_obj_set_style_text_color(s_orbit_preview, lv_color_hex(COLOR_TEXT), LV_PART_MAIN);
+  lv_obj_set_style_text_align(s_orbit_preview, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+  lv_obj_align(s_orbit_preview, LV_ALIGN_BOTTOM_MID, 0, -(line_h - lv_font_get_line_height(&g_font_14)) / 2);
+  useChainedFont(s_orbit_preview);
+  s_orbit_pos = lv_label_create(root);
+  lv_obj_set_style_text_font(s_orbit_pos, &g_font_12, LV_PART_MAIN);
+  lv_obj_set_style_text_color(s_orbit_pos, lv_color_hex(COLOR_SUB), LV_PART_MAIN);
+  lv_obj_align(s_orbit_pos, LV_ALIGN_BOTTOM_RIGHT, -10, -(line_h - lv_font_get_line_height(&g_font_12)) / 2);
+  lv_obj_update_layout(root);
+  orbitPlace(false, 0);
+}
+#endif  // TLORA_PAGER (orbit)
 
 static void openAppDrawer() {
   closeAppDrawer();
@@ -61577,6 +61889,30 @@ static void openAppDrawer() {
   const int n = n_static;
 #endif
 
+#if defined(TLORA_PAGER)
+  if (touchPrefsGetLauncherOrbit()) {   // Comet's orbit instead of the grid
+    static OrbitSrc src[kOrbitMax];
+    int m = 0;
+    for (int i = 0; i < n && m < kOrbitMax; i++) {
+#if CAP_LUA_APPS
+      const int oi = s_draw_order[i];
+      if (oi < 0) {
+        const LuaInstApp& a = s_lua_inst[-oi - 1];
+        src[m++] = { luaAppIconGlyph(a.icon), a.name, APPACT_LUA_BASE + (-oi - 1), 0 };
+        continue;
+      }
+#else
+      const int oi = i;
+#endif
+      // On the orbit the arc is Home, so the widgets' tile says what it shows.
+      const char* lbl = tiles[oi].act == APPACT_CMDCENTER ? TR("Status") : tiles[oi].label;
+      src[m++] = { tiles[oi].icon, lbl, tiles[oi].act, tiles[oi].badge };
+    }
+    orbitBuild(s_appdrawer_root, sw, sh - STATUSBAR_H - TABBAR_H, src, m);
+    lv_obj_set_scrollbar_mode(s_appdrawer_root, LV_SCROLLBAR_MODE_OFF);
+    return;
+  }
+#endif
   // Grid size: compact (board default) or LARGE (one fewer column, bigger tiles,
   // icons + labels, for low vision). Toggled from the app-drawer cog (top-right).
   const bool big_grid = touchPrefsGetAppGridLarge();
