@@ -278,13 +278,11 @@ def obj_data_sections(d):
 
 # ---- inputs and entry points --------------------------------------------------------
 def _libdeps(root, rel):
-    """First match of rel in a fetched copy of the libraries: any env's .pio/libdeps (the
-    core and LVGL are the same versions in every env), the IDF build's idf/deps/lib, or
-    $COMET_LIBDEPS (scripts/deploy-apps.sh fetches the two there when neither exists).
-    The last two name the core 'meshcore'."""
-    hits = sorted(glob.glob(os.path.join(root, '.pio', 'libdeps', '*', rel)))
-    if hits:
-        return hits[0]
+    """rel in a fetched copy of the libraries, the pinned one first so every machine
+    scans the same sources and generates the same table: the IDF build's idf/deps/lib
+    (versions pinned in idf/fetch-deps.sh), then $COMET_LIBDEPS (scripts/deploy-apps.sh
+    fetches the same pins there), and only then any env's .pio/libdeps. The first two
+    name the core 'meshcore'."""
     head, _, tail = rel.partition('/')
     name = 'meshcore' if head == 'MeshCore' else head
     for base in (os.path.join(root, 'idf', 'deps', 'lib'), os.environ.get('COMET_LIBDEPS', '')):
@@ -292,7 +290,8 @@ def _libdeps(root, rel):
             p = os.path.join(base, name, tail) if tail else os.path.join(base, name)
             if os.path.exists(p):
                 return p
-    return None
+    hits = sorted(glob.glob(os.path.join(root, '.pio', 'libdeps', '*', rel)))
+    return hits[0] if hits else None
 
 
 def src_files(root):
