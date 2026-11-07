@@ -243,6 +243,8 @@ static_assert(ChannelSenderSplit::kMaxWireName >= (size_t)UITask::MAX_SENDER_NAM
   #endif
   #include "KeyboardLayouts.h"
   #include "i18n.h"
+  #define A11Y_TR(s) TR(s)
+  #include "A11y.h"           // what the screen reader will say for a focus stop (docs/ACCESSIBILITY.md)
   #include "emoji_data.h"     // baked Noto colour-emoji glyphs (emojiGlyphLookup)
   #include "AvatarText.h"     // initials and the name's emoji for avatars (pure, host-tested)
   #include "qr_icon.h"        // baked recolour-able QR glyph (qr_icon_dsc) for the Chats Share button
@@ -6869,6 +6871,13 @@ static void navFocusCb(lv_group_t* g) {
     s_nav_ta_editing = (f != nullptr && (by_touch || f == g_lv.ch.composer_ta || f == g_lv.dm.composer_ta));
 #endif
     s_nav_focus_prev = f;
+#if defined(COMET_A11Y_TRACE)
+    {   // what the screen reader will say here (docs/ACCESSIBILITY.md)
+      char said[256];
+      a11yDescribe(f, said, sizeof said);
+      Serial.printf("[a11y] %s\n", said[0] ? said : "(no name)");
+    }
+#endif
   }
   lv_obj_t* nav_was_styled = s_nav_styled;
   if (f != nav_was_styled || !s_nav_show) navTipFocusMoved((f && s_nav_show) ? f : nullptr);
@@ -61607,6 +61616,7 @@ static void orbitPreviewUpdate() {
                (out || sender[0]) ? ": " : "", text);
   }
   lv_label_set_text(s_orbit_preview, line);
+  a11ySetHint(it.btn, line);
   if (s_orbit_pos) {
     char p[16];
     snprintf(p, sizeof p, "%d / %d", it.pos + 1, s_orbit_n);
@@ -61763,6 +61773,7 @@ static void orbitAddTile(lv_obj_t* root, const char* icon, const char* label, in
     lv_obj_add_flag(b, LV_OBJ_FLAG_IGNORE_LAYOUT);
     lv_obj_align(b, LV_ALIGN_TOP_RIGHT, -4, 4);
   }
+  a11ySetName(t, label);   // the hint is the line under the arc (orbitPreviewUpdate)
   s_orbit[s_orbit_n++] = { t, ic, nm, act, badge, pos };
 }
 

@@ -48,15 +48,12 @@ already a focus stop, so reading the focus covers the whole UI.
 - Text goes through the UI language (TR), so it speaks the language the UI
   shows.
 
-**Engine:** a decision is still open.
-- eSpeak NG (GPLv3, like Comet) handles over 100 languages and stays clear at
-  high rates, which experienced screen-reader users prefer. It sounds robotic.
-  Its code and data are about 1.4 MB.
-- PicoTTS (Apache-2.0) sounds more natural but has only 6 voices (en-GB,
-  en-US, de, fr, it, es). It needs about 1.1 MB of RAM (PSRAM), and its language
-  data is 0.75–1.4 MB.
+**Engine: eSpeak NG** (GPLv3, like Comet). It covers over 100 languages and
+stays clear at high rates, which experienced screen-reader users prefer. Its
+code and data are about 1.4 MB. PicoTTS sounds more natural, but it has only
+6 voices and needs about 1.1 MB of RAM; we can add it later as a second voice.
 
-Either way the voice data lives outside the app image, so it doesn't eat the
+The voice data lives outside the app image, so it doesn't eat the
 OTA slots: either in a data partition or on the SD card, loaded only when the
 reader is on. Comet would ship English and German first.
 
@@ -83,8 +80,27 @@ function from the firmware. Turning it off brings everything back.
 
 ## Order of work
 
+The Pager UI comes first (docs/PAGER_UI.md). While it is built, every new screen
+is made ready for this: each focus stop has a name, role and hint that
+`A11y.h` can describe (see Prepared so far). After the UI:
+
 1. Settings > Accessibility page, prefs, and the setup step (mode choice only).
 2. Easy mode (Home set, settings list, chat look, confirmations).
-3. Speech engine and audio path on the Pager, then on the Max.
-4. Screen reader: focus speech, roles, toasts and messages, name audit.
+3. eSpeak NG and the audio path on the Pager, then on the Max.
+4. Screen reader: speak the focus, roles, toasts and messages; audit the names.
 5. Starting the reader from the welcome screen without seeing it.
+
+## Prepared so far
+
+- `src/ui-touch/A11y.h` builds what the reader would say for any LVGL object:
+  - its name: an explicit one set with `a11ySetName()`, otherwise the
+    labels inside it;
+  - its role and state: button, switch on/off, slider %, checkbox, list
+    choice, text field;
+  - its place: "3 of 12" among its siblings;
+  - an optional hint.
+- Builds with `-DCOMET_A11Y_TRACE` log `[a11y] ...` on every focus change,
+  which is what the reader will speak. Use it to find stops without a good
+  name. Normal builds compile none of it in.
+- The orbit names its tiles (app name, position, the line under the arc as
+  hint).
