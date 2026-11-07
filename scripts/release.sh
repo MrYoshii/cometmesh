@@ -157,8 +157,9 @@ if [ "$MODE" = "--promote" ]; then
 else
   # 2b. Beta: build each board. Check first that this machine can build all of them,
   #     so a release never stops half way with some boards built and others not.
-  [ -z "$(git -C "$ROOT" status --porcelain -- src variants idf lib platformio.ini 2>/dev/null)" ] ||
-    { echo "uncommitted changes in the firmware sources: commit them, so every board gets the same state"; exit 1; }
+  DIRTY="$(git -C "$ROOT" status --porcelain -- src variants idf lib platformio.ini 2>/dev/null)"
+  [ -z "$DIRTY" ] ||
+    { echo "uncommitted changes in the firmware sources: commit them, so every board gets the same state"; echo "$DIRTY"; exit 1; }
   while read -r id kind _ _; do
     case "$kind" in
       idf) [ -n "${IDF_PATH:-}" ] || { echo "$id needs ESP-IDF 5.5 (source esp-idf/export.sh); nothing built"; exit 1; } ;;
