@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# wadamesh release — two channels: TEST (beta, default) and STABLE (promote).
+# comet release — two channels: TEST (beta, default) and STABLE (promote).
 #
 # Cut a TEST build (builds all PlatformIO boards and publishes the beta channel):
-#   WADAMESH_VPS=user@host scripts/release.sh beta_21
+#   COMET_VPS=user@host scripts/release.sh beta_21
 #
 # Promote an ALREADY-BUILT beta to STABLE (no rebuild — copies the tested bins):
-#   WADAMESH_VPS=user@host scripts/release.sh beta_21 --promote
+#   COMET_VPS=user@host scripts/release.sh beta_21 --promote
 #
-# Channels on the VPS firmware root (firmware.wadamesh.com, behind Cloudflare):
+# Channels on the VPS firmware root (firmware.cometmesh.org, behind Cloudflare):
 #   releases/BETA/<tag>/   immutable beta archives   <- test channel + new-firmware beta check
 #   releases/TOUCH/<tag>/  immutable stable archives <- stable feed + legacy on-device check
 #   latest-beta/           beta feed   (version.json + manifests + rolling bins)
@@ -24,12 +24,12 @@ MODE="beta"
 PIO="${PIO:-$HOME/Library/Python/3.9/bin/pio}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$ROOT/out/firmware"                        # local mirror of the VPS firmware root
-DEST="${WADAMESH_VPS:-}"; DEST_PATH="${WADAMESH_VPS_PATH:-/srv/wadamesh/firmware}"
+DEST="${COMET_VPS:-}"; DEST_PATH="${COMET_VPS_PATH:-/srv/comet/firmware}"
 
 # env:binname pairs — plain string form (works on macOS's bash 3.2; no associative arrays).
 # All S3/PIO boards. The T-Display P4 is an ESP32-P4 IDF build (tdisplay_p4/) handled OUT of band
 # — see the release skill / the P4 build+merge step — because this loop is PlatformIO-only.
-ENVS="heltec_v4_tft_companion_radio_usb_tcp_touch:wadamesh-heltec-v4-tft LilyGo_TDeck_companion_radio_touch:wadamesh-tdeck ThinkNode_M9_companion_radio_touch:wadamesh-thinknode-m9 rak_tap_v2_companion_radio_touch:wadamesh-rak-tap-v2 heltec_v4_r8_tft_companion_radio_usb_tcp_touch:wadamesh-heltec-v4-r8-tft tlora_pager_lr1121_companion_radio_touch:wadamesh-tlora-pager-lr1121 tlora_pager_sx1262_companion_radio_touch:wadamesh-tlora-pager-sx1262 attaky_mesh_series_companion_radio_touch:wadamesh-attaky wio_tracker_l2_companion_radio_touch:wadamesh-wio-tracker-l2 crowpanel_35_companion_radio_touch:wadamesh-crowpanel-35 crowpanel_50_companion_radio_touch:wadamesh-crowpanel-50 LilyGo_TDeck_Pro_v1_0_companion_radio_touch:wadamesh-tdeck-pro-v1-0 LilyGo_TDeck_Pro_v1_1_companion_radio_touch:wadamesh-tdeck-pro-v1-1 LilyGo_TDeck_Max_companion_radio_touch:wadamesh-tdeck-max sensecap_indicator_companion_radio_touch:wadamesh-sensecap-indicator"
+ENVS="heltec_v4_tft_companion_radio_usb_tcp_touch:comet-heltec-v4-tft LilyGo_TDeck_companion_radio_touch:comet-tdeck ThinkNode_M9_companion_radio_touch:comet-thinknode-m9 rak_tap_v2_companion_radio_touch:comet-rak-tap-v2 heltec_v4_r8_tft_companion_radio_usb_tcp_touch:comet-heltec-v4-r8-tft tlora_pager_lr1121_companion_radio_touch:comet-tlora-pager-lr1121 tlora_pager_sx1262_companion_radio_touch:comet-tlora-pager-sx1262 attaky_mesh_series_companion_radio_touch:comet-attaky wio_tracker_l2_companion_radio_touch:comet-wio-tracker-l2 crowpanel_35_companion_radio_touch:comet-crowpanel-35 crowpanel_50_companion_radio_touch:comet-crowpanel-50 LilyGo_TDeck_Pro_v1_0_companion_radio_touch:comet-tdeck-pro-v1-0 LilyGo_TDeck_Pro_v1_1_companion_radio_touch:comet-tdeck-pro-v1-1 LilyGo_TDeck_Max_companion_radio_touch:comet-tdeck-max sensecap_indicator_companion_radio_touch:comet-sensecap-indicator"
 
 # Per-channel destination paths.
 if [ "$MODE" = "stable" ]; then
@@ -100,7 +100,7 @@ if [ "$MODE" = "beta" ]; then
   # — including the release tag, which is how a build silently ships untagged.
   BUILD_DATE="$(date '+%d-%b-%Y')"
   echo "firmware data: tag=$TAG core=$CORE_VER meshcomod=$MESHCOMOD_VER date=$BUILD_DATE"
-  export PLATFORMIO_BUILD_FLAGS="-DFIRMWARE_RELEASE_TAG='\"${TAG}\"' -DFIRMWARE_VERSION='\"wadamesh ${TAG}\"' -DFIRMWARE_BUILD_DATE='\"${BUILD_DATE}\"' -DFIRMWARE_CORE_VERSION='\"${MESHCOMOD_VER}\"'"
+  export PLATFORMIO_BUILD_FLAGS="-DFIRMWARE_RELEASE_TAG='\"${TAG}\"' -DFIRMWARE_VERSION='\"comet ${TAG}\"' -DFIRMWARE_BUILD_DATE='\"${BUILD_DATE}\"' -DFIRMWARE_CORE_VERSION='\"${MESHCOMOD_VER}\"'"
   # Keep the in-tree default (what DEV flashes show) in step with the pinned core,
   # so a bench build never reports a version the firmware no longer is.
   sed -i '' -E "s/^#define FIRMWARE_VERSION \"v[0-9.]+-touch\"/#define FIRMWARE_VERSION \"${MESHCOMOD_VER}-touch\"/" src/MyMesh.h
@@ -112,12 +112,12 @@ if [ "$MODE" = "beta" ]; then
     cp ".pio/build/$env/firmware-merged.bin" "$ARCH/$TAG/$name-merged.bin"
     cp ".pio/build/$env/firmware-merged.bin" "$FEED/$name-merged.bin"   # rolling -> flasher (standalone)
     cp ".pio/build/$env/firmware.bin"        "$FEED/$name.bin"          # rolling app image -> Launcher path
-    if [ "$name" = "wadamesh-tdeck-pro-v1-1" ]; then
+    if [ "$name" = "comet-tdeck-pro-v1-1" ]; then
       # beta_85 and earlier identify V1.1 as "tdeck-pro". Keep only the app
       # alias in the archive so OTA works without creating a third matrix board.
-      cp ".pio/build/$env/firmware.bin"        "$ARCH/$TAG/wadamesh-tdeck-pro.bin"
-      cp ".pio/build/$env/firmware.bin"        "$FEED/wadamesh-tdeck-pro.bin"
-      cp ".pio/build/$env/firmware-merged.bin" "$FEED/wadamesh-tdeck-pro-merged.bin"
+      cp ".pio/build/$env/firmware.bin"        "$ARCH/$TAG/comet-tdeck-pro.bin"
+      cp ".pio/build/$env/firmware.bin"        "$FEED/comet-tdeck-pro.bin"
+      cp ".pio/build/$env/firmware-merged.bin" "$FEED/comet-tdeck-pro-merged.bin"
     fi
   done
 else
@@ -149,10 +149,10 @@ else
     cp "$SRC/$name-merged.bin" "$ARCH/$TAG/$name-merged.bin"
     cp "$SRC/$name-merged.bin" "$FEED/$name-merged.bin"
     cp "$SRC/$name.bin"        "$FEED/$name.bin"
-    if [ "$name" = "wadamesh-tdeck-pro-v1-1" ]; then
-      cp "$SRC/$name.bin"        "$ARCH/$TAG/wadamesh-tdeck-pro.bin"
-      cp "$SRC/$name.bin"        "$FEED/wadamesh-tdeck-pro.bin"
-      cp "$SRC/$name-merged.bin" "$FEED/wadamesh-tdeck-pro-merged.bin"
+    if [ "$name" = "comet-tdeck-pro-v1-1" ]; then
+      cp "$SRC/$name.bin"        "$ARCH/$TAG/comet-tdeck-pro.bin"
+      cp "$SRC/$name.bin"        "$FEED/comet-tdeck-pro.bin"
+      cp "$SRC/$name-merged.bin" "$FEED/comet-tdeck-pro-merged.bin"
     fi
   done
   echo "promoted $TAG bins  $SRC -> $ARCH/$TAG (+ $FEED)"
@@ -227,5 +227,5 @@ if [ -n "$DEST" ]; then
   rsync -av --exclude 'apps/' "$OUT/" "$DEST:$DEST_PATH/"
   echo "published $TAG ($MODE) -> $DEST:$DEST_PATH"
 else
-  echo "WADAMESH_VPS not set — built + staged in $ARCH/$TAG + $FEED only (no publish)."
+  echo "COMET_VPS not set — built + staged in $ARCH/$TAG + $FEED only (no publish)."
 fi

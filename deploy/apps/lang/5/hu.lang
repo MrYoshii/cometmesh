@@ -1,4 +1,4 @@
-# wadamesh language file
+# comet language file
 # canonical source - translators: edit this file and PR it
 # code: hu
 # ver: 5
@@ -249,7 +249,7 @@ Still analyzing the previous\npath… try again in a moment.	Még mindig elemzem
 This contact hasn't shared\na GPS position.	Ez a kapcsolat nem osztotta meg GPS-pozícióját.
 Tip: you can scan for networks in Settings → Network after setup.	Tipp: a beállítás után a Beállítások → Hálózat menüpontban kereshet hálózatokat.
 Type your network name — or switch to Wi-Fi in Settings to scan	Írd be a hálózatod nevét – vagy válts Wi-Fi-re a beállításokban a kereséshez
-Update manually at flasher.wadamesh.com\n(Wi-Fi update is paused for now)	Frissítsd manuálisan a flasher.wadamesh.com oldalon\n(A Wi-Fi frissítés egyelőre szünetel)
+Update manually at flasher.cometmesh.org\n(Wi-Fi update is paused for now)	Frissítsd manuálisan a flasher.cometmesh.org oldalon\n(A Wi-Fi frissítés egyelőre szünetel)
 Wi-Fi needed to fetch the\nterrain profile for this path.\nConnect in Settings → Wi-Fi.	Wi-Fi szükséges a terepprofil lekéréséhez ehhez az útvonalhoz. Csatlakozás a Beállítások → Wi-Fi menüpontban.
 You can run setup later in Settings → Device	A beállítást később is futtathatja a Beállítások → Eszköz menüpontban.
 Your location is unknown.\nSet GPS / position in\nSettings → Profile first.	A tartózkodási helye ismeretlen.\nElőször állítsa be a GPS-t / pozíciót a\nBeállítások → Profil menüpontban.
@@ -304,7 +304,7 @@ Sound on	Hang bekapcsolva
 Sound off	Hang kikapcsolva
 TCP on	TCP bekapcsolva
 TCP off	TCP kikapcsolva
-Welcome to WADAMESH	Üdvözöl a WADAMESH
+Welcome to COMET	Üdvözöl a COMET
 Get Started	Kezdés
 Choose your name	Válaszd ki a neved
 Your name	A neved
@@ -700,13 +700,13 @@ Unsupported WAV (need 16-bit PCM)	Nem támogatott WAV (16 bites PCM szükséges)
 Update bin saved to SD	A frissítési láda SD-kártyára mentve
 Update complete.\nRebooting...	Frissítés kész.\nÚjraindítás...
 Update via the Launcher	Frissítés a Launcher
-Update via the Launcher / flasher.wadamesh.com	Frissítés a Launcher / flasher.wadamesh.com oldalon
-Update via the Launcher / flasher.wadamesh.com.	Frissítés a Launcher / flasher.wadamesh.com oldalon.
+Update via the Launcher / flasher.cometmesh.org	Frissítés a Launcher / flasher.cometmesh.org oldalon
+Update via the Launcher / flasher.cometmesh.org.	Frissítés a Launcher / flasher.cometmesh.org oldalon.
 Username (optional)	Felhasználónév (nem kötelező)
 Volume	Hangerő
 W up  ·  A left  ·  D right  ·  Z down  ·  S select  ·  Q back	W fel · A balra · D jobbra · Z le · S kiválasztás · Q vissza
 WADA#15B6A6 MESH#	WADA#15B6A6 MESH#
-WADAMESH	WADAMESH
+COMET	COMET
 Wi-Fi not connected	Nincs Wi-Fi-kapcsolat
 Wi-Fi on, scanning…	Wi-Fi bekapcsolva, szkennelés…
 Yesterday	Tegnap
@@ -748,7 +748,7 @@ Catalog unavailable	A katalógus nem érhető el
 Loading catalog…	Katalógus betöltése…
 Loading the language catalog…	Nyelvi katalógus betöltése…
 Language catalog unavailable - check Wi-Fi, then reopen this tab.	A nyelvi katalógus nem érhető el - ellenőrizd a Wi-Fit, majd nyisd meg újra a lapot.
-Fetching the app list from firmware.wadamesh.com	Applista letöltése: firmware.wadamesh.com
+Fetching the app list from firmware.cometmesh.org	Applista letöltése: firmware.cometmesh.org
 Turn Wi-Fi on, then tap refresh. Apps already installed still work.	Kapcsold be a Wi-Fit, majd frissíts. A már telepített appok működnek.
 Installing…	Telepítés…
 Install failed (network?)	A telepítés nem sikerült (hálózat?)

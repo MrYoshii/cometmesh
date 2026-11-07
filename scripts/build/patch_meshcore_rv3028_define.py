@@ -1,11 +1,11 @@
 Import("env")
 import os
 
-MARKER = "wadamesh-rv3028-guard-patch"
+MARKER = "comet-rv3028-guard-patch"
 OLD = "#define RV3028_ADDRESS   0x52"
 NEW = """#ifndef RV3028_ADDRESS
 #define RV3028_ADDRESS   0x52
-#endif  // wadamesh-rv3028-guard-patch"""
+#endif  // comet-rv3028-guard-patch"""
 
 path = os.path.join(
     env.subst("$PROJECT_LIBDEPS_DIR"),

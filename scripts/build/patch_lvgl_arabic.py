@@ -26,13 +26,13 @@
 import os
 import sys
 
-MARKER = "wadamesh-lvgl-arabic-patch"
+MARKER = "comet-lvgl-arabic-patch"
 EDITS = (
     (
         "    /*{Key Offset, End, Beginning, Middle, Isolated, {conjunction}}*/\n"
         "    {1, 0xFE84, -1, 0, -1,  {1, 0}},    // أ\n",
         "    /*{Key Offset, End, Beginning, Middle, Isolated, {conjunction}}*/\n"
-        "    {0, 0xFE82, -1, 0, -1,  {1, 0}},    // آ  (wadamesh-lvgl-arabic-patch: LVGL 8 had no row)\n"
+        "    {0, 0xFE82, -1, 0, -1,  {1, 0}},    // آ  (comet-lvgl-arabic-patch: LVGL 8 had no row)\n"
         "    {1, 0xFE84, -1, 0, -1,  {1, 0}},    // أ\n",
     ),
     (

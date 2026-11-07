@@ -1,4 +1,4 @@
-// Automated screenshots of the wadamesh web control panel demo, to doc-shots/web_*.png.
+// Automated screenshots of the comet web control panel demo, to doc-shots/web_*.png.
 // Start the demo server first:  python3 scripts/doc/web-demo/serve.py 8791
 // Then:  NODE_PATH=<playwright node_modules> node scripts/doc/web-demo/shoot.js [port] [outdir]
 const { chromium } = require('playwright');

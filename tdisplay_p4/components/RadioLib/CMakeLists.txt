@@ -13,7 +13,7 @@
 # RadioLib auto-selects the Arduino path via `#if defined(ARDUINO)` in BuildOpt.h,
 # but arduino-esp32 exports -DARDUINO only PRIVATE-ly, so RadioLib's own TUs (and
 # our consumers) wouldn't see it. We therefore force RADIOLIB_BUILD_ARDUINO as a
-# PUBLIC define: it reaches both RadioLib's sources AND wadamesh_app (which
+# PUBLIC define: it reaches both RadioLib's sources AND comet_app (which
 # includes <RadioLib.h>), keeping the Module class layout identical on both sides.
 
 file(GLOB_RECURSE RADIOLIB_SOURCES "src/*.cpp")

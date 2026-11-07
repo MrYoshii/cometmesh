@@ -1,12 +1,12 @@
 {
-  "name": "wadamesh — Heltec V4 TFT",
+  "name": "comet — Heltec V4 TFT",
   "version": "beta_1",
   "new_install_prompt_erase": true,
   "builds": [
     {
       "chipFamily": "ESP32-S3",
       "parts": [
-        { "path": "https://firmware.wadamesh.com/latest/wadamesh-heltec-v4-tft-merged.bin", "offset": 0 }
+        { "path": "https://firmware.cometmesh.org/latest/comet-heltec-v4-tft-merged.bin", "offset": 0 }
       ]
     }
   ]

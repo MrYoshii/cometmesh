@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Offline demo server for the wadamesh web control panel.
+Offline demo server for the comet web control panel.
 
 Serves the extracted index.html at GET / and speaks the device's /term
 WebSocket protocol with hard-coded demo data, so the real SPA renders exactly
@@ -353,7 +353,7 @@ def main():
     srv.bind(("127.0.0.1", port))
     srv.listen(16)
     url = "http://127.0.0.1:%d/" % port
-    print("wadamesh web-demo serving at %s" % url)
+    print("comet web-demo serving at %s" % url)
     print("  (Ctrl-C to stop)")
     try:
         while True:

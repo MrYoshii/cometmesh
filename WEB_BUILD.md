@@ -1,13 +1,13 @@
-# wadamesh in the browser (WEB_BUILD)
+# comet in the browser (WEB_BUILD)
 
-The real wadamesh touch UI (`src/ui-touch`) built for a computer instead of an
+The real comet touch UI (`src/ui-touch`) built for a computer instead of an
 ESP32, driving a mesh it reaches through a backend. Phase 1 is a native
 macOS/Linux build in an SDL2 window with a demo backend; phase 2 is the same
 build in a web page (Emscripten, `web/dist/`). Phase 3 connects it to a real
 MeshCore companion node.
 
 ```
-web/build.sh host     # build web/build-host/wadamesh-host
+web/build.sh host     # build web/build-host/comet-host
 web/build.sh run      # build and start it (data in web/data/)
 web/build.sh shots    # run the acceptance tour headless -> web/docs/*.png
 web/build.sh smoke    # the same tour, exit status only (CI, release gate)
@@ -17,7 +17,7 @@ web/build.sh web-debug  # -g + runtime assertions -> web/dist-debug/
 web/build.sh serve    # serve web/dist on http://localhost:8080 with COOP/COEP
 web/build.sh webtest  # the same tour in headless Chromium/Firefox/WebKit (Playwright)
 web/build.sh mobiletest  # phones and tablets: iPhone 14, Pixel 7, iPad (Playwright device emulation)
-web/build-host/wadamesh-host --serial /dev/cu.usbmodem101   # drive a real node (see "The companion backend")
+web/build-host/comet-host --serial /dev/cu.usbmodem101   # drive a real node (see "The companion backend")
 ```
 
 Needs cmake, ninja, SDL2 (`brew install cmake ninja sdl2`); the browser build
@@ -70,7 +70,7 @@ fits a laptop browser window at 1:1. Phones and tablets get the size of their ow
 screen instead (see "Phones and tablets").
 
 Build defines (all in `web/CMakeLists.txt`): `WADA_WEB ESP32 HAS_TOUCH_UI UI_LVGL
-MULTI_TRANSPORT_COMPANION HAS_CARDKB WADAMESH_FORK_BUILD MAX_CONTACTS=500
+MULTI_TRANSPORT_COMPANION HAS_CARDKB COMET_FORK_BUILD MAX_CONTACTS=500
 MAX_GROUP_CHANNELS=40 HAS_GPS_MOTION` and `WADA_TILE_SERVER` (read from
 `DEFAULT_TILE_SERVER` in `src/helpers/esp32/TouchPrefsStore.cpp`, like the version). `ESP32` is on because the UI's ESP32 code paths are the
 device code paths; the compat layer backs them. `MULTI_TRANSPORT_COMPANION` is
@@ -122,7 +122,7 @@ other difference is a capability flag that a future board can use too.
 `web/mesh/WebMesh.h` declares a class named `MyMesh` with exactly the members
 the touch UI uses (100 distinct `the_mesh.` members across 466 call sites),
 with the same signatures. The plain data types are the real MeshCore and
-wadamesh headers (`ContactInfo`, `ChannelDetails`, `mesh::Identity`,
+comet headers (`ContactInfo`, `ChannelDetails`, `mesh::Identity`,
 `NodePrefs`, `RegionRegistry`, `DataStore`, `ADV_TYPE_*`, `OUT_PATH_UNKNOWN`,
 `MSG_SEND_*`, `TxtTxDebugInfo`). There are no templates, macros or catch-alls,
 so:
@@ -163,7 +163,7 @@ companion link can answer them:
 | `uiSendSignalProbe`, `uiStartDiscoverScan`, `discoverCount/Get/Clear` | 0 / empty (no own radio; `CMD_SEND_CONTROL_DATA` could carry discovery later) |
 | `getTotalAirTime`, `getReceiveAirTime`, `getRemainingTxBudget`, `isRadioReceiving`, `getProtoNumClients` | 0 / false |
 | `getStore`, `getOrphanedBlobs` | nullptr / 0 (no local DataStore) |
-| `lastRxScopeIsHome`, `pushChannelScope`, `popChannelScope`, `setScopeDirectFloods` | the node's region key and per-send scope are not in the protocol (a wadamesh node applies each channel's scope itself) |
+| `lastRxScopeIsHome`, `pushChannelScope`, `popChannelScope`, `setScopeDirectFloods` | the node's region key and per-send scope are not in the protocol (a comet node applies each channel's scope itself) |
 | `uiIsMeshcomodRecipient` | false |
 | `uiRegisterExpectedAck` | no-op (the backend matches its own ACKs) |
 | `getNextCompanionRetryWakeDelay`, `hasPendingWork`, `persistSyncHistoryNow` | false / no-op (no companion retry or sync ring here) |
@@ -196,9 +196,9 @@ canvas LVGL flushes into), and the touch API (`heltecV4CapTouch*`) is
 ## The companion backend (`web/mesh/Companion*`)
 
 ```
-wadamesh-host --serial /dev/cu.usbmodem101          # USB (the node's companion over USB)
-wadamesh-host --tcp 192.168.1.50:5000               # the node's TCP companion server (Wi-Fi on)
-wadamesh-host --serial /dev/cu.usbmodem101 --read-only
+comet-host --serial /dev/cu.usbmodem101          # USB (the node's companion over USB)
+comet-host --tcp 192.168.1.50:5000               # the node's TCP companion server (Wi-Fi on)
+comet-host --serial /dev/cu.usbmodem101 --read-only
 ```
 
 In the browser, the page's Connect button picks the node (see "Connecting the
@@ -213,10 +213,10 @@ CLI other than `get`/`ver`/`board`/`clock`); messages, adverts and requests stil
 go out. `WADA_COMPANION_DEBUG=1` logs every frame.
 
 **Protocol.** STOCK MeshCore 1.17 / 1.18 companion behaviour (`CompanionBackend.h`
-has the codes), with the wadamesh differences handled: wadamesh also pushes
+has the codes), with the comet differences handled: comet also pushes
 message frames live (so 16/17 count as the reply only while
 `CMD_SYNC_NEXT_MESSAGE` is in flight, and a message seen both ways is dropped
-once), keeps a per-client sync cursor (we send client id `wadamesh-web` in
+once), keeps a per-client sync cursor (we send client id `comet-web` in
 `APP_START`, which stock ignores), and appends a "Meshcomod" pseudo contact
 (filtered). One command is in flight at a time; pushes arrive any time.
 
@@ -363,14 +363,14 @@ The tile fetch task (`tile_fetch`, a pthread) downloads with the firmware's own 
 
 ## Two copies: https (threads) and http (no threads)
 
-The public page is served twice (app.wadamesh.com): **https** is the full client (Web
+The public page is served twice (app.cometmesh.org): **https** is the full client (Web
 Serial, Web Bluetooth and the location need a secure context); **http** is the one that
 can reach a node over Wi-Fi, because a node's companion server speaks plain `ws://`,
 which a secure page may not open (mixed content). On http (other than localhost) a page
 is never cross-origin isolated, so there is no SharedArrayBuffer and no pthreads.
 
-- Two bundles, one page: `app.js` loads `wadamesh.js` next to itself when
-  `crossOriginIsolated`, else `nt/wadamesh.js` (`web/dist-nothreads`, deployed at
+- Two bundles, one page: `app.js` loads `comet.js` next to itself when
+  `crossOriginIsolated`, else `nt/comet.js` (`web/dist-nothreads`, deployed at
   `/nt/`). `web/build.sh web` builds both (the page's `?v=` hash covers both);
   `web/build.sh serve` serves `nt/` too. Tile and Store URLs are relative, so both
   bundles use the same `tiles/` and `fw/apps/` next to the page. The page (shell) is
@@ -408,7 +408,7 @@ and the update badge. `CAP_STORE_DOWNLOADS 1` keeps the baked apps and languages
 the offline first load and turns the Store on; a downloaded copy wins, as everywhere.
 
 - **Path**: the firmware's own install code over `wadaHttpRequest()`: every
-  `http://firmware.wadamesh.com/apps/...` URL becomes the same-origin `fw/apps/...`
+  `http://firmware.cometmesh.org/apps/...` URL becomes the same-origin `fw/apps/...`
   next to the page. `web/scripts/serve.py` proxies exactly the catalog, app, file
   and `.lang` paths (`STORE_PATH`; catalogs `no-cache`, version folders a week), and
   `location ^~ /web/fw/apps/` in `web/deploy/nginx-snippet.conf` does the same on the
@@ -433,7 +433,7 @@ the offline first load and turns the Store on; a downloaded copy wins, as everyw
 Settings > Backups works with the firmware's own code:
 
 - **Export**: `MyMesh::uiExportBackup` in the stand-in writes the device's file
-  (`src/MyMesh.cpp`'s fields, the MeshCore app's shape plus wadamesh's blocks and the
+  (`src/MyMesh.cpp`'s fields, the MeshCore app's shape plus comet's blocks and the
   app preferences) without the private key; the UI saves it in the data dir as on a
   device, and `CAP_FILE_HANDOFF` hands it to the browser, which downloads it
   (`web/platform/WebFiles.cpp boardHandOffFile`, a Blob + `<a download>`; the UI's
@@ -441,7 +441,7 @@ Settings > Backups works with the firmware's own code:
 - **Import**: "Import backup" lists the saved ones as on a device; "Import from this
   computer" opens the browser's file picker (`boardPickFile`), the page writes the
   file into this backend's SPIFFS, and the UI's usual confirm + import + restart
-  follow. The stand-in's import applies name, radio, wadamesh and app settings,
+  follow. The stand-in's import applies name, radio, comet and app settings,
   position, channels and contacts (a node: `SET_ADVERT_NAME`, `SET_RADIO_PARAMS`,
   `SET_OTHER_PARAMS`, `SET_CHANNEL`, `ADD_UPDATE_CONTACT`; contacts are added and
   updated, never deleted from a node over the link). A restart waits up to 20 s for
@@ -481,7 +481,7 @@ in as text, UTF-8, through `cardKbUiKey`'s `BLE_KEY_TEXT` path.
 
 **The size.** `web/shell/app.js` picks the board's resolution once per boot from the
 window (`Module.wadaSize`, read by `web_main.cpp` before the display exists;
-`WebDisplay` takes any size; natively `wadamesh-host --size WxH`):
+`WebDisplay` takes any size; natively `comet-host --size WxH`):
 
 | Window | Canvas | Shown |
 |---|---|---|
@@ -542,8 +542,8 @@ USB: connect over Wi-Fi."), Android Chrome gets Bluetooth.
 **Tests.** `web/build.sh mobiletest` (`web/scripts/mobile-tour.mjs`, Playwright device
 emulation: iPhone 14 and iPad in WebKit, Pixel 7 in Chromium): the canvas covers more
 than 90 % of the window below a one-row bar; tap into a chat (taps go by label text,
-`wadamesh.findText`, or by the canvas's own size), type "Grüße vom Handy 👋" through the
-hidden field, the LVGL field holds exactly that (`wadamesh.editText`), the UI's keys stay
+`comet.findText`, or by the canvas's own size), type "Grüße vom Handy 👋" through the
+hidden field, the LVGL field holds exactly that (`comet.editText`), the UI's keys stay
 down, Enter sends, it is saved as UTF-8; on the Pixel an IME composition grows, commits
 and is deleted; turn to landscape (fills, the message is there) and back (same size,
 the message is in the chat); the chooser; the manifest and icons; no page errors.
@@ -664,8 +664,8 @@ the demo backend replays its cast at every boot, as a companion node will.
 `wadaHttpRequest()` (`web/compat/wada_http.h`) and serves the reply from memory
 (getString, getSize, getStreamPtr, writeToStream). See "Map tiles" and "Store".
 
-**Size and speed** (release, `-O2`, Emscripten 6.0.12): wadamesh.wasm 2.45 MB
-(gzip 1.28 MB, brotli 1.14 MB), wadamesh.js 98 KB (brotli 23 KB); `-Os` saves
+**Size and speed** (release, `-O2`, Emscripten 6.0.12): comet.wasm 2.45 MB
+(gzip 1.28 MB, brotli 1.14 MB), comet.js 98 KB (brotli 23 KB); `-Os` saves
 only 2 % (most of the wasm is fonts, emoji and the baked languages/apps), so
 release stays `-O2`. First frame (Chromium, cold cache, brotli): ~0.4 s local,
 ~0.5 s at 50 Mbit/s, ~1.5 s at 10 Mbit/s, ~7.4 s on "Fast 3G"; the boot splash
@@ -709,7 +709,7 @@ requestAnimationFrame, ~40 UI frames/s presented (LVGL's refresh period).
 - Companion: messages the node itself sent (on its own screen or from another
   app) are not in the protocol's sync, so they do not appear here.
 - Companion: a stock node's waiting-message queue is shared with the phone app
-  (whoever syncs first gets the messages); wadamesh keeps a cursor per client.
+  (whoever syncs first gets the messages); comet keeps a cursor per client.
 - Companion: 256-bit channel keys cannot be written (the protocol carries 128).
 - Companion: the guest-login fallback does not reset the route first (the device
   does); the contact list is refreshed on connect and by pushes, not polled.

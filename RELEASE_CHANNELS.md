@@ -1,4 +1,4 @@
-# WadaMesh release channels — Stable + Test
+# Comet release channels — Stable + Test
 
 Goal: ship **test** builds to the community fast, let them shake out, then **promote**
 a proven test build to **stable**. What ships to stable is exactly what was tested
@@ -28,9 +28,9 @@ a proven test build to **stable**. What ships to stable is exactly what was test
 | GitHub release | blessed `beta_N`, marked **Latest** | every `beta_N`, **pre-release** + rolling `beta-latest` |
 | VPS archive | `releases/TOUCH/<beta_N>/` (only blessed lands here) | `releases/BETA/<beta_N>/` |
 | VPS channel feed | `stable/` (version.json + bins) | `beta/` (version.json + bins) |
-| Flasher (flasher.wadamesh.com) | default | "Beta / testing" toggle |
+| Flasher (flasher.cometmesh.org) | default | "Beta / testing" toggle |
 | On-device update check | stable feed (legacy firmware reads `releases/TOUCH`) | beta feed (Phase 2 setting) |
-| LauncherHub (bmorcelli, T-Deck) | existing entry (follows GitHub Latest) | new "WadaMesh (Beta)" entry (Phase 3) |
+| LauncherHub (bmorcelli, T-Deck) | existing entry (follows GitHub Latest) | new "Comet (Beta)" entry (Phase 3) |
 | Tanmatsu app-store | promote on stable only | (skipped for tests) |
 
 ## The linchpin: keeping field devices on stable
@@ -67,7 +67,7 @@ Beta channel).
 - [ ] GitHub: ensure beta_20 is **Latest**; future betas → `--prerelease`.
 - [ ] Flasher: Stable (default) / Beta toggle + the beta manifest.
 - [ ] `release.sh` / `gen-flasher-meta.py`: add `--channel beta|stable` producing the right feed/assets + the rolling `beta-latest`.
-- [ ] Rewrite the `wadamesh-release` skill into the two-workflow form.
+- [ ] Rewrite the `comet-release` skill into the two-workflow form.
 
 ### Phase 2 — on-device channel selector (ships in a beta, then promoted)
 - [ ] Settings → **Update channel: Stable / Beta**, default Stable (persisted).
@@ -76,8 +76,8 @@ Beta channel).
 
 ### Phase 3 — LauncherHub beta listing (PR to bmorcelli, when wanted)
 - [ ] Rolling `beta-latest` already produced in Phase 1.
-- [ ] PR `bmorcelli/M5Stack-json-fw`: add a `wadamesh_beta.py` (mirror `bruce_beta.py`, track `beta-latest`) + a `t-deck.json` (Beta) entry.
-- [ ] Result: T-Deck Launcher shows **WadaMesh** + **WadaMesh (Beta)**, both auto-synced.
+- [ ] PR `bmorcelli/M5Stack-json-fw`: add a `comet_beta.py` (mirror `bruce_beta.py`, track `beta-latest`) + a `t-deck.json` (Beta) entry.
+- [ ] Result: T-Deck Launcher shows **Comet** + **Comet (Beta)**, both auto-synced.
 - Until then: T-Deck Launcher beta testers side-load the beta `.bin` manually (it is a T-Deck-only gap; V4 uses the flasher).
 
 ## Where current work lands

@@ -85,7 +85,7 @@ bool webOskShown() {
   return s_kb && !lv_obj_has_flag(s_kb, LV_OBJ_FLAG_HIDDEN);
 }
 
-// ---- tests: find a label by its text (web/shell/app.js wadamesh.findText) -------------------
+// ---- tests: find a label by its text (web/shell/app.js comet.findText) -------------------
 // The phone tests run at whatever size the phone gets, so they tap things by name instead of
 // by fixed coordinates. Exact match first, then a label that contains the text; only labels
 // that are visible on screen. Returns the middle as (x << 16) | y, or -1.

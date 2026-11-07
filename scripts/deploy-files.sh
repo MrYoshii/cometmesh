@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
-# Publish the USB Files page (deploy/files/) to files.wadamesh.com's web root.
-# Nginx vhost: deploy/nginx/files.wadamesh.com.conf.
+# Publish the USB Files page (deploy/files/) to files.cometmesh.org's web root.
+# Nginx vhost: deploy/nginx/files.cometmesh.org.conf.
 #
 # Usage:
-#   WADAMESH_VPS=user@your-vps scripts/deploy-files.sh             # deploy
-#   WADAMESH_VPS=user@your-vps scripts/deploy-files.sh --dry-run   # preview only
+#   COMET_VPS=user@your-vps scripts/deploy-files.sh             # deploy
+#   COMET_VPS=user@your-vps scripts/deploy-files.sh --dry-run   # preview only
 #
 # Optional:
-#   WADAMESH_FILES_PATH=/srv/wadamesh/files   # override the web root
+#   COMET_FILES_PATH=/srv/comet/files   # override the web root
 #
 # The VPS target comes from the environment; never commit it.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/deploy/files/"
-DEST="${WADAMESH_VPS:?set WADAMESH_VPS=user@host}"
-DEST_PATH="${WADAMESH_FILES_PATH:-/srv/wadamesh/files}"
+DEST="${COMET_VPS:?set COMET_VPS=user@host}"
+DEST_PATH="${COMET_FILES_PATH:-/srv/comet/files}"
 
 DRY=""
 [ "${1:-}" = "--dry-run" ] && DRY="--dry-run"
@@ -25,5 +25,5 @@ rsync -avz $DRY --delete "$SRC" "$DEST:$DEST_PATH/"
 if [ -z "$DRY" ]; then
   echo
   echo "deployed deploy/files/ -> $DEST:$DEST_PATH"
-  echo "note: Cloudflare edge-caches; purge files.wadamesh.com if a change does not show."
+  echo "note: Cloudflare edge-caches; purge files.cometmesh.org if a change does not show."
 fi

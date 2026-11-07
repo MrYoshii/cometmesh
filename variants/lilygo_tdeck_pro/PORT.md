@@ -45,7 +45,7 @@ without a logic trace or hardware result.
 
 ## Display and input
 
-Wadamesh still renders LVGL in RGB565. `TDeckProDisplay` thresholds each dirty
+Comet still renders LVGL in RGB565. `TDeckProDisplay` thresholds each dirty
 band into a full 1-bit shadow, then coalesces the completed LVGL frame into an
 e-paper update. Every tenth update is full; the intervening updates use the
 panel's partial-refresh mode. The UI is fixed to the light palette.
@@ -53,7 +53,7 @@ panel's partial-refresh mode. The UI is fixed to the light palette.
 Greys and accent fills do not survive the 1-bit reduction, so the Pro draws its
 controls in black ink instead:
 
-- Boot: the pre-LVGL screen draws the wadamesh mesh mark (the shared RGB565
+- Boot: the pre-LVGL screen draws the comet mesh mark (the shared RGB565
   artwork, inverted to black on white) with the wordmark under it. It is not
   animated.
 - Settings landing: every row, Device included, has the 2 px black outline

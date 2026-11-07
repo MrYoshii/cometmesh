@@ -45,7 +45,7 @@ const Route kRoutes[] = {
   { WADA_TILE_SERVER, "tiles" },
   { WADA_STORE_BASE, "fw/apps" },
 };
-const char* const kNever[] = { "http://firmware.wadamesh.com", "https://firmware.wadamesh.com",
+const char* const kNever[] = { "http://firmware.cometmesh.org", "https://firmware.cometmesh.org",
                                WADA_TILE_SERVER };
 enum class Way { Refused, Proxied, Direct };
 bool under(const std::string& url, const char* base) {
@@ -99,7 +99,7 @@ int wadaHttpRequest(const char* method, const std::string& url, const std::vecto
     return HTTPC_ERROR_CONNECTION_REFUSED;
 #endif
   // Proxied: same origin, relative to the page's folder (a pthread resolves it against
-  // wadamesh.js, which sits next to index.html): /tiles/... locally, /web/tiles/... on
+  // comet.js, which sits next to index.html): /tiles/... locally, /web/tiles/... on
   // the site. Direct: the URL itself (CORS decides; an http:// one from an https page
   // is blocked by the browser).
   const std::string target = way == Way::Proxied ? std::string(route->local) + rest : url;
@@ -198,7 +198,7 @@ static int nativeRequest(const char* method, const std::string& url, const std::
     if (strncasecmp(h.c_str(), "User-Agent:", 11) == 0) ua = true;
     req += h + "\r\n";
   }
-  if (!ua) req += "User-Agent: wadamesh-web (https://github.com/ALLFATHER-BV/wadamesh)\r\n";
+  if (!ua) req += "User-Agent: comet-web (https://github.com/MrYoshii/cometmesh)\r\n";
   if (body && body_len) req += "Content-Length: " + std::to_string(body_len) + "\r\n";
   req += "\r\n";
   bool ok = send(fd, req.data(), req.size(), 0) == (ssize_t)req.size();

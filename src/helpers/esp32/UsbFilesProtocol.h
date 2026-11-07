@@ -1,6 +1,6 @@
 #pragma once
 // =============================================================================
-// USB Files: the wire protocol between files.wadamesh.com (Web Serial) and the
+// USB Files: the wire protocol between files.cometmesh.org (Web Serial) and the
 // firmware's USB Files app. Pure C++ with no Arduino dependency, so the host
 // tests (test/test_usb_files_protocol.cpp) build it as-is.
 //
@@ -315,7 +315,7 @@ inline bool topLevelFile(const char* rel) {
 
 inline bool nameIsBackupOrCrash(const char* name) {
   if (!name) return false;
-  if (strcmp(name, "wadamesh-crash.elf") == 0 || strcmp(name, "wadamesh-crash.elf.txt") == 0)
+  if (strcmp(name, "comet-crash.elf") == 0 || strcmp(name, "comet-crash.elf.txt") == 0)
     return true;
   const size_t n = strlen(name);
   return n > 14 && strncmp(name, "meshcore-", 9) == 0 && strcmp(name + n - 5, ".json") == 0;

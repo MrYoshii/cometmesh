@@ -1,4 +1,4 @@
-/* wadamesh in the browser: the page around the device canvas.
+/* comet in the browser: the page around the device canvas.
    Tokens are the site's Night palette (deploy/site/theme.css), dark only. */
 :root{
   color-scheme:dark;

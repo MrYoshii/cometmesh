@@ -2,7 +2,7 @@
 # One-time: dump YOUR Tanmatsu's AppFS partition as the "pristine" baseline that
 # tan_deploy.py diffs against.
 #
-# Do this while the launcher's own apps are installed and wadamesh is NOT, so the
+# Do this while the launcher's own apps are installed and comet is NOT, so the
 # baseline represents the device as it ships. Using someone else's dump risks writing
 # over apps you actually have: the deploy writes only the sectors that differ from
 # this file, so the file has to describe YOUR device.

@@ -38,11 +38,11 @@ static const rm69a10_lcd_init_cmd_t vendor_specific_init_default[] = {
     {0x30, (uint8_t[]){0x00, 0x00, 0x04, 0xCF}, 4, 0},
     {0x12, (uint8_t[]){0x00}, 1, 0},
     {0x35, (uint8_t[]){0x00}, 1, 0},
-    // wadamesh: hardcode 16bit/pixel (0x75) — the RM69A10Display DPI is RGB565. LilyGo gated this behind
+    // comet: hardcode 16bit/pixel (0x75) — the RM69A10Display DPI is RGB565. LilyGo gated this behind
     // CONFIG_SCREEN_PIXEL_FORMAT_RGB565/RGB888, neither of which is defined in our build, so the original
     // sent NO pixel-format command and the panel fell back to its default format.
     {0x3A, (uint8_t[]){0x75}, 1, 0}, // interface pixel format 16bit/pixel (RGB565)
-    // wadamesh: LilyGo's reference shipped brightness 0x00 (设置屏幕亮度为0 = "set brightness to 0") — a BLACK
+    // comet: LilyGo's reference shipped brightness 0x00 (设置屏幕亮度为0 = "set brightness to 0") — a BLACK
     // AMOLED even with display-on. Set it to max so the UI is actually visible.
     {0x51, (uint8_t[]){0xFF}, 1, 0}, // display brightness = max (WRITE_DISPLAY_BRIGHTNESS)
     {0x11, (uint8_t[]){0x00}, 0, 120},

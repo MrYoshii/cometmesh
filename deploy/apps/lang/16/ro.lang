@@ -1,4 +1,4 @@
-# wadamesh language file
+# comet language file
 # canonical source - translators: edit this file and PR it
 # code: ro
 # ver: 16
@@ -309,7 +309,7 @@ Factory reset?\n\nErases identity, contacts,\nchannels, messages, Wi-Fi\nand eve
 Failed to save channel.	Salvarea canalului a eşuat.
 Favorites full (max %d)	Favorite pline (max %d)
 Favorites unsupported	Favoritele nu sunt acceptate
-Fetching the app list from firmware.wadamesh.com	Se preia lista de aplicaţii de la firmware.wadamesh.com
+Fetching the app list from firmware.cometmesh.org	Se preia lista de aplicaţii de la firmware.cometmesh.org
 Files	Fişiere
 Find	Caută
 Finish	Finalizează
@@ -888,19 +888,19 @@ Up
 Update	Actualizează
 Update bin saved to SD	Bin de actualizare salvat pe SD
 Update complete.\nRebooting...	Actualizare completă.\nSe reporneşte...
-Update manually at flasher.wadamesh.com\n(Wi-Fi update is paused for now)	Actualizează manual la flasher.wadamesh.com\n(actualizarea Wi-Fi e momentan suspendată)
+Update manually at flasher.cometmesh.org\n(Wi-Fi update is paused for now)	Actualizează manual la flasher.cometmesh.org\n(actualizarea Wi-Fi e momentan suspendată)
 Update via the Launcher	Actualizează prin Launcher
-Update via the Launcher / flasher.wadamesh.com	Actualizează prin Launcher / flasher.wadamesh.com
-Update via the Launcher / flasher.wadamesh.com.	Actualizează prin Launcher / flasher.wadamesh.com.
+Update via the Launcher / flasher.cometmesh.org	Actualizează prin Launcher / flasher.cometmesh.org
+Update via the Launcher / flasher.cometmesh.org.	Actualizează prin Launcher / flasher.cometmesh.org.
 Updated - rebooting…	Actualizat - repornire…
 Use	Foloseşte
 Username (optional)	Utilizator (opţional)
 Volume	Volum
 W up  ·  A left  ·  D right  ·  Z down  ·  S select  ·  Q back	W sus  ·  A stânga  ·  D dreapta  ·  Z jos  ·  S selectare  ·  Q înapoi
 WADA#15B6A6 MESH#	WADA#15B6A6 MESH#
-WADAMESH	WADAMESH
+COMET	COMET
 Waiting for Wi-Fi...	Se aşteaptă Wi-Fi...
-Welcome to WADAMESH	Bun venit la WADAMESH
+Welcome to COMET	Bun venit la COMET
 While this is on, anyone on your Wi-Fi can view and control this device. Uses plain HTTP (local network only).	Cât timp e pornit, oricine din reţeaua ta Wi-Fi poate vedea şi controla dispozitivul. Foloseşte HTTP simplu (doar reţea locală).
 Wi-Fi	Wi-Fi
 Wi-Fi & Bluetooth	Wi-Fi şi Bluetooth

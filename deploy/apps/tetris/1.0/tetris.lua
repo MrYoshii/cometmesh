@@ -1,4 +1,4 @@
--- Tetris — wadamesh Lua app
+-- Tetris — comet Lua app
 -- Swipe left/right to move  |  Swipe up to rotate  |  Swipe down to hard-drop
 -- Keyboard: arrows to move/rotate, Enter or Space to hard-drop
 -- Contributed by samuelcoustet

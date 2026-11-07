@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sideload the freshly-built wadamesh onto a Tanmatsu, as an AppFS app under the
+# Sideload the freshly-built comet onto a Tanmatsu, as an AppFS app under the
 # badge.team launcher. Run AFTER `tanmatsu/build.sh build`.
 #
 #   tanmatsu/tools/tan_flash.sh [/dev/cu.usbmodemXXXX]
@@ -51,7 +51,7 @@ python3 "$ESPTOOL" --chip esp32p4 -p "$PORT" --before default_reset --after hard
 python3 "$ESPTOOL" --chip esp32p4 -p "$PORT" --before default_reset --after hard_reset \
   --connect-attempts 3 read_flash "$PART_OFF" 0x10000 "$OUT/appfs_readback.bin" 2>&1 | grep -iE "Read [0-9]|fatal" | tail -1
 if cmp -s "$OUT/appfs_readback.bin" "$OUT/appfs_meta.bin"; then
-  echo "metadata verified: installed. Launch 'WadaMesh' from the launcher menu."
+  echo "metadata verified: installed. Launch 'Comet' from the launcher menu."
 else
   echo "metadata DIFFERS — the commit write did not land. Re-run this script."
   exit 1

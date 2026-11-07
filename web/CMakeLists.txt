@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# wadamesh in the browser: the real touch UI (src/ui-touch) built for a host OS.
+# comet in the browser: the real touch UI (src/ui-touch) built for a host OS.
 #
-#   web/build.sh host   -> build-host/wadamesh-host  (native, SDL2 window)
-#   web/build.sh web    -> build-web/wadamesh.{js,wasm} + dist/ (Emscripten, same CMake via emcmake)
+#   web/build.sh host   -> build-host/comet-host  (native, SDL2 window)
+#   web/build.sh web    -> build-web/comet.{js,wasm} + dist/ (Emscripten, same CMake via emcmake)
 #
 # Layout (see WEB_BUILD.md at the repo root):
 #   third_party/  pinned sources fetched by fetch-deps.sh (gitignored)
@@ -10,7 +10,7 @@
 #   mesh/         MyMesh stand-in (the UI's compile-time contract) + backends
 #   platform/     SDL2 display/input, the "web" board globals, main()
 cmake_minimum_required(VERSION 3.20)
-project(wadamesh_web C CXX)
+project(comet_web C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
@@ -64,7 +64,7 @@ if(EMSCRIPTEN)
   else()
     add_compile_options(-pthread)
   endif()
-  list(APPEND WADA_COMMON_DEFS WADA_DEFAULT_DATA_DIR="/data")   # the IDBFS mount (shell/wadamesh.js)
+  list(APPEND WADA_COMMON_DEFS WADA_DEFAULT_DATA_DIR="/data")   # the IDBFS mount (shell/comet.js)
 endif()
 
 # ---- LVGL 8.4 (same lv_conf.h as the firmware: include/lv_conf.h) ----------------
@@ -170,7 +170,7 @@ set(WADA_APP_DEFS
   ESP32=1                    # the UI's ESP32 code paths ARE the device code paths; compat/ backs them
   HAS_TOUCH_UI=1
   UI_LVGL=1
-  WADAMESH_FORK_BUILD=1
+  COMET_FORK_BUILD=1
   HAS_CARDKB=1               # the host keyboard drives the UI's external-keyboard path (platform/WebKeyboard.cpp)
   MULTI_TRANSPORT_COMPANION=1   # every touch board builds the multi-transport UI; compat/ stubs the transports
   MAX_CONTACTS=500
@@ -209,33 +209,33 @@ else()
   set(SDL2_LIBS SDL2::SDL2)
 endif()
 
-add_executable(wadamesh-host ${APP_SRCS} ${WEB_SRCS})
-target_include_directories(wadamesh-host PRIVATE
+add_executable(comet-host ${APP_SRCS} ${WEB_SRCS})
+target_include_directories(comet-host PRIVATE
   ${WEB}/mesh ${WEB}/platform     # <target.h> + the MyMesh stand-in
   $<$<STREQUAL:${WADA_HOST_BOARD},m9>:${REPO}/variants/thinknode_m9>   # <M9Keyboard.h>
   ${WADA_COMPAT_INC}
   ${SRC} ${UI} ${REPO}/include
   ${CORE}
   ${TP}/ArduinoJson/src)
-target_compile_definitions(wadamesh-host PRIVATE ${WADA_APP_DEFS} ${WADA_VERSION_DEFS})
-target_link_libraries(wadamesh-host PRIVATE wada_core wada_lvgl wada_lua wada_thirdparty ${SDL2_LIBS})
+target_compile_definitions(comet-host PRIVATE ${WADA_APP_DEFS} ${WADA_VERSION_DEFS})
+target_link_libraries(comet-host PRIVATE wada_core wada_lvgl wada_lua wada_thirdparty ${SDL2_LIBS})
 if(WADA_SIM_PAGER)
   # The stubs come first so <driver/i2s.h>, "Es8311Codec.h", ... resolve to them.
-  target_include_directories(wadamesh-host BEFORE PRIVATE ${WEB}/sim_pager)
-  target_sources(wadamesh-host PRIVATE ${WEB}/sim_pager/SimPager.cpp ${SRC}/helpers/HardwareRtcClock.cpp ${SRC}/helpers/esp32/WebFileTransfer.cpp)
+  target_include_directories(comet-host BEFORE PRIVATE ${WEB}/sim_pager)
+  target_sources(comet-host PRIVATE ${WEB}/sim_pager/SimPager.cpp ${SRC}/helpers/HardwareRtcClock.cpp ${SRC}/helpers/esp32/WebFileTransfer.cpp)
 endif()
 # The UI is warning-clean under the firmware's GCC flags, not under clang -Wall; keep
 # the host build readable. Errors are what matter here (they are the drift alarm).
-target_compile_options(wadamesh-host PRIVATE -w -fno-strict-aliasing)
+target_compile_options(comet-host PRIVATE -w -fno-strict-aliasing)
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   # 81k-line UITask.cpp: keep clang's bracket-nesting / constexpr limits out of the way.
-  target_compile_options(wadamesh-host PRIVATE -fbracket-depth=512)
+  target_compile_options(comet-host PRIVATE -fbracket-depth=512)
 endif()
 
 if(EMSCRIPTEN)
-  # Output: wadamesh.js (loader + pthread worker entry) + wadamesh.wasm. build.sh web
+  # Output: comet.js (loader + pthread worker entry) + comet.wasm. build.sh web
   # copies them next to web/shell/ into web/dist/.
-  set_target_properties(wadamesh-host PROPERTIES OUTPUT_NAME wadamesh)
+  set_target_properties(comet-host PROPERTIES OUTPUT_NAME comet)
   if(WADA_NO_THREADS)
     set(WADA_THREAD_LINK
       -sASYNCIFY=1                 # fibers: the FreeRTOS tasks on the page's one thread
@@ -259,7 +259,7 @@ if(EMSCRIPTEN)
     -sINITIAL_MEMORY=67108864
     -sALLOW_MEMORY_GROWTH=1
     -sMAXIMUM_MEMORY=1073741824
-    -sMODULARIZE=1 -sEXPORT_NAME=createWadamesh
+    -sMODULARIZE=1 -sEXPORT_NAME=createComet
     -sENVIRONMENT=web,worker
     -sEXIT_RUNTIME=0
     -lidbfs.js
@@ -272,11 +272,11 @@ if(EMSCRIPTEN)
   else()
     list(APPEND WADA_WEB_LINK -sASSERTIONS=1 -sSAFE_HEAP=0)
   endif()
-  target_link_options(wadamesh-host PRIVATE ${WADA_WEB_LINK})
+  target_link_options(comet-host PRIVATE ${WADA_WEB_LINK})
   # The browser companion transports (Web Serial / Web Bluetooth / WebSocket) are JS
   # glue that shares the module scope; the framing is C++ (web/mesh/BrowserTransport.cpp).
-  target_link_options(wadamesh-host PRIVATE "SHELL:--pre-js ${WEB}/mesh/js/companion-transports.js")
+  target_link_options(comet-host PRIVATE "SHELL:--pre-js ${WEB}/mesh/js/companion-transports.js")
   # A --pre-js file is not a source CMake tracks: without this, editing the transports
-  # left wadamesh.js stale (the change built "fine" and never shipped).
-  set_property(TARGET wadamesh-host APPEND PROPERTY LINK_DEPENDS ${WEB}/mesh/js/companion-transports.js)
+  # left comet.js stale (the change built "fine" and never shipped).
+  set_property(TARGET comet-host APPEND PROPERTY LINK_DEPENDS ${WEB}/mesh/js/companion-transports.js)
 endif()

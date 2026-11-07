@@ -81,7 +81,7 @@ on the physical device.
 
 ### UX
 - **"Save update bin to SD"** now offered on the R8 (About page) — it
-  qualified on every axis and its OTA bin name (`wadamesh-heltec-v4-r8-tft`)
+  qualified on every axis and its OTA bin name (`comet-heltec-v4-r8-tft`)
   already existed.
 - **"Set as wallpaper" hidden where no lock screen exists** (`CAP_LOCK_SCREEN`
   gate — the R8 is the only filesystem board without one; the button toasted

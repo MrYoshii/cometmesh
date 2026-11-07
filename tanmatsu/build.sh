@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Reusable wadamesh/Tanmatsu build wrapper: activates the project-local ESP-IDF 5.5.1
+# Reusable comet/Tanmatsu build wrapper: activates the project-local ESP-IDF 5.5.1
 # and runs idf.py with our device/target/sdkconfig params.
 #   ./build.sh build        # compile
 #   ./build.sh flash -p ... # flash over USB (dev)
@@ -39,7 +39,7 @@ WADA_FW_TAG="${WADA_FW_TAG:-$(git describe --tags --match 'beta_*' --always 2>/d
 WADA_FW_DATE="$(date '+%-d %b %Y')"
 IDF_ARGS=(-B build/tanmatsu \
   -DDEVICE=tanmatsu \
-  -DSDKCONFIG_DEFAULTS="sdkconfigs/general;sdkconfigs/tanmatsu;sdkconfigs/wadamesh;sdkconfigs/wadamesh_tanmatsu" \
+  -DSDKCONFIG_DEFAULTS="sdkconfigs/general;sdkconfigs/tanmatsu;sdkconfigs/comet;sdkconfigs/comet_tanmatsu" \
   -DWADA_FW_TAG="$WADA_FW_TAG" -DWADA_FW_DATE="$WADA_FW_DATE" \
   -DIDF_TARGET=esp32p4)
 
@@ -55,7 +55,7 @@ if [ -f sdkconfig ]; then
       rm -f sdkconfig
       break
     fi
-  done < sdkconfigs/wadamesh_tanmatsu
+  done < sdkconfigs/comet_tanmatsu
 fi
 
 # A fresh clone has no managed_components yet. Configure once to download them,
@@ -85,7 +85,7 @@ fi
 # our app .bin and never touches the device's own firmware.
 HOSTED_C="managed_components/espressif__arduino-esp32/cores/esp32/esp32-hal-hosted.c"
 if [ -f "$HOSTED_C" ] && grep -q 'if (err != ESP_OK) {  *//&& err != ESP_ERR_NOT_ALLOWED' "$HOSTED_C"; then
-  sed -i '' 's|if (err != ESP_OK) {  *//&& err != ESP_ERR_NOT_ALLOWED.*|if (err != ESP_OK \&\& err != ESP_ERR_NOT_ALLOWED) {  // wadamesh: tolerate esp_hosted pre-init|' "$HOSTED_C"
+  sed -i '' 's|if (err != ESP_OK) {  *//&& err != ESP_ERR_NOT_ALLOWED.*|if (err != ESP_OK \&\& err != ESP_ERR_NOT_ALLOWED) {  // comet: tolerate esp_hosted pre-init|' "$HOSTED_C"
   echo "[build.sh] patched arduino esp32-hal-hosted.c (esp-hosted NOT_ALLOWED tolerance for WiFi)"
 fi
 
@@ -96,7 +96,7 @@ fi
 # call so the file compiles. Idempotent.
 BLEDEV_CPP="managed_components/espressif__arduino-esp32/libraries/BLE/src/BLEDevice.cpp"
 if [ -f "$BLEDEV_CPP" ] && grep -q 'int rc = ble_gap_read_local_irk(irk);' "$BLEDEV_CPP"; then
-  sed -i '' 's|int rc = ble_gap_read_local_irk(irk);|int rc = 0; (void)irk;  // wadamesh: arduino BLE unused; symbol renamed in IDF 5.5 NimBLE|' "$BLEDEV_CPP"
+  sed -i '' 's|int rc = ble_gap_read_local_irk(irk);|int rc = 0; (void)irk;  // comet: arduino BLE unused; symbol renamed in IDF 5.5 NimBLE|' "$BLEDEV_CPP"
   echo "[build.sh] patched arduino BLEDevice.cpp (stub renamed ble_gap_read_local_irk)"
 fi
 

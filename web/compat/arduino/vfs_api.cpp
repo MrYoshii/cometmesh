@@ -74,7 +74,7 @@ FileImplPtr VFSImpl::open(const char* fpath, const char* mode, const bool create
         int start_index = 0;
         int end_index = 0;
 
-        token = (char *)strchr(fpath+1,'/');   // wadamesh web: const-correct for C++ libc (only local edit)
+        token = (char *)strchr(fpath+1,'/');   // comet web: const-correct for C++ libc (only local edit)
         end_index = (token-fpath);
 
         while (token != NULL)

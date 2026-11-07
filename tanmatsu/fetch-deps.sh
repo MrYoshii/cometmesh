@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Populate tanmatsu/components/ with the MeshCore core + the Arduino libraries wadamesh needs,
+# Populate tanmatsu/components/ with the MeshCore core + the Arduino libraries comet needs,
 # sourced from PlatformIO's already-resolved libdeps. Run an S3 build first to populate them:
 #   /Users/kaj/Library/Python/3.9/bin/pio run -e LilyGo_TDeck_companion_radio_touch
 # Vendored payloads are gitignored (regenerate with this script); the committed component
@@ -52,10 +52,10 @@ vend "Melopero RV3028"
 vend "CayenneLPP"
 vend "ArduinoJson"           # header-only; some core/app files include it
 vend "base64"                # base64.hpp (companion / QR code paths)
-# app-layer libs (validate they build on P4; used once wadamesh_app is wired):
+# app-layer libs (validate they build on P4; used once comet_app is wired):
 vend "MicroNMEA"             # GPS NMEA parsing
 vend "AsyncTCP"              # the core's ESP32Board HTTP-OTA + companion-over-IP transport
-vend "ESPAsyncWebServer"     # WebSocket/HTTP companion server (needs the task WDT on — sdkconfigs/wadamesh)
+vend "ESPAsyncWebServer"     # WebSocket/HTTP companion server (needs the task WDT on — sdkconfigs/comet)
 vend "AsyncElegantOTA"       # OTA web UI (the core's ESP32Board HTTP-OTA)
 # NOTE: PubSubClient is deliberately NOT vended — the MQTT bridge is compiled out on the Tanmatsu
 # (HAS_TANMATSU no-op stub in MqttBridge.h); the P4's esp-hosted Wi-Fi isn't wired for it and it
@@ -77,7 +77,7 @@ p = 'components/meshcore/core/src/helpers/ESP32Board.cpp'
 s = open(p).read()
 s2, n1 = re.subn(r'#include <target\.h>\n', '', s)
 pat = re.compile(r'void ESP32Board::powerOff\(\).*?esp_deep_sleep_start\(\);.*?\n\}\n', re.S)
-minimal = '''// wadamesh(fetch-deps patch): IDF builds have no monorepo <target.h>; radio/display
+minimal = '''// comet(fetch-deps patch): IDF builds have no monorepo <target.h>; radio/display
 // teardown belongs to the launcher/BSP on these boards. Minimal deep sleep only.
 void ESP32Board::powerOff() { enterDeepSleep(0); }
 

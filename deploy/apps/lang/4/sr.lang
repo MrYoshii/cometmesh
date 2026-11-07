@@ -1,4 +1,4 @@
-# wadamesh language file
+# comet language file
 # canonical source - translators: edit this file and PR it
 # code: sr
 # ver: 4
@@ -249,7 +249,7 @@ Still analyzing the previous\npath… try again in a moment.	Још се ана�
 This contact hasn't shared\na GPS position.	Овај контакт није поделио\nGPS позицију.
 Tip: you can scan for networks in Settings → Network after setup.	Савет: мреже можете скенирати у Подешавања → Мрежа након подешавања.
 Type your network name — or switch to Wi-Fi in Settings to scan	Унесите назив мреже — или пређите на Wi-Fi у Подешавањима за скенирање
-Update manually at flasher.wadamesh.com\n(Wi-Fi update is paused for now)	Ажурирајте ручно на flasher.wadamesh.com\n(Wi-Fi ажурирање је за сада паузирано)
+Update manually at flasher.cometmesh.org\n(Wi-Fi update is paused for now)	Ажурирајте ручно на flasher.cometmesh.org\n(Wi-Fi ажурирање је за сада паузирано)
 Wi-Fi needed to fetch the\nterrain profile for this path.\nConnect in Settings → Wi-Fi.	Потребан Wi-Fi за профил\nтерена ове путање.\nПовежите у Подешавања → Wi-Fi.
 You can run setup later in Settings → Device	Подешавање можете покренути касније у Подешавања → Уређај
 Your location is unknown.\nSet GPS / position in\nSettings → Profile first.	Локација је непозната.\nПрво поставите GPS / позицију у\nПодешавања → Профил.
@@ -304,7 +304,7 @@ Sound on	Звук укљ
 Sound off	Звук искљ
 TCP on	TCP укљ
 TCP off	TCP искљ
-Welcome to WADAMESH	Добро дошли у WADAMESH
+Welcome to COMET	Добро дошли у COMET
 Get Started	Започни
 Choose your name	Изаберите своје име
 Your name	Ваше име
@@ -700,13 +700,13 @@ Unsupported WAV (need 16-bit PCM)	Неподржан WAV (потребан 16-б
 Update bin saved to SD	Датотека ажурирања сачувана на SD
 Update complete.\nRebooting...	Ажурирање завршено.\nПоновно покретање...
 Update via the Launcher	Ажурирај преко Launcher-а
-Update via the Launcher / flasher.wadamesh.com	Ажурирај преко Launcher-а / flasher.wadamesh.com
-Update via the Launcher / flasher.wadamesh.com.	Ажурирај преко Launcher-а / flasher.wadamesh.com.
+Update via the Launcher / flasher.cometmesh.org	Ажурирај преко Launcher-а / flasher.cometmesh.org
+Update via the Launcher / flasher.cometmesh.org.	Ажурирај преко Launcher-а / flasher.cometmesh.org.
 Username (optional)	Корисничко име (опционо)
 Volume	Јачина звука
 W up  ·  A left  ·  D right  ·  Z down  ·  S select  ·  Q back	W горе  ·  A лево  ·  D десно  ·  Z доле  ·  S избор  ·  Q назад
 WADA#15B6A6 MESH#	WADA#15B6A6 MESH#
-WADAMESH	WADAMESH
+COMET	COMET
 Wi-Fi not connected	Wi-Fi није повезан
 Wi-Fi on, scanning…	Wi-Fi укључен, тражим…
 Yesterday	Јуче
@@ -748,7 +748,7 @@ Catalog unavailable	Каталог није доступан
 Loading catalog…	Учитавање каталога…
 Loading the language catalog…	Учитавање каталога језика…
 Language catalog unavailable - check Wi-Fi, then reopen this tab.	Каталог језика није доступан - провери Wi-Fi па поново отвори картицу.
-Fetching the app list from firmware.wadamesh.com	Преузимање листе апликација са firmware.wadamesh.com
+Fetching the app list from firmware.cometmesh.org	Преузимање листе апликација са firmware.cometmesh.org
 Turn Wi-Fi on, then tap refresh. Apps already installed still work.	Укључи Wi-Fi па освежи. Инсталиране апликације и даље раде.
 Installing…	Инсталирање…
 Install failed (network?)	Инсталирање није успело (мрежа?)

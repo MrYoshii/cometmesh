@@ -1,4 +1,4 @@
-// Host harness for wadamesh Lua apps: vendored Lua 5.4.7 (LUA_32BITS, same
+// Host harness for comet Lua apps: vendored Lua 5.4.7 (LUA_32BITS, same
 // numeric model as the device) + the same library set the firmware opens, plus
 // the debug lib for the harness's own instruction-budget hook.
 #include "lua.h"

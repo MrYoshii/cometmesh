@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// T-LoRa Pager location provider: the wadamesh NMEA provider with the u-blox
+// T-LoRa Pager location provider: the comet NMEA provider with the u-blox
 // MIA-M10Q's two ways to rest.
 //
 // The core provider this board used before did nothing on stop(): the module

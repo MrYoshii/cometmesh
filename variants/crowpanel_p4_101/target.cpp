@@ -163,17 +163,17 @@ esp_err_t crowpanelSdProbe() {
 // Written by esp-hosted's transport driver when the C6's INIT event arrives (build.sh patch to
 // transport_drv.c), read by crowpanelC6Describe(). 0 / unknown until the transport has come up.
 extern "C" {
-volatile uint32_t wadamesh_c6_fw_version = 0;
-volatile int      wadamesh_c6_fw_known   = 0;
+volatile uint32_t comet_c6_fw_version = 0;
+volatile int      comet_c6_fw_known   = 0;
 }
 
 int crowpanelC6Describe(char* out, size_t cap) {
   if (!out || !cap) return -1;
-  if (!wadamesh_c6_fw_known) {
+  if (!comet_c6_fw_known) {
     snprintf(out, cap, "C6 firmware version not reported (transport not up)");
     return -1;
   }
-  const uint32_t v = wadamesh_c6_fw_version;
+  const uint32_t v = comet_c6_fw_version;
   const unsigned maj = ESP_HOSTED_VERSION_MAJOR(v), min = ESP_HOSTED_VERSION_MINOR(v), pat = ESP_HOSTED_VERSION_PATCH(v);
   if (v == 0) {
     snprintf(out, cap, "C6 esp-hosted firmware did not report a version (very old); host is %d.%d.%d. "

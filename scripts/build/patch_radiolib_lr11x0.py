@@ -24,7 +24,7 @@
 Import("env")
 import os
 
-MARKER = "wadamesh-lr1110-oldfw-patch"
+MARKER = "comet-lr1110-oldfw-patch"
 
 
 def _shape(ind):
@@ -33,7 +33,7 @@ def _shape(ind):
            + ind + "RADIOLIB_ASSERT(state);")
     new = "\n".join([
         ind + "state = this->driveDiosInSleepMode(true);",
-        ind + "// wadamesh-lr1110-oldfw-patch: LR1110 transceiver FW older than 0x0308",
+        ind + "// comet-lr1110-oldfw-patch: LR1110 transceiver FW older than 0x0308",
         ind + "// doesn't implement DriveDiosInSleepMode (0x012A) and answers CMD_PERR,",
         ind + "// which would abort init (-706) on an otherwise healthy radio. The command",
         ind + "// only stops DIO glitches in sleep mode - safe to skip on old firmware.",

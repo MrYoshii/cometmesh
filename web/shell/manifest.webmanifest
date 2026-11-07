@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "wadamesh",
-  "short_name": "wadamesh",
-  "description": "The wadamesh touch UI in your browser: a demo mesh, or your own MeshCore node over USB, Bluetooth or Wi-Fi.",
+  "name": "comet",
+  "short_name": "comet",
+  "description": "The comet touch UI in your browser: a demo mesh, or your own MeshCore node over USB, Bluetooth or Wi-Fi.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

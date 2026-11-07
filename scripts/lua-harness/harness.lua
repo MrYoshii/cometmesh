@@ -1137,7 +1137,7 @@ end
 
 scenarios.pager_portrait_jumbo = function()
   cfg = { w = 222, h = 436, caps = { sdk_ext = true, keyboard = true, touch = false, compass = false },
-          contacts = { { name = "WADAMESH-BASE-NODE-EXTRA", type = 2, ago_s = 1, lat = 37.8, lon = -122.4 } }, self_lat = 37.75, self_lon = -122.45 }
+          contacts = { { name = "COMET-BASE-NODE-EXTRA", type = 2, ago_s = 1, lat = 37.8, lon = -122.4 } }, self_lat = 37.75, self_lon = -122.45 }
   cfg.gps = function() return { lat = 37.75, lon = -122.45, sats = 7, alt_m = 5, speed_kmh = 12.3, course = 215 } end
   storekv = {}
   wada = build_wada(); wada.ui.text_h = function(sz) return ({ [12] = 21, [14] = 22, [16] = 27 })[sz] or 21 end
@@ -1758,7 +1758,7 @@ local function pe_bytes(n, e_lfanew)
   return table.concat(t)
 end
 local NBSP = "\194\160"   -- the worm's blank-looking folder name
--- The M9 card as the advisory describes it, plus wadamesh's own data and tiles.
+-- The M9 card as the advisory describes it, plus comet's own data and tiles.
 local function infected_card(extra)
   local f = {
     ["/autorun.inf"] = "[autorun]\r\nopen=" .. NBSP .. "\\svchost.exe\r\n",
@@ -1767,9 +1767,9 @@ local function infected_card(extra)
     ["/RECYCLER/S-1-5-21-1004/desktop.dat"] = pe_bytes(300, 0x78),   -- a program under a harmless name
     ["/copyright.png"] = PNG,
     ["/test file.txt"] = "test",
-    ["/wadamesh/contacts3"] = "MZ" .. string.rep("\165", 200),        -- starts with MZ by chance
-    ["/wadamesh/ui_threads_v1.bin"] = string.rep("\1", 300),
-    ["/wadamesh/lang/hu.lang"] = "# ver: 22\n",
+    ["/comet/contacts3"] = "MZ" .. string.rep("\165", 200),        -- starts with MZ by chance
+    ["/comet/ui_threads_v1.bin"] = string.rep("\1", 300),
+    ["/comet/lang/hu.lang"] = "# ver: 22\n",
     ["/autorun"] = true,                                              -- an empty "vaccine" folder
   }
   for z = 8, 10 do for x = 130, 133 do for y = 80, 83 do
@@ -1970,8 +1970,8 @@ scenarios.sdscan_m9 = function()
   press("Remove")
   scan_until(app, "Removed 4 files.")
   assert(#cfg.sd_removed == 4)
-  for _, keep in ipairs({ "/copyright.png", "/test file.txt", "/wadamesh/contacts3",
-                          "/wadamesh/ui_threads_v1.bin", "/wadamesh/lang/hu.lang",
+  for _, keep in ipairs({ "/copyright.png", "/test file.txt", "/comet/contacts3",
+                          "/comet/ui_threads_v1.bin", "/comet/lang/hu.lang",
                           "/maps/osm/8/130/80.png", "/autorun" }) do
     assert(sd_exists(keep), "removed something that is not a threat: " .. keep)
   end
@@ -1984,8 +1984,8 @@ end
 
 scenarios.sdscan_paging_and_full = function()
   cfg = sd_cfg(320, 196)
-  local extra = { ["/maps/osm/8/130/evil.exe"] = pe_bytes(200), ["/wadamesh/history/zz.vbs"] = "WScript.Echo 1" }
-  for i = 1, 100 do extra[string.format("/wadamesh/history/seg%03d", i)] = string.rep("\2", 90) end
+  local extra = { ["/maps/osm/8/130/evil.exe"] = pe_bytes(200), ["/comet/history/zz.vbs"] = "WScript.Echo 1" }
+  for i = 1, 100 do extra[string.format("/comet/history/seg%03d", i)] = string.rep("\2", 90) end
   cfg.sdtree = infected_card(extra)
   wada = build_wada()
   local app = load_app()
@@ -1995,7 +1995,7 @@ scenarios.sdscan_paging_and_full = function()
   assert(rows_mention("zz.vbs"), "the 101st file of a folder was never reached: paging broken")
   assert(not rows_mention("evil.exe"), "a quick scan should not walk the tiles")
   local paged = 0
-  for _, c in ipairs(cfg.sd_calls) do if c.path == "/wadamesh/history" and c.start > 1 then paged = paged + 1 end end
+  for _, c in ipairs(cfg.sd_calls) do if c.path == "/comet/history" and c.start > 1 then paged = paged + 1 end end
   assert(paged >= 4, "expected the history folder to be read in pages, got " .. paged)
   press("Scan again")
   press("Full scan")
@@ -2070,7 +2070,7 @@ end
 scenarios.sdscan_cost = function()
   cfg = sd_cfg(320, 196)
   local extra = {}
-  for i = 1, 400 do extra[string.format("/wadamesh/history/seg%03d", i)] = string.rep("\2", 90) end
+  for i = 1, 400 do extra[string.format("/comet/history/seg%03d", i)] = string.rep("\2", 90) end
   cfg.sdtree = infected_card(extra)
   wada = build_wada()
   local app = load_app()

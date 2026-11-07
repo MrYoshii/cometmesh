@@ -51,7 +51,7 @@ public:
   bool setSleep(wifi_ps_type_t) { return true; }
   bool setTxPower(wifi_power_t) { return false; }
   bool setHostname(const char*) { return true; }
-  const char* getHostname() { return "wadamesh-web"; }
+  const char* getHostname() { return "comet-web"; }
   void persistent(bool) {}
   void useStaticBuffers(bool) {}
   bool config(IPAddress, IPAddress, IPAddress, IPAddress = (uint32_t)0, IPAddress = (uint32_t)0) { return false; }

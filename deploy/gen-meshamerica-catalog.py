@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the Mesh America Configurator catalog JSON for wadamesh.
+"""Generate the Mesh America Configurator catalog JSON for comet.
 
 Mesh America (apps.meshamerica.com — the flasher Cascadia Mesh uses) merges a
 provider "catalog" JSON into its device list. Spec: third-party hosts ONE static
@@ -7,9 +7,9 @@ JSON (this file's output) at a stable HTTPS+CORS URL, plus the firmware bins ove
 HTTPS+CORS; their app reads it live. See provider-api-spec.md from TJ Downes.
 
 We host:
-  - the bins on firmware.wadamesh.com/releases/TOUCH/<TAG>/  (Cloudflare HTTPS +
+  - the bins on firmware.cometmesh.org/releases/TOUCH/<TAG>/  (Cloudflare HTTPS +
     `Access-Control-Allow-Origin: *`, immutable per-tag dir — see deploy/nginx/
-    firmware.wadamesh.com.conf), and
+    firmware.cometmesh.org.conf), and
   - this catalog at a stable HTTPS+CORS URL (deployed alongside the firmware).
 
 Usage:  python3 deploy/gen-meshamerica-catalog.py <TAG>  > meshamerica-catalog.json
@@ -32,8 +32,8 @@ def newest_tag():
     return "beta_%d" % max(tags) if tags else "beta_9"
 
 TAG  = sys.argv[1] if len(sys.argv) > 1 else newest_tag()
-BASE = "https://firmware.wadamesh.com/releases/TOUCH/%s" % TAG
-ICON = "https://wadamesh.com/wadamesh-icon-512.png"
+BASE = "https://firmware.cometmesh.org/releases/TOUCH/%s" % TAG
+ICON = "https://cometmesh.org/comet-icon-512.png"
 
 # "What's new" — one user-facing line per non-blank, non-# line of the notes file.
 notes = ""
@@ -45,12 +45,12 @@ if os.path.exists(nf):
     notes = "\n".join(l.strip() for l in open(nf, encoding="utf-8")
                       if l.strip() and not l.strip().startswith("#"))
 
-# Every wadamesh tile here is ESP32-S3, touch-UI ("gui") role. ota_0 sits at
+# Every comet tile here is ESP32-S3, touch-UI ("gui") role. ota_0 sits at
 # 0x10000 on every touch env (partitions_t*_touch.csv), so flash-update@0x10000 is correct.
 # `name` MUST match the official MeshCore device name character-for-character, or Mesh America lists it
 # as a NEW device instead of folding our firmware into the existing tile (TJ Downes, 2026-06). Canonical
 # names verified from apps.meshamerica.com/proxy/flasher/config.json. The V4 entry is the Expansion Kit
-# (Touch) variant only, per Kaj. `slug` still maps to our bin filenames on firmware.wadamesh.com.
+# (Touch) variant only, per Kaj. `slug` still maps to our bin filenames on firmware.cometmesh.org.
 #
 # A board may carry `variants` instead of a single `slug`: one "gui" firmware entry is emitted per
 # variant, all under the one tile. The T-Lora Pager ships with either radio, and Mesh America folds both
@@ -66,7 +66,7 @@ BOARDS = [
 ]
 
 def _firmware(title, slug):
-    merged, appbin = "wadamesh-%s-merged.bin" % slug, "wadamesh-%s.bin" % slug
+    merged, appbin = "comet-%s-merged.bin" % slug, "comet-%s.bin" % slug
     return {
         "role": "gui",
         "title": title,
@@ -87,8 +87,8 @@ def device(b):
     # `variants` (per-radio builds) fold under one tile; a plain board is the single default variant.
     variants = b.get("variants") or [{"title": "Touch UI", "slug": b["slug"]}]
     return {
-        "maker": "wadamesh",
-        "class": "wadamesh",
+        "maker": "comet",
+        "class": "comet",
         "name": b["name"],
         "type": "esp32",
         "tooltip": "<img class='device' src='%s'>" % ICON,
@@ -98,14 +98,14 @@ def device(b):
 # Optional "what's this?" blurb Mesh America shows on a hover tooltip next to our provider badge
 # (spec section 3, added by TJ 2026-06-30). Plain text only — rendered escaped, so no markup/links.
 DESCRIPTION = (
-    "WADAMESH is a full touch-screen interface for MeshCore: on-device chat, contacts, a live map "
+    "COMET is a full touch-screen interface for MeshCore: on-device chat, contacts, a live map "
     "with offline tiles, and complete radio settings. Same MeshCore protocol and phone-app companion "
     "as stock MeshCore, just a richer on-device front-end."
 )
 
 catalog = {
     "description": DESCRIPTION,
-    "maker":  {"wadamesh": {"name": "wadamesh"}},
+    "maker":  {"comet": {"name": "comet"}},
     "device": [device(b) for b in BOARDS],
 }
 print(json.dumps(catalog, indent=2, ensure_ascii=False))

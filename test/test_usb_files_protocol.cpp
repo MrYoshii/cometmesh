@@ -172,8 +172,8 @@ int main() {
   assert(acc(ROOT_INTERNAL, "/screenshots/s1.png", false) == A_WRITE);
   assert(acc(ROOT_INTERNAL, "/lock/wall.jpg", false) == A_WRITE);
   assert(acc(ROOT_INTERNAL, "/meshcore-2026-09-19.json", false) == A_WRITE);
-  assert(acc(ROOT_INTERNAL, "/wadamesh-crash.elf", false) == A_WRITE);
-  assert(acc(ROOT_INTERNAL, "/wadamesh-crash.elf.txt", false) == A_WRITE);
+  assert(acc(ROOT_INTERNAL, "/comet-crash.elf", false) == A_WRITE);
+  assert(acc(ROOT_INTERNAL, "/comet-crash.elf.txt", false) == A_WRITE);
   assert(acc(ROOT_INTERNAL, "/identity/_main.id", false) == A_READ);
   assert(acc(ROOT_INTERNAL, "/contacts3", false) == A_READ);
   assert(acc(ROOT_INTERNAL, "/new_prefs", false) == A_READ);

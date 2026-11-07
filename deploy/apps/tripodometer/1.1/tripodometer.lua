@@ -1,4 +1,4 @@
--- Trip Odometer 1.1 — wadamesh Lua app
+-- Trip Odometer 1.1 — comet Lua app
 -- GPS trip computer: distance, time, avg/max speed, min/current altitude,
 -- return-to-home bearing.
 -- Tap Start/Stop to track, Reset to clear. Saves your trip across app restarts.

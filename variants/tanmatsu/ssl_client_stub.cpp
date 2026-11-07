@@ -3,7 +3,7 @@
 // On the P4 / IDF 5.5.1, arduino's NetworkClientSecure.cpp call signatures don't match
 // ssl_client.cpp's definitions (an arduino-internal / toolchain ABI mismatch — e.g. the port
 // param mangles `unsigned long` at the call site but `uint32_t` at the definition), so they're
-// undefined at link. wadamesh doesn't use HTTPS yet (the companion link is USB/LoRa and map
+// undefined at link. comet doesn't use HTTPS yet (the companion link is USB/LoRa and map
 // tiles are plain HTTP), so stub the referenced symbols to let the app link.
 //
 // Symbols + signatures are taken verbatim from the linker's undefined-reference list. These are

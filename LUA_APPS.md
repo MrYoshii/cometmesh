@@ -1,7 +1,7 @@
 # Lua apps — plan + tracker
 
 Goal: non-core apps become **Lua scripts** installed from a store catalog on
-firmware.wadamesh.com — installable, uninstallable and updatable without cutting
+firmware.cometmesh.org — installable, uninstallable and updatable without cutting
 a beta, one app artifact for every board, and writable by the community without
 forking the firmware. Runtime target: **Lua 5.4** (vanilla, no JIT — smallest
 serious VM, trivial to sandbox, portable Xtensa/RISC-V).
@@ -70,7 +70,7 @@ catalog is the third.
   min_api, boards allow-list, icon glyph, description) on the active storage
   root (SD where adopted, internal FS otherwise) — same resolution as chat
   history.
-- Catalog: `https://firmware.wadamesh.com/apps/apps.json` + one `.lua` +
+- Catalog: `https://firmware.cometmesh.org/apps/apps.json` + one `.lua` +
   `.json` per app in `apps/<id>/<version>/`. Served like firmware: VPS rsync,
   immutable per-version paths, mutable index. Device store page = fetch
   index → list → install (download 2 files) → appears in the drawer.
@@ -200,7 +200,7 @@ once files are field-proven.
 - 2026-08-22: **wada.sys.gps() widened + wada.sys.compass() + GPS Compass
   app.** gps() now carries `alt` (m) everywhere and `speed_kmh`/`course` on
   boards that build their GPS on `src/helpers/WadaNmeaLocationProvider.h`
-  (a Wadamesh-owned copy of the core provider exposing the RMC motion fields
+  (a Comet-owned copy of the core provider exposing the RMC motion fields
   it keeps private; M9 first, flag `HAS_GPS_MOTION`), and it returns nil while
   the user has GPS switched off. compass() is on a new HARDWARE gate
   `CAP_COMPASS` (the M9's QMC6309, driver `variants/thinknode_m9/M9Compass.*`,

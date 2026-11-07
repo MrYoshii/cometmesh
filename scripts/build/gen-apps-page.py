@@ -20,7 +20,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 CATALOG = os.path.join(ROOT, "deploy", "apps", "apps.json")
 INFO = os.path.join(ROOT, "deploy", "site", "apps-info.json")
 OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "deploy", "site", "apps.html")
-GH = "https://github.com/ALLFATHER-BV/wadamesh"
+GH = "https://github.com/MrYoshii/cometmesh"
 
 # What a catalog "requires" means for the person reading the page.
 RUNS_ON = {
@@ -129,20 +129,20 @@ PAGE = r"""<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script>try{if(localStorage.getItem('wm-theme')==='light')document.documentElement.setAttribute('data-theme','light')}catch(e){}</script>
 <meta name="theme-color" content="#000400">
-<title>WADAMESH · App Store</title>
-<meta name="description" content="The Lua apps you can install on a WADAMESH device from its built-in Store: radio tools, navigation, emergency messaging, music and games. Free, sandboxed and reviewed. Write your own with the SDK.">
-<link rel="canonical" href="https://wadamesh.com/apps.html">
+<title>COMET · App Store</title>
+<meta name="description" content="The Lua apps you can install on a COMET device from its built-in Store: radio tools, navigation, emergency messaging, music and games. Free, sandboxed and reviewed. Write your own with the SDK.">
+<link rel="canonical" href="https://cometmesh.org/apps.html">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="WADAMESH">
-<meta property="og:url" content="https://wadamesh.com/apps.html">
-<meta property="og:title" content="WADAMESH · App Store">
+<meta property="og:site_name" content="COMET">
+<meta property="og:url" content="https://cometmesh.org/apps.html">
+<meta property="og:title" content="COMET · App Store">
 <meta property="og:description" content="Radio tools, navigation, emergency messaging, music and games for your mesh radio. Free, sandboxed and reviewed.">
-<meta property="og:image" content="https://wadamesh.com/og-image.png?v=2">
+<meta property="og:image" content="https://cometmesh.org/og-image.png?v=2">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="favicon.ico" sizes="32x32">
-<link rel="icon" href="wadamesh-badge.svg" type="image/svg+xml">
+<link rel="icon" href="comet-badge.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -287,7 +287,7 @@ PAGE = r"""<!doctype html>
     <div class="mk">
       <div><h3>1. Read the SDK guide</h3><p>The <a href="sdk.html">SDK guide</a> starts with <a href="sdk.html#hello">your first app</a> in ten lines and documents every call. Snake, RF Monitor and Nearby are small enough to read in one sitting.</p></div>
       <div><h3>2. Try it on your own device</h3><p>Copy your <code>.lua</code> file to <code>/meshcomod/apps/</code> on the SD card (or <code>/apps/</code> on boards that store internally) and it appears in the app drawer, no manifest needed. <a href="sdk.html#install">How side-loading works</a>.</p></div>
-      <div><h3>3. Send it in</h3><p>Fork <a href="@@GH@@" target="_blank" rel="noopener">ALLFATHER-BV/wadamesh</a>, add <code>deploy/apps/&lt;id&gt;/&lt;ver&gt;/</code> with your <code>.lua</code> and manifest, add your app to <code>deploy/apps/apps.json</code>, and open a pull request saying what it does and which boards you tried. A published version is never edited: a change ships as the next version. No git? <a href="@@GH@@/issues/new" target="_blank" rel="noopener">Open an issue</a> with the file attached. <a href="@@GH@@/blob/main/deploy/apps/README.md" target="_blank" rel="noopener">The full guide</a>.</p></div>
+      <div><h3>3. Send it in</h3><p>Fork <a href="@@GH@@" target="_blank" rel="noopener">MrYoshii/cometmesh</a>, add <code>deploy/apps/&lt;id&gt;/&lt;ver&gt;/</code> with your <code>.lua</code> and manifest, add your app to <code>deploy/apps/apps.json</code>, and open a pull request saying what it does and which boards you tried. A published version is never edited: a change ships as the next version. No git? <a href="@@GH@@/issues/new" target="_blank" rel="noopener">Open an issue</a> with the file attached. <a href="@@GH@@/blob/main/deploy/apps/README.md" target="_blank" rel="noopener">The full guide</a>.</p></div>
       <div><h3>4. What review looks for</h3><ul>
         <li>Never reads, sends or stores keys, identities or channel secrets</li>
         <li>No flash writes in a loop or on every packet</li>

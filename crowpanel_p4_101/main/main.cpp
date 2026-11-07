@@ -1,4 +1,4 @@
-// wadamesh on the Elecrow CrowPanel Advanced 10.1" ESP32-P4 HMI (1024x600). EXPERIMENTAL.
+// comet on the Elecrow CrowPanel Advanced 10.1" ESP32-P4 HMI (1024x600). EXPERIMENTAL.
 //
 // Standalone ESP-IDF app, modelled on tdisplay_p4/main/main.cpp (same P4 + C6 esp-hosted pairing,
 // same storage law: hot store on the internal LittleFS 'storage' partition, the microSD for tiles and
@@ -95,10 +95,10 @@ static MyMesh& makeTheMesh() {
 }
 MyMesh& the_mesh = makeTheMesh();
 
-static void wadameshSetup() {
+static void cometSetup() {
   Serial.begin(115200);
   delay(150);
-  printf("[BOOT] wadamesh / CrowPanel P4 10.1 (board revision V%d.%d, EXPERIMENTAL)\n", CP_REV / 10, CP_REV % 10);
+  printf("[BOOT] comet / CrowPanel P4 10.1 (board revision V%d.%d, EXPERIMENTAL)\n", CP_REV / 10, CP_REV % 10);
 
   // 1. On-chip LDO rails (DSI PHY + the 3.3 V pad domain of touch/LCD-reset/SD), backlight + amp off.
   crowpanelP4PowerOn();
@@ -189,9 +189,9 @@ static void wadameshSetup() {
   // and BLE only: display, touch and LoRa are already up by now.
 #if defined(BLE_PIN_CODE)
   char* nm = the_mesh.getNodePrefs()->node_name;
-  serial_interface.prepareBle("wadamesh-", nm, the_mesh.getBLEPin());
+  serial_interface.prepareBle("comet-", nm, the_mesh.getBLEPin());
   if (wifiConfigGetBleEnabled()) {
-    if (hostedInitBLE()) serial_interface.beginBle("wadamesh-", nm, the_mesh.getBLEPin());
+    if (hostedInitBLE()) serial_interface.beginBle("comet-", nm, the_mesh.getBLEPin());
     else                 printf("[BOOT] hostedInitBLE FAILED (BLE unavailable; LoRa, touch and the UI keep running)\n");
     crowpanelC6ReportOnce("BLE start");
   } else {
@@ -213,7 +213,7 @@ static void wadameshSetup() {
 extern "C" void app_main(void) {
   crowpanelP4InstallFullRestart();   // before anything else registers a shutdown handler
   initArduino();
-  wadameshSetup();
+  cometSetup();
 
   // Wi-Fi state machine + SNTP + TCP/WS companion server, as in tdisplay_p4/main/main.cpp
   // (esp-hosted backend: Arduino's real WiFi over esp_wifi_remote).

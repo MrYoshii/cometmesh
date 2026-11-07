@@ -1,4 +1,4 @@
-# wadamesh language file
+# comet language file
 # canonical source - translators: edit this file and PR it
 # code: pl
 # ver: 30
@@ -342,7 +342,7 @@ Factory reset?\n\nErases identity, contacts,\nchannels, messages, Wi-Fi\nand eve
 Failed to save channel.	Nie udało się zapisać kanału.
 Favorites full (max %d)	Ulubione pełne (maks. %d)
 Favorites unsupported	Ulubione nie są obsługiwane
-Fetching the app list from firmware.wadamesh.com	Pobieranie listy aplikacji z firmware.wadamesh.com
+Fetching the app list from firmware.cometmesh.org	Pobieranie listy aplikacji z firmware.cometmesh.org
 Files	Pliki
 Find	Znajdź
 Finish	Zakończ
@@ -934,19 +934,19 @@ Up	W górę
 Update	Aktualizacja
 Update bin saved to SD	Pojemnik aktualizacji zapisany na karcie SD
 Update complete.\nRebooting...	Aktualizacja zakończona.\nPonowne uruchamianie...
-Update manually at flasher.wadamesh.com\n(Wi-Fi update is paused for now)	Aktualizuj ręcznie na stronie flasher.wadamesh.com\n (aktualizacja Wi-Fi jest chwilowo wstrzymana)
+Update manually at flasher.cometmesh.org\n(Wi-Fi update is paused for now)	Aktualizuj ręcznie na stronie flasher.cometmesh.org\n (aktualizacja Wi-Fi jest chwilowo wstrzymana)
 Update via the Launcher	Aktualizacja poprzez Launcher
-Update via the Launcher / flasher.wadamesh.com	Aktualizacja poprzez Launcher / flasher.wadamesh.com
-Update via the Launcher / flasher.wadamesh.com.	Aktualizacja poprzez Launcher / flasher.wadamesh.com.
+Update via the Launcher / flasher.cometmesh.org	Aktualizacja poprzez Launcher / flasher.cometmesh.org
+Update via the Launcher / flasher.cometmesh.org.	Aktualizacja poprzez Launcher / flasher.cometmesh.org.
 Updated - rebooting…	Zaktualizowano — ponowne uruchamianie…
 Use	Użyj
 Username (optional)	Nazwa użytkownika (opcjonalnie)
 Volume	Tom
 W up  ·  A left  ·  D right  ·  Z down  ·  S select  ·  Q back	W w górę · A w lewo · D w prawo · Z w dół · S wybierz · Q w tył
 WADA#15B6A6 MESH#	SIATKA WADA#15B6A6#
-WADAMESH	WADAMESH
+COMET	COMET
 Waiting for Wi-Fi...	Oczekiwanie na Wi-Fi...
-Welcome to WADAMESH	Witamy w WADAMESH
+Welcome to COMET	Witamy w COMET
 While this is on, anyone on your Wi-Fi can view and control this device. Uses plain HTTP (local network only).	Gdy ta opcja jest włączona, każdy użytkownik Wi-Fi może przeglądać to urządzenie i sterować nim. Używa zwykłego protokołu HTTP (tylko sieć lokalna).
 Wi-Fi	Wi-Fi
 Wi-Fi & Bluetooth	Wi-Fi i Bluetooth
@@ -1085,7 +1085,7 @@ EXPERIMENTAL. Boots into a text console with no graphical interface: type comman
 Enter text	Wpisz tekst
 Entering console mode - rebooting...	Wejście do trybu konsoli – ponowne uruchomienie...
 Favorite	Ulubiony
-How tiles work:\nThe map is built from 256×256 "slippy" tiles. Only the tiles for the area you're viewing are fetched — there is no bulk pre-download.\n\nBecause this device can't do HTTPS (not enough heap after Wi-Fi starts) and decodes JPEG far more cheaply than PNG, tiles come from the wadamesh proxy: it fetches the upstream PNG over HTTPS with an identifying User-Agent, re-encodes it as JPEG, and caches it. Your device then caches each tile to its own flash, so a tile is only downloaded once.\n\nUse Options → Reload tiles to re-download the tiles currently in view if one looks corrupted.	Jak działają kafelki:\nMapa zbudowana jest z „śliskich” kafelków o wymiarach 256×256. Pobierane są tylko kafelki z przeglądanego obszaru — nie ma wstępnego pobierania zbiorczego. \n\n Ponieważ to urządzenie nie obsługuje protokołu HTTPS (nie ma wystarczającej ilości sterty po uruchomieniu Wi-Fi) i dekoduje JPEG znacznie taniej niż PNG, kafelki pochodzą z serwera proxy wadamesh: pobiera nadrzędny plik PNG przez HTTPS z identyfikującym agentem użytkownika, ponownie koduje go jako JPEG i buforuje. Następnie urządzenie buforuje każdy kafelek we własnej pamięci flash, więc jest on pobierany tylko raz. \n\nUżyj opcji → Załaduj ponownie kafelki, aby ponownie pobrać aktualnie wyświetlane kafelki, jeśli jeden wygląda na uszkodzony.
+How tiles work:\nThe map is built from 256×256 "slippy" tiles. Only the tiles for the area you're viewing are fetched — there is no bulk pre-download.\n\nBecause this device can't do HTTPS (not enough heap after Wi-Fi starts) and decodes JPEG far more cheaply than PNG, tiles come from the comet proxy: it fetches the upstream PNG over HTTPS with an identifying User-Agent, re-encodes it as JPEG, and caches it. Your device then caches each tile to its own flash, so a tile is only downloaded once.\n\nUse Options → Reload tiles to re-download the tiles currently in view if one looks corrupted.	Jak działają kafelki:\nMapa zbudowana jest z „śliskich” kafelków o wymiarach 256×256. Pobierane są tylko kafelki z przeglądanego obszaru — nie ma wstępnego pobierania zbiorczego. \n\n Ponieważ to urządzenie nie obsługuje protokołu HTTPS (nie ma wystarczającej ilości sterty po uruchomieniu Wi-Fi) i dekoduje JPEG znacznie taniej niż PNG, kafelki pochodzą z serwera proxy comet: pobiera nadrzędny plik PNG przez HTTPS z identyfikującym agentem użytkownika, ponownie koduje go jako JPEG i buforuje. Następnie urządzenie buforuje każdy kafelek we własnej pamięci flash, więc jest on pobierany tylko raz. \n\nUżyj opcji → Załaduj ponownie kafelki, aby ponownie pobrać aktualnie wyświetlane kafelki, jeśli jeden wygląda na uszkodzony.
 Init…	Inicjacja…
 Leaving console mode - rebooting...	Wyjście z trybu konsoli – ponowne uruchomienie...
 Link lost	Utracono połączenie
@@ -1301,10 +1301,10 @@ Scanning...	Skanowanie...
 Stopped after 	Zatrzymano po 
 They are Windows programs, scripts, shortcuts or autorun files. A mesh radio never uses them, and nothing else on the card is touched.	Są to programy systemu Windows, skrypty, skróty lub pliki automatycznego uruchamiania. Radio mesh nigdy ich nie używa i nic innego na karcie nie jest ruszane.
 This board has no SD card access for apps.	Ta płyta nie ma dostępu do kart SD dla aplikacji.
-This firmware can only find them. Update wadamesh to remove them here.	To oprogramowanie może tylko je znaleźć. Zaktualizuj wadamesh, aby usunąć je tutaj.
+This firmware can only find them. Update comet to remove them here.	To oprogramowanie może tylko je znaleźć. Zaktualizuj comet, aby usunąć je tutaj.
 Finds and removes Windows programs, scripts, shortcuts and autorun files, like the worm on some ThinkNode M9 cards. A mesh radio never uses these.	Znajduje i usuwa programy Windows, skrypty, skróty i pliki automatycznego uruchamiania, takie jak robak na niektórych kartach ThinkNode M9. Radio mesh nigdy ich nie używa.
 No known Windows malware found.	Nie znaleziono żadnego znanego złośliwego oprogramowania dla systemu Windows.
-This firmware can find these but not remove them. Update wadamesh, or format the card: in Files, hold the SD card row.	To oprogramowanie sprzętowe może je znaleźć, ale nie może ich usunąć. Zaktualizuj wadamesh lub sformatuj kartę: w Plikach przytrzymaj wiersz karty SD.
+This firmware can find these but not remove them. Update comet, or format the card: in Files, hold the SD card row.	To oprogramowanie sprzętowe może je znaleźć, ale nie może ich usunąć. Zaktualizuj comet lub sformatuj kartę: w Plikach przytrzymaj wiersz karty SD.
 SD Scan only removes files it recognises. If the card may be infected, the safest fix is to copy off what you need and format it completely: in Files, hold the SD card row.	Skanowanie SD usuwa tylko pliki, które rozpoznaje. Jeśli karta może zostać zainfekowana, najbezpieczniejszym rozwiązaniem jest skopiowanie potrzebnych danych i całkowite ich sformatowanie: w obszarze Pliki przytrzymaj wiersz karty SD.
 and %d more	i %d więcej
 High contrast	Wysoki kontrast
@@ -1492,7 +1492,7 @@ Tap the EN key on the keyboard to switch	Naciśnij klawisz EN na klawiaturze, ab
 Tells the matrix how many devices run this build, so a board with no reports can be told apart from a board nobody owns. Sends the board and the version, nothing else.	Informuje matrycę, na ilu urządzeniach działa ta kompilacja, więc tablicę bez raportów można odróżnić od tablicy, której nikt nie posiada. Wysyła planszę i wersję, nic więcej.
 Terminal	Terminal
 Test report: %s	Raport z testu: %s
-Thank you. Your report is on wadamesh.com/beta	Dziękuję. Twoje zgłoszenie znajduje się na stronie wadamesh.com/beta
+Thank you. Your report is on cometmesh.org/beta	Dziękuję. Twoje zgłoszenie znajduje się na stronie cometmesh.org/beta
 The PINs did not match	PINy nie pasują
 The mesh around you instead of a dark screen. Every ring is a real packet.	Siatka wokół Ciebie zamiast ciemnego ekranu. Każdy pierścionek to prawdziwy pakiet.
 This is everything that leaves the device. No name, no contacts, no position.	To wszystko, co opuszcza urządzenie. Żadnego nazwiska, żadnych kontaktów, żadnego stanowiska.
@@ -1723,7 +1723,7 @@ Typing	Wpisywanie
 Unreleased test firmware: newer features, less tested. The update check and Install update both follow it.	Niepublikowane oprogramowanie testowe: nowsze funkcje, mniej testowane. Po nich następuje sprawdzenie aktualizacji i instalacja aktualizacji.
 Until	Do
 Up to date (beta_%d)	Aktualny (beta_%d)
-Update available: beta_%d\nYou have beta_%d. Get it at flasher.wadamesh.com.	Dostępna aktualizacja: beta_%d\nMasz wersję beta_%d. Zdobądź go na flasher.wadamesh.com.
+Update available: beta_%d\nYou have beta_%d. Get it at flasher.cometmesh.org.	Dostępna aktualizacja: beta_%d\nMasz wersję beta_%d. Zdobądź go na flasher.cometmesh.org.
 Update available: beta_%d\nYou have beta_%d. Install it below.	Dostępna aktualizacja: beta_%d\nMasz wersję beta_%d. Zainstaluj go poniżej.
 Used only when the time zone is Custom (UTC offset).	Używane tylko wtedy, gdy strefa czasowa jest niestandardowa (przesunięcie UTC).
 Wallpaper	Tapeta

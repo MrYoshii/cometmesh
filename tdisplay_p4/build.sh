@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# wadamesh / LilyGo T-Display P4 build wrapper. Standalone ESP-IDF app
+# comet / LilyGo T-Display P4 build wrapper. Standalone ESP-IDF app
 # (NOT a launcher/AppFS app like the Tanmatsu) — flashes directly over USB.
 # Reuses the Tanmatsu's project-local ESP-IDF 5.5.1 (esp32p4) via the ../tanmatsu
 # symlinks, and the board-neutral components (meshcore/ardlibs/lvgl/esp_hosted).
@@ -82,7 +82,7 @@ WADA_FW_TAG="${WADA_FW_TAG:-$(git describe --tags --match 'beta_*' --always 2>/d
 WADA_FW_DATE="$(date '+%-d %b %Y')"
 IDF_ARGS=(-B "build/$P4_BUILD_TARGET" \
   -DDEVICE=tdisplay_p4 \
-  -DSDKCONFIG_DEFAULTS="sdkconfigs/general;sdkconfigs/wadamesh;sdkconfigs/tdisplay_p4" \
+  -DSDKCONFIG_DEFAULTS="sdkconfigs/general;sdkconfigs/comet;sdkconfigs/tdisplay_p4" \
   -DWADA_FW_TAG="$WADA_FW_TAG" -DWADA_FW_DATE="$WADA_FW_DATE" \
   -DIDF_TARGET=esp32p4)
 
@@ -133,8 +133,8 @@ fi
 # Meck-P4's working SD init sets the flag; Arduino's SD_MMC never does and has no API for it. Patch
 # the P4's own managed copy. Idempotent.
 SDMMC_C="managed_components/espressif__arduino-esp32/libraries/SD_MMC/src/SD_MMC.cpp"
-if [ -f "$SDMMC_C" ] && ! grep -q 'wadamesh P4: internal pullups' "$SDMMC_C"; then
-  sed -i '' 's|sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();|sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();\n  slot_config.flags \|= SDMMC_SLOT_FLAG_INTERNAL_PULLUP;  // wadamesh P4: internal pullups (no external ones on the SD lines)|' "$SDMMC_C"
+if [ -f "$SDMMC_C" ] && ! grep -q 'comet P4: internal pullups' "$SDMMC_C"; then
+  sed -i '' 's|sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();|sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();\n  slot_config.flags \|= SDMMC_SLOT_FLAG_INTERNAL_PULLUP;  // comet P4: internal pullups (no external ones on the SD lines)|' "$SDMMC_C"
   echo "[build.sh] patched arduino SD_MMC.cpp (internal pull-ups on the SD slot)"
 fi
 # --- Build-time patch: a dead C6 must not spin the SDIO rx task -----------------------------------
@@ -151,7 +151,7 @@ fi
 # posted, Wi-Fi and BLE are simply unavailable, and everything else on the device keeps running.
 # Idempotent.
 HOSTED_SDIO="managed_components/nicolaielectronics__esp-hosted-tanmatsu/host/drivers/transport/sdio/sdio_drv.c"
-if [ -f "$HOSTED_SDIO" ] && ! grep -q 'wadamesh: park instead of spinning' "$HOSTED_SDIO"; then
+if [ -f "$HOSTED_SDIO" ] && ! grep -q 'comet: park instead of spinning' "$HOSTED_SDIO"; then
   python3 - "$HOSTED_SDIO" <<'PYEOF'
 import re, sys
 p = sys.argv[1]
@@ -166,7 +166,7 @@ new = """#if H_TRANSPORT_RESTART_ON_FAILURE
 			ESP_LOGI(TAG, "Host is resetting itself, to avoid any sdio race condition");
 			g_h.funcs->_h_restart_host();
 #else
-			/* wadamesh: park instead of spinning. The transport is down and we are
+			/* comet: park instead of spinning. The transport is down and we are
 			 * not allowed to reboot the host, so retrying can only fail again at
 			 * full speed. The failure event is already posted; stop here and let the
 			 * rest of the device run without Wi-Fi/BLE. */
@@ -188,8 +188,8 @@ fi
 # the flag added above (that's the branch that actually runs with BOARD_SDMMC_SLOT=0) — so patch that
 # struct literal too. Without the flag the IDF host explicitly FLOATS the pads -> deterministic 0x109
 # CRC at the first data read regardless of card/frequency.
-if [ -f "$SDMMC_C" ] && ! grep -q 'wadamesh P4: slot0 pullups' "$SDMMC_C"; then
-  sed -i '' 's|^    .flags = 0,$|    .flags = SDMMC_SLOT_FLAG_INTERNAL_PULLUP,  // wadamesh P4: slot0 pullups (struct rebuilt here; the earlier flag is discarded)|' "$SDMMC_C"
+if [ -f "$SDMMC_C" ] && ! grep -q 'comet P4: slot0 pullups' "$SDMMC_C"; then
+  sed -i '' 's|^    .flags = 0,$|    .flags = SDMMC_SLOT_FLAG_INTERNAL_PULLUP,  // comet P4: slot0 pullups (struct rebuilt here; the earlier flag is discarded)|' "$SDMMC_C"
   echo "[build.sh] patched arduino SD_MMC.cpp (slot-0 struct pull-up flag)"
 fi
 
@@ -199,18 +199,18 @@ fi
 HOSTED_C="managed_components/espressif__arduino-esp32/cores/esp32/esp32-hal-hosted.c"
 if [ -f "$HOSTED_C" ]; then
   if [ -n "${WADA_P4_LEGACY_AT:-}" ]; then
-    if ! grep -q 'wadamesh P4: never start esp_hosted' "$HOSTED_C"; then
-      sed -i '' 's|^static bool hostedInit() {|static bool hostedInit() { return false; // wadamesh P4: never start esp_hosted (legacy C6 uses ESP-AT)|' "$HOSTED_C"
+    if ! grep -q 'comet P4: never start esp_hosted' "$HOSTED_C"; then
+      sed -i '' 's|^static bool hostedInit() {|static bool hostedInit() { return false; // comet P4: never start esp_hosted (legacy C6 uses ESP-AT)|' "$HOSTED_C"
       echo "[build.sh] hard-stubbed arduino hostedInit() (legacy ESP-AT build)"
     fi
-  elif grep -q 'wadamesh P4: never start esp_hosted' "$HOSTED_C"; then
-    sed -i '' 's|^static bool hostedInit() { return false; // wadamesh P4: never start esp_hosted.*$|static bool hostedInit() {|' "$HOSTED_C"
+  elif grep -q 'comet P4: never start esp_hosted' "$HOSTED_C"; then
+    sed -i '' 's|^static bool hostedInit() { return false; // comet P4: never start esp_hosted.*$|static bool hostedInit() {|' "$HOSTED_C"
     echo "[build.sh] restored arduino hostedInit() (hosted C6 build)"
   fi
 fi
 BLEDEV_CPP="managed_components/espressif__arduino-esp32/libraries/BLE/src/BLEDevice.cpp"
 if [ -f "$BLEDEV_CPP" ] && grep -q 'int rc = ble_gap_read_local_irk(irk);' "$BLEDEV_CPP"; then
-  sed -i '' 's|int rc = ble_gap_read_local_irk(irk);|int rc = 0; (void)irk;  // wadamesh: arduino BLE unused; symbol renamed in IDF 5.5 NimBLE|' "$BLEDEV_CPP"
+  sed -i '' 's|int rc = ble_gap_read_local_irk(irk);|int rc = 0; (void)irk;  // comet: arduino BLE unused; symbol renamed in IDF 5.5 NimBLE|' "$BLEDEV_CPP"
   echo "[build.sh] patched arduino BLEDevice.cpp (stub renamed ble_gap_read_local_irk)"
 fi
 
@@ -224,7 +224,7 @@ fi
 for HDIR in espressif__esp_hosted nicolaielectronics__esp-hosted-tanmatsu; do
   HINIT_C="managed_components/$HDIR/host/port/esp/freertos/src/port_esp_hosted_host_init.c"
   if [ -f "$HINIT_C" ] && grep -q 'ESP_ERROR_CHECK(esp_hosted_init());' "$HINIT_C"; then
-    sed -i '' 's|ESP_ERROR_CHECK(esp_hosted_init());|/* wadamesh P4: initialize C6 only after XL9535 board power */|' "$HINIT_C"
+    sed -i '' 's|ESP_ERROR_CHECK(esp_hosted_init());|/* comet P4: initialize C6 only after XL9535 board power */|' "$HINIT_C"
     echo "[build.sh] neutralized $HDIR auto-init constructor (defer until board power)"
   fi
 done

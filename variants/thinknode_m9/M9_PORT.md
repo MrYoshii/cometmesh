@@ -1,4 +1,4 @@
-# Heltec ThinkNode M9 — wadamesh port
+# Heltec ThinkNode M9 — comet port
 
 Fresh port against `main`, built alongside (not replacing) the Heltec V4 TFT and
 LilyGo T-Deck envs. Env name: `ThinkNode_M9_companion_radio_touch`.

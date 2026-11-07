@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
-// HI8561 TFT-LCD (MIPI-DSI, 540x1168 portrait) — wadamesh DisplayDriver for the LilyGo T-Display P4
+// HI8561 TFT-LCD (MIPI-DSI, 540x1168 portrait) — comet DisplayDriver for the LilyGo T-Display P4
 // *LCD* SKU. The T-Display P4 ships in two panel variants (LilyGo's own firmware branches
 // [hi8561] vs [rm69a10]): the AMOLED SKU uses the RM69A10 (see RM69A10Display), the TFT-LCD SKU
 // uses the HI8561 TDDI (integrated display+touch driver). This class is the LCD-SKU display; it is

@@ -1,4 +1,4 @@
-# wadamesh language file
+# comet language file
 # canonical source - translators: edit this file and PR it
 # code: ro
 # ver: 23
@@ -323,7 +323,7 @@ Factory reset?\n\nErases identity, contacts,\nchannels, messages, Wi-Fi\nand eve
 Failed to save channel.	Salvarea canalului a eşuat.
 Favorites full (max %d)	Favorite pline (max %d)
 Favorites unsupported	Favoritele nu sunt acceptate
-Fetching the app list from firmware.wadamesh.com	Se preia lista de aplicaţii de la firmware.wadamesh.com
+Fetching the app list from firmware.cometmesh.org	Se preia lista de aplicaţii de la firmware.cometmesh.org
 Files	Fişiere
 Find	Caută
 Finish	Finalizează
@@ -913,19 +913,19 @@ Up
 Update	Actualizează
 Update bin saved to SD	Bin de actualizare salvat pe SD
 Update complete.\nRebooting...	Actualizare completă.\nSe reporneşte...
-Update manually at flasher.wadamesh.com\n(Wi-Fi update is paused for now)	Actualizează manual la flasher.wadamesh.com\n(actualizarea Wi-Fi e momentan suspendată)
+Update manually at flasher.cometmesh.org\n(Wi-Fi update is paused for now)	Actualizează manual la flasher.cometmesh.org\n(actualizarea Wi-Fi e momentan suspendată)
 Update via the Launcher	Actualizează prin Launcher
-Update via the Launcher / flasher.wadamesh.com	Actualizează prin Launcher / flasher.wadamesh.com
-Update via the Launcher / flasher.wadamesh.com.	Actualizează prin Launcher / flasher.wadamesh.com.
+Update via the Launcher / flasher.cometmesh.org	Actualizează prin Launcher / flasher.cometmesh.org
+Update via the Launcher / flasher.cometmesh.org.	Actualizează prin Launcher / flasher.cometmesh.org.
 Updated - rebooting…	Actualizat - repornire…
 Use	Foloseşte
 Username (optional)	Utilizator (opţional)
 Volume	Volum
 W up  ·  A left  ·  D right  ·  Z down  ·  S select  ·  Q back	W sus  ·  A stânga  ·  D dreapta  ·  Z jos  ·  S selectare  ·  Q înapoi
 WADA#15B6A6 MESH#	WADA#15B6A6 MESH#
-WADAMESH	WADAMESH
+COMET	COMET
 Waiting for Wi-Fi...	Se aşteaptă Wi-Fi...
-Welcome to WADAMESH	Bun venit la WADAMESH
+Welcome to COMET	Bun venit la COMET
 While this is on, anyone on your Wi-Fi can view and control this device. Uses plain HTTP (local network only).	Cât timp e pornit, oricine din reţeaua ta Wi-Fi poate vedea şi controla dispozitivul. Foloseşte HTTP simplu (doar reţea locală).
 Wi-Fi	Wi-Fi
 Wi-Fi & Bluetooth	Wi-Fi şi Bluetooth
@@ -1065,7 +1065,7 @@ EXPERIMENTAL. Boots into a text console with no graphical interface: type comman
 Enter text	Enter text
 Entering console mode - rebooting...	Entering console mode - rebooting...
 Favorite	Favorite
-How tiles work:\nThe map is built from 256×256 "slippy" tiles. Only the tiles for the area you're viewing are fetched — there is no bulk pre-download.\n\nBecause this device can't do HTTPS (not enough heap after Wi-Fi starts) and decodes JPEG far more cheaply than PNG, tiles come from the wadamesh proxy: it fetches the upstream PNG over HTTPS with an identifying User-Agent, re-encodes it as JPEG, and caches it. Your device then caches each tile to its own flash, so a tile is only downloaded once.\n\nUse Options → Reload tiles to re-download the tiles currently in view if one looks corrupted.	How tiles work:\nThe map is built from 256×256 "slippy" tiles. Only the tiles for the area you're viewing are fetched — there is no bulk pre-download.\n\nBecause this device can't do HTTPS (not enough heap after Wi-Fi starts) and decodes JPEG far more cheaply than PNG, tiles come from the wadamesh proxy: it fetches the upstream PNG over HTTPS with an identifying User-Agent, re-encodes it as JPEG, and caches it. Your device then caches each tile to its own flash, so a tile is only downloaded once.\n\nUse Options → Reload tiles to re-download the tiles currently in view if one looks corrupted.
+How tiles work:\nThe map is built from 256×256 "slippy" tiles. Only the tiles for the area you're viewing are fetched — there is no bulk pre-download.\n\nBecause this device can't do HTTPS (not enough heap after Wi-Fi starts) and decodes JPEG far more cheaply than PNG, tiles come from the comet proxy: it fetches the upstream PNG over HTTPS with an identifying User-Agent, re-encodes it as JPEG, and caches it. Your device then caches each tile to its own flash, so a tile is only downloaded once.\n\nUse Options → Reload tiles to re-download the tiles currently in view if one looks corrupted.	How tiles work:\nThe map is built from 256×256 "slippy" tiles. Only the tiles for the area you're viewing are fetched — there is no bulk pre-download.\n\nBecause this device can't do HTTPS (not enough heap after Wi-Fi starts) and decodes JPEG far more cheaply than PNG, tiles come from the comet proxy: it fetches the upstream PNG over HTTPS with an identifying User-Agent, re-encodes it as JPEG, and caches it. Your device then caches each tile to its own flash, so a tile is only downloaded once.\n\nUse Options → Reload tiles to re-download the tiles currently in view if one looks corrupted.
 Init…	Init…
 Leaving console mode - rebooting...	Leaving console mode - rebooting...
 Link lost	Link lost
@@ -1282,9 +1282,9 @@ Scanning...	Scanning...
 Stopped after 	Stopped after 
 They are Windows programs, scripts, shortcuts or autorun files. A mesh radio never uses them, and nothing else on the card is touched.	They are Windows programs, scripts, shortcuts or autorun files. A mesh radio never uses them, and nothing else on the card is touched.
 This board has no SD card access for apps.	This board has no SD card access for apps.
-This firmware can only find them. Update wadamesh to remove them here.	This firmware can only find them. Update wadamesh to remove them here.
+This firmware can only find them. Update comet to remove them here.	This firmware can only find them. Update comet to remove them here.
 Finds and removes Windows programs, scripts, shortcuts and autorun files, like the worm on some ThinkNode M9 cards. A mesh radio never uses these.	Finds and removes Windows programs, scripts, shortcuts and autorun files, like the worm on some ThinkNode M9 cards. A mesh radio never uses these.
 No known Windows malware found.	No known Windows malware found.
-This firmware can find these but not remove them. Update wadamesh, or format the card: in Files, hold the SD card row.	This firmware can find these but not remove them. Update wadamesh, or format the card: in Files, hold the SD card row.
+This firmware can find these but not remove them. Update comet, or format the card: in Files, hold the SD card row.	This firmware can find these but not remove them. Update comet, or format the card: in Files, hold the SD card row.
 SD Scan only removes files it recognises. If the card may be infected, the safest fix is to copy off what you need and format it completely: in Files, hold the SD card row.	SD Scan only removes files it recognises. If the card may be infected, the safest fix is to copy off what you need and format it completely: in Files, hold the SD card row.
 and %d more	and %d more

@@ -1,4 +1,4 @@
-// wadamesh on the Tanmatsu (ESP32-P4) — the app entry point.
+// comet on the Tanmatsu (ESP32-P4) — the app entry point.
 //
 // Replaces the S3 boards' src/main.cpp setup()/loop(): it declares the app globals and runs the
 // bring-up. badge-bsp owns the display/input/power; arduino-esp32 is the runtime; the LoRa is the
@@ -227,7 +227,7 @@ static void bootSplashBegin() {
   bsp_display_get_parameters(&hh, &vv, &cf, &en);
   printf("[BOOT] panel %ux%u fmt=%d endian=%d\n", (unsigned)hh, (unsigned)vv, (int)cf, (int)en);
   for (int i = 0; i < BOOT_PW * BOOT_PH; i++) s_boot_fb[i] = 0x0000;   // black
-  bootDrawText(16, 28, "WADAMESH",     BOOT_FG, 3);                     // caps wordmark
+  bootDrawText(16, 28, "COMET",     BOOT_FG, 3);                     // caps wordmark
   bootDrawText(16, 64, "============", BOOT_FG, 2);                     // terminal rule under it
   s_boot_y = 100;
   bootBlit();
@@ -299,13 +299,13 @@ static void hostedConnectC6() {
   Serial.printf("[BOOT] C6 hosted link: %s\n", rc == 0 ? "UP" : "FAILED");
 }
 
-static void wadameshSetup() {
+static void cometSetup() {
   // Do NOT call Serial.begin() on the Tanmatsu (P4). The launcher already owns the USB-Serial-JTAG
   // console; re-initialising it here crashed the app during boot (before the splash could even draw
   // — the beta_21+ symptom of "blue screen, no boot log"). Serial output is swallowed on this board's
   // IDF console anyway, so printf (not Serial) carries the [BOOT] logs. See tanmatsu-serial-begin memory.
   delay(150);
-  printf("[BOOT] wadamesh / tanmatsu\n");
+  printf("[BOOT] comet / tanmatsu\n");
 
   // badge-bsp: panel + input + power. The panel must be up before LVGL flushes to it; ask for
   // RGB565 to match LVGL's 16-bit color depth (lvglFlush -> writePixelsRGB565 -> bsp_display_blit).
@@ -435,9 +435,9 @@ static void wadameshSetup() {
   bootLog("Bluetooth");
   if (hostedInitBLE()) {
     char* nm = the_mesh.getNodePrefs()->node_name;
-    serial_interface.prepareBle("wadamesh-", nm, the_mesh.getBLEPin());
+    serial_interface.prepareBle("comet-", nm, the_mesh.getBLEPin());
     if (wifiConfigGetBleEnabled())
-      serial_interface.beginBle("wadamesh-", nm, the_mesh.getBLEPin());
+      serial_interface.beginBle("comet-", nm, the_mesh.getBLEPin());
   } else {
     Serial.println("[BOOT] hostedInitBLE FAILED");
   }
@@ -464,7 +464,7 @@ static void wadameshSetup() {
 
 extern "C" void app_main(void) {
   initArduino();
-  wadameshSetup();
+  cometSetup();
 
   // WiFi state machine + SNTP + TCP companion server. On the S3 boards this lives in
   // src/main.cpp's loop() — which the Tanmatsu build excludes — so without it the UI's

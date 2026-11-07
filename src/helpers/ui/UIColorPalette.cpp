@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The single wadamesh definition of the 1.17 core's UIColor palette (semantic
+// The single comet definition of the 1.17 core's UIColor palette (semantic
 // ColorVal statics declared in helpers/ui/DisplayDriver.h). This file compiles
 // into EVERY target: all PIO envs build src/ wholesale, and both IDF apps glob
-// src/**/*.cpp into the whole-archive wadamesh_app component — so the palette
+// src/**/*.cpp into the whole-archive comet_app component — so the palette
 // must be defined here EXACTLY ONCE, never in a display-driver .cpp (the P4
 // builds compile both panel-SKU drivers into one archive, and the core's own
 // driver .cpps carry upstream definitions that stay unlinked only while nothing

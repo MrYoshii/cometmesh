@@ -4,7 +4,7 @@
 Import("env")
 import os
 
-MARKER = "wadamesh-wio-tracker-l2-dmadesc-oom-patch"
+MARKER = "comet-wio-tracker-l2-dmadesc-oom-patch"
 
 OLD_ALLOC = """  void Bus_SPI::_alloc_dmadesc(size_t len)
   {
@@ -15,7 +15,7 @@ OLD_ALLOC = """  void Bus_SPI::_alloc_dmadesc(size_t len)
 
 NEW_ALLOC = """  void Bus_SPI::_alloc_dmadesc(size_t len)
   {
-    // wadamesh-wio-tracker-l2-dmadesc-oom-patch: retain the working descriptor array
+    // comet-wio-tracker-l2-dmadesc-oom-patch: retain the working descriptor array
     // when a replacement cannot be allocated.
     auto next = (lldesc_t*)heap_caps_malloc(sizeof(lldesc_t) * len, MALLOC_CAP_DMA);
     if (next == nullptr) { return; }
@@ -34,7 +34,7 @@ NEW_SETUP = """    if (_dmadesc_size * SPI_MAX_DMA_LEN < len)
     {
       _alloc_dmadesc(len / SPI_MAX_DMA_LEN + 1);
     }
-    // wadamesh-wio-tracker-l2-dmadesc-oom-patch: skip a frame rather than walking a
+    // comet-wio-tracker-l2-dmadesc-oom-patch: skip a frame rather than walking a
     // null or undersized descriptor array after allocation failure.
     if (_dmadesc == nullptr || _dmadesc_size * SPI_MAX_DMA_LEN < len) { return; }
     lldesc_t *dmadesc = _dmadesc;"""

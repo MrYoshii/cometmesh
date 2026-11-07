@@ -49,7 +49,7 @@ static esp_err_t panel_hi8561_disp_on_off(esp_lcd_panel_t *panel, bool on_off);
 esp_err_t esp_lcd_new_panel_hi8561(const esp_lcd_panel_io_handle_t io, const esp_lcd_panel_dev_config_t *panel_dev_config,
                                    esp_lcd_panel_handle_t *ret_panel)
 {
-    // wadamesh: version-log commented out — the ESP_LCD_HI8561_VER_* macros come from the component's
+    // comet: version-log commented out — the ESP_LCD_HI8561_VER_* macros come from the component's
     // cmake_utilities dependency, which we don't vendor (same as esp_lcd_rm69a10.cpp). Sole edit to this
     // otherwise-verbatim Espressif Apache-2.0 driver.
     // ESP_LOGI(TAG, "version: %d.%d.%d", ESP_LCD_HI8561_VER_MAJOR, ESP_LCD_HI8561_VER_MINOR,

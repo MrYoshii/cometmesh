@@ -26,20 +26,20 @@ PORT_PATH = os.path.join(LIB_ROOT, "porting", "nimble", "src",
 NPL_PATH = os.path.join(LIB_ROOT, "porting", "npl", "freertos", "src",
                         "npl_os_freertos.c")
 
-HOST_MARKER = "wadamesh-nimble-defer-host-timer-delete"
+HOST_MARKER = "comet-nimble-defer-host-timer-delete"
 HOST_OLD = """    if (!ble_hs_is_enabled()) {
         ble_npl_callout_stop(&ble_hs_timer);
         ble_npl_callout_deinit(&ble_hs_timer);
     } else {"""
 HOST_NEW = """    if (!ble_hs_is_enabled()) {
-        /* wadamesh-nimble-defer-host-timer-delete: nimble_port_stop() can
+        /* comet-nimble-defer-host-timer-delete: nimble_port_stop() can
          * reach this while the FreeRTOS timer daemon still owns an expiry.
          * Stop here; ble_hs_deinit() destroys the callout after the host exits.
          */
         ble_npl_callout_stop(&ble_hs_timer);
     } else {"""
 
-PORT_MARKER = "wadamesh-nimble-drain-callouts-before-eventq-delete"
+PORT_MARKER = "comet-nimble-drain-callouts-before-eventq-delete"
 PORT_OLD = """    ble_npl_eventq_deinit(&g_eventq_dflt);
 #endif
     ble_hs_deinit();
@@ -47,7 +47,7 @@ PORT_OLD = """    ble_npl_eventq_deinit(&g_eventq_dflt);
 #if !SOC_ESP_NIMBLE_CONTROLLER
 #if CONFIG_NIMBLE_STACK_USE_MEM_POOLS"""
 PORT_NEW = """#endif
-    /* wadamesh-nimble-drain-callouts-before-eventq-delete: host callouts can
+    /* comet-nimble-drain-callouts-before-eventq-delete: host callouts can
      * still deliver an already-expired event while their FreeRTOS timer delete
      * is draining. Keep the destination queue valid until they are gone.
      */
@@ -57,7 +57,7 @@ PORT_NEW = """#endif
     ble_npl_eventq_deinit(&g_eventq_dflt);
 #if CONFIG_NIMBLE_STACK_USE_MEM_POOLS"""
 
-NPL_MARKER = "wadamesh-nimble-timer-delete-barrier"
+NPL_MARKER = "comet-nimble-timer-delete-barrier"
 NPL_OLD = """void
 npl_freertos_callout_deinit(struct ble_npl_callout *co)
 {
@@ -100,7 +100,7 @@ npl_freertos_callout_deinit(struct ble_npl_callout *co)
     if(esp_timer_delete(co->handle))
 \tESP_LOGW(LOG_TAG, \"Timer not deleted\");
 #else
-    /* wadamesh-nimble-timer-delete-barrier: xTimerDelete() is asynchronous.
+    /* comet-nimble-timer-delete-barrier: xTimerDelete() is asynchronous.
      * Queue a no-allocation barrier behind it and wait before invalidating the
      * callback state the timer daemon may still be using.
      */

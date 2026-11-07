@@ -81,21 +81,21 @@ def main():
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
-<title>WADAMESH Changelog</title>
-<meta name="description" content="What changed in every WADAMESH build, newest first.">
-<link rel="canonical" href="https://wadamesh.com/changelog.html">
+<title>COMET Changelog</title>
+<meta name="description" content="What changed in every COMET build, newest first.">
+<link rel="canonical" href="https://cometmesh.org/changelog.html">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="WADAMESH">
-<meta property="og:url" content="https://wadamesh.com/changelog.html">
-<meta property="og:title" content="WADAMESH changelog">
-<meta property="og:description" content="What changed in every WADAMESH build, newest first.">
-<meta property="og:image" content="https://wadamesh.com/og-image.png?v=2">
+<meta property="og:site_name" content="COMET">
+<meta property="og:url" content="https://cometmesh.org/changelog.html">
+<meta property="og:title" content="COMET changelog">
+<meta property="og:description" content="What changed in every COMET build, newest first.">
+<meta property="og:image" content="https://cometmesh.org/og-image.png?v=2">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="The WADAMESH home screen on a LilyGo T-Deck">
+<meta property="og:image:alt" content="The COMET home screen on a LilyGo T-Deck">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="favicon.ico" sizes="32x32">
-<link rel="icon" href="wadamesh-badge.svg" type="image/svg+xml">
+<link rel="icon" href="comet-badge.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
   :root{--bg:#ffffff;--bg2:#f4f6f2;--ink:#15181e;--mut:#5d6770;--line:#e5e8e2;--teal:#15b6a6;--teal-ink:#0b7a6f;color-scheme:light}
@@ -120,7 +120,7 @@ def main():
 <main>
 <button type="button" class="wm-theme" data-theme-toggle aria-label="Switch to light mode" title="Switch to light mode"><svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg><svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button>
 <h1>WADA<span class="t">MESH</span> changelog</h1>
-<p class="lede">What changed in every build, newest first. Install any of them at <a href="https://wadamesh.com/">wadamesh.com</a>.</p>
+<p class="lede">What changed in every build, newest first. Install any of them at <a href="https://cometmesh.org/">cometmesh.org</a>.</p>
 %s
 </main>
 </body>

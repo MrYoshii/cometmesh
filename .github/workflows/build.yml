@@ -54,8 +54,8 @@ jobs:
           path: |
             ~/.platformio
             .pio/libdeps
-          key: pio-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}
-          restore-keys: pio-${{ matrix.env }}-
+          key: pio-comet-${{ matrix.env }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: pio-comet-${{ matrix.env }}-
 
       - name: Install PlatformIO
         run: pip install --upgrade platformio

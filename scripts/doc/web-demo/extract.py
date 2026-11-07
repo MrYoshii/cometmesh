@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Extract the wadamesh web control-panel SPA from the firmware C source.
+Extract the comet web control-panel SPA from the firmware C source.
 
 The page is the C string literal `WS_HTML_TERMINAL_PAGE[]` in
     src/helpers/esp32/WebSocketCompanionServer.cpp
@@ -117,7 +117,7 @@ def main():
         f.write(html)
     print("wrote %s (%d bytes)" % (OUT, len(html)))
     # sanity: the reconstructed page must have the key anchors
-    for needle in ("<!DOCTYPE html>", "WADAMESH", "/term", "id=w", "showTab"):
+    for needle in ("<!DOCTYPE html>", "COMET", "/term", "id=w", "showTab"):
         if needle not in html:
             print("  WARNING: expected %r not found in output" % needle, file=sys.stderr)
 

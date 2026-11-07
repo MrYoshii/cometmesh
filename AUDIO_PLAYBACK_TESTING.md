@@ -76,7 +76,7 @@ to populate it is the repository's serial uploader:
    ```sh
    ffmpeg -y -i "/path/to/your/file.mp3" \
      -t 10 -ac 1 -ar 22050 -b:a 48k \
-     /tmp/wadamesh-audio-test.mp3
+     /tmp/comet-audio-test.mp3
    ```
 
 3. Find the serial port with `pio device list`.
@@ -98,7 +98,7 @@ to populate it is the repository's serial uploader:
      --port /dev/cu.usbmodem101 \
      --remote /apps/audio_test.d/test.mp3 \
      --reboot \
-     /tmp/wadamesh-audio-test.mp3
+     /tmp/comet-audio-test.mp3
    ```
 
 6. Open **Apps > audio_test** after reboot. With no card inserted, the app

@@ -78,9 +78,9 @@ public:
 //     GCM is the lightweight, hardware-accelerated equivalent.
 //
 // Topics (QoS 0, retained where noted):
-//   wadamesh/{node_hex}/msg/dm   — direct / signed messages (only if DM publish ON)
-//   wadamesh/{node_hex}/msg/ch   — channel messages (only if channel publish ON)
-//   wadamesh/{node_hex}/status   — LWT: "online" on connect, "offline" on drop (retained)
+//   comet/{node_hex}/msg/dm   — direct / signed messages (only if DM publish ON)
+//   comet/{node_hex}/msg/ch   — channel messages (only if channel publish ON)
+//   comet/{node_hex}/status   — LWT: "online" on connect, "offline" on drop (retained)
 //
 // ENCRYPTED PAYLOAD WIRE FORMAT (when a PSK is set):
 //   base64( nonce[12] || ciphertext[n] || tag[16] ),  AES-256-GCM,

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Build the AppFS write-images for a wadamesh sideload on the Tanmatsu.
+"""Build the AppFS write-images for a comet sideload on the Tanmatsu.
 
 Takes the pristine AppFS partition image plus the freshly-built application.bin,
-inserts/updates the "wadamesh" app inside it, then works out the MINIMUM set of
+inserts/updates the "comet" app inside it, then works out the MINIMUM set of
 64 KB sectors that changed and writes them out as two blobs:
 
     <out>/appfs_app.bin   -> flash at the app data offset   (write FIRST)
@@ -33,7 +33,7 @@ except ImportError:
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--pristine", default=os.path.join(HERE, "dev_appfs.bin"),
-                help="dump of the device's AppFS partition BEFORE wadamesh is installed")
+                help="dump of the device's AppFS partition BEFORE comet is installed")
 ap.add_argument("--app", default=os.path.join(REPO, "tanmatsu", "build", "tanmatsu", "application.bin"))
 ap.add_argument("--out", default="/tmp")
 ap.add_argument("--part-offset", type=lambda v: int(v, 0), default=0x420000,
@@ -59,7 +59,7 @@ if os.path.exists(meta_prev):
             m = AppFSMeta(mr[idx * APPFS_METADATA_SIZE:(idx + 1) * APPFS_METADATA_SIZE], idx)
             if m.header.check_magic() and m.check_crc32():
                 for p in m.pageInfo:
-                    if p.get_name() == "wadamesh":
+                    if p.get_name() == "comet":
                         prev = max(prev, p.get_version())
     except Exception as e:
         print("warn: could not read the previous version:", e)
@@ -67,7 +67,7 @@ ver = a.version or ((prev + 1) if prev else 1)
 print(f"app: {len(appbin)} bytes (0x{len(appbin):X})   version: {ver} (previous {prev})")
 
 fs = AppFS(pristine)
-fs.create_file("wadamesh", "WadaMesh", ver, appbin)
+fs.create_file("comet", "Comet", ver, appbin)
 newimg = fs.get_data()
 if len(newimg) != len(pristine):
     sys.exit("image size changed: the app does not fit this AppFS partition")

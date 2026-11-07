@@ -62,7 +62,7 @@ body:
       label: Crash report or screenshot
       description: >
         If the device saved a crash report, attach it: Files, or USB Files at
-        files.wadamesh.com. A crash report turns a guess into a line number.
+        files.cometmesh.org. A crash report turns a guess into a line number.
 
   - type: checkboxes
     id: checks

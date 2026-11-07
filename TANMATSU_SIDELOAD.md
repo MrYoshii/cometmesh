@@ -1,13 +1,13 @@
-# Sideloading wadamesh on the Tanmatsu
+# Sideloading comet on the Tanmatsu
 
-For developers building wadamesh from source and putting it on a Tanmatsu.
-If you just want to run it, install **WadaMesh** from the launcher's app store
+For developers building comet from source and putting it on a Tanmatsu.
+If you just want to run it, install **Comet** from the launcher's app store
 instead; this document is about running your own build.
 
 ## Understand the model first, or you will brick the launcher
 
-wadamesh is **not** standalone firmware on this board. The Tanmatsu boots
-badge.team's launcher, and wadamesh runs as an **AppFS app** underneath it,
+comet is **not** standalone firmware on this board. The Tanmatsu boots
+badge.team's launcher, and comet runs as an **AppFS app** underneath it,
 exactly like the launcher's own apps.
 
 So you never flash the whole device. You write **one app image plus one metadata
@@ -44,7 +44,7 @@ tanmatsu/tools/dump-pristine.sh /dev/cu.usbmodemXXXX
 ```
 
 This dumps **your** device's AppFS partition as the baseline that later deploys
-diff against. Do it while the launcher's own apps are installed and wadamesh is
+diff against. Do it while the launcher's own apps are installed and comet is
 not, so the baseline is the device as it ships.
 
 Use your own dump, not someone else's. The deploy writes only the sectors that
@@ -96,7 +96,7 @@ leaves you on the old binary with no error anywhere.
 
 ## Verify
 
-Launch **WadaMesh** from the launcher menu. An empty serial log immediately after
+Launch **Comet** from the launcher menu. An empty serial log immediately after
 flashing is normal, because the launcher is a silent GUI OS on USB-CDC; the boot
 log appears once the app itself starts.
 
@@ -139,5 +139,5 @@ pio run -e heltec_v4_tft_companion_radio_usb_tcp_touch
 ## Related
 
 - `TANMATSU_PORT.md` — the port's status and outstanding work
-- [wadamesh.com/sdk.html](https://wadamesh.com/sdk.html) — writing Lua apps, which
+- [cometmesh.org/sdk.html](https://cometmesh.org/sdk.html) — writing Lua apps, which
   needs no firmware build at all

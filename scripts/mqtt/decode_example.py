@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Reference subscriber + decryptor for the wadamesh MQTT bridge.
+Reference subscriber + decryptor for the comet MQTT bridge.
 
 The bridge publishes received mesh messages to:
-    wadamesh/{node_hex}/msg/dm    direct / signed messages  (only if DM publish is ON)
-    wadamesh/{node_hex}/msg/ch    channel messages
-    wadamesh/{node_hex}/status    "online" / "offline" (retained LWT)
+    comet/{node_hex}/msg/dm    direct / signed messages  (only if DM publish is ON)
+    comet/{node_hex}/msg/ch    channel messages
+    comet/{node_hex}/status    "online" / "offline" (retained LWT)
 
 Payload:
     - No encryption key set on the device -> payload is plain UTF-8 JSON.
@@ -39,8 +39,8 @@ def main():
     import paho.mqtt.client as mqtt
 
     def on_connect(c, *_):
-        c.subscribe("wadamesh/+/msg/#")
-        print("subscribed to wadamesh/+/msg/#")
+        c.subscribe("comet/+/msg/#")
+        print("subscribed to comet/+/msg/#")
 
     def on_message(_c, _u, msg):
         try:

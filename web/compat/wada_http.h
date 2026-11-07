@@ -6,9 +6,9 @@
 // Where requests go (compat/src/http_host.cpp):
 //   * the firmware's map tile server (DEFAULT_TILE_SERVER in TouchPrefsStore.cpp, read by
 //     web/CMakeLists.txt as WADA_TILE_SERVER): tiles + the line-of-sight elevation query
-//   * the Store, http://firmware.wadamesh.com/apps (WADA_STORE_BASE, checked against
+//   * the Store, http://firmware.cometmesh.org/apps (WADA_STORE_BASE, checked against
 //     UITask.cpp at configure time): catalogs, app files, language files
-//   * never the rest of firmware.wadamesh.com: the update check, OTA images, beta
+//   * never the rest of firmware.cometmesh.org: the update check, OTA images, beta
 //     reports and the install count are refused (CAP_OTA 0) and take their offline path
 //   * anything else (a Lua app's wada.net, the Reader): fetched directly, which works
 //     when that server sends CORS headers and fails cleanly otherwise. No open proxy.

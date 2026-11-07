@@ -11,7 +11,7 @@
 # set here (a page cannot set one). Each only passes the paths the firmware asks for:
 #   /tiles/...   -> the map tile server (DEFAULT_TILE_SERVER in
 #                   src/helpers/esp32/TouchPrefsStore.cpp, or --tiles URL)
-#   /fw/apps/... -> the Store, http://firmware.wadamesh.com/apps (or --store URL)
+#   /fw/apps/... -> the Store, http://firmware.cometmesh.org/apps (or --store URL)
 #   serve.py DIR [PORT] [--bind ADDR] [--tiles http://tiles.example] [--store http://x/apps] [--nt DIR]
 # /nt/ serves the no-threads bundle (web/dist-nothreads, or --nt DIR) the page loads when
 # it is not cross-origin isolated (any http:// origin other than localhost).
@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-UA = 'wadamesh-web (https://github.com/ALLFATHER-BV/wadamesh)'
+UA = 'comet-web (https://github.com/MrYoshii/cometmesh)'
 # z/x/y.jpg (+ the topo style's /opentopo prefix) and the line-of-sight elevation query
 TILE_PATH = re.compile(r'^/tiles(/(?:[a-z]+/)?\d{1,2}/\d{1,7}/\d{1,7}\.(?:jpg|png)|/elev\?locations=[0-9.,|%C-]{1,1400})$')
 
@@ -36,12 +36,12 @@ def default_tile_server():
             return m.group(1).rstrip('/')
     except OSError:
         pass
-    return 'http://tiles.wadamesh.com'
+    return 'http://tiles.cometmesh.org'
 
 
 TILE_UPSTREAM = default_tile_server()
 NT_DIR = None   # the no-threads bundle served at /nt/ (main(): --nt DIR, else ../dist-nothreads)
-STORE_UPSTREAM = 'http://firmware.wadamesh.com/apps'
+STORE_UPSTREAM = 'http://firmware.cometmesh.org/apps'
 # catalogs, <id>/<ver>/<file> (code, manifest, the app's own files), language files
 STORE_PATH = re.compile(r'^/fw/apps/(apps\.json|langs\.json|[A-Za-z0-9_-]{1,20}/[0-9][0-9.]{0,7}/[A-Za-z0-9_-][A-Za-z0-9._-]{0,39}'
                         r'|lang/(?:[0-9][0-9.]{0,7}/)?[a-z]{2}(?:-[a-z]{2})?\.lang)$')
@@ -154,7 +154,7 @@ def main():
     port = int(args[1]) if len(args) > 1 else 8080
     os.chdir(root)
     srv = http.server.ThreadingHTTPServer((bind, port), Handler)
-    print(f'wadamesh web: http://{"localhost" if bind == "127.0.0.1" else bind}:{port}/  (serving {os.getcwd()}, map tiles from {TILE_UPSTREAM}, Store from {STORE_UPSTREAM}, Ctrl-C stops)', flush=True)
+    print(f'comet web: http://{"localhost" if bind == "127.0.0.1" else bind}:{port}/  (serving {os.getcwd()}, map tiles from {TILE_UPSTREAM}, Store from {STORE_UPSTREAM}, Ctrl-C stops)', flush=True)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

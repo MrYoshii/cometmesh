@@ -29,9 +29,9 @@ static SntpClockPush s_sntp_push;
 #include <esp_partition.h>   // find/erase otadata so the bootloader returns to the recovery
 #include <helpers/TouchDiagTrace.h>
 #include <helpers/MeshTouchTxTrace.h>
-#include "helpers/esp32/TouchPrefsStore.h"   // QUOTED: get wadamesh's copy (touchPrefsReload), not the lib's stale one
+#include "helpers/esp32/TouchPrefsStore.h"   // QUOTED: get comet's copy (touchPrefsReload), not the lib's stale one
 #include "helpers/esp32/SdNvsPrefs.h"        // route prefs to file storage (SD/SPIFFS), off NVS
-                                             // (quoted: use wadamesh's src/ copy, not the lib's stale one)
+                                             // (quoted: use comet's src/ copy, not the lib's stale one)
 #include "helpers/esp32/BootTimeSync.h"      // opt-in cold-boot clock sync over saved Wi-Fi (#383)
 #include "helpers/WifiRejoinPolicy.h"         // when the loop rejoins a dropped/failed Wi-Fi link (#685)
 #include "ui-touch/i18n.h"                    // translated Pager transport-state alerts

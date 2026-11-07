@@ -1,4 +1,4 @@
-# wadamesh language file
+# comet language file
 # canonical source - translators: edit this file and PR it
 # code: cs
 # ver: 28
@@ -341,7 +341,7 @@ Factory reset?\n\nErases identity, contacts,\nchannels, messages, Wi-Fi\nand eve
 Failed to save channel.	Kanál se nepodařilo uložit.
 Favorites full (max %d)	Oblíbené jsou plné (max. %d)
 Favorites unsupported	Oblíbené nejsou podporovány
-Fetching the app list from firmware.wadamesh.com	Načítání seznamu aplikací z firmware.wadamesh.com
+Fetching the app list from firmware.cometmesh.org	Načítání seznamu aplikací z firmware.cometmesh.org
 Files	Soubory
 Find	Hledat
 Finish	Hotovo
@@ -930,19 +930,19 @@ Up	Nahoru
 Update	Aktualizace
 Update bin saved to SD	Aktualizační BIN uložen na SD
 Update complete.\nRebooting...	Aktualizace dokončena.\nRestartování…
-Update manually at flasher.wadamesh.com\n(Wi-Fi update is paused for now)	Aktualizujte ručně na flasher.wadamesh.com\n(Aktualizace přes Wi-Fi je zatím pozastavena)
+Update manually at flasher.cometmesh.org\n(Wi-Fi update is paused for now)	Aktualizujte ručně na flasher.cometmesh.org\n(Aktualizace přes Wi-Fi je zatím pozastavena)
 Update via the Launcher	Aktualizovat přes Launcher
-Update via the Launcher / flasher.wadamesh.com	Aktualizovat přes Launcher / flasher.wadamesh.com
-Update via the Launcher / flasher.wadamesh.com.	Aktualizovat přes Launcher / flasher.wadamesh.com.
+Update via the Launcher / flasher.cometmesh.org	Aktualizovat přes Launcher / flasher.cometmesh.org
+Update via the Launcher / flasher.cometmesh.org.	Aktualizovat přes Launcher / flasher.cometmesh.org.
 Updated - rebooting…	Aktualizováno - restartování…
 Use	Použít
 Username (optional)	Uživatelské jméno (volitelné)
 Volume	Hlasitost
 W up  ·  A left  ·  D right  ·  Z down  ·  S select  ·  Q back	W nahoru  ·  A vlevo  ·  D vpravo  ·  Z dolů  ·  S vybrat  ·  Q zpět
 WADA#15B6A6 MESH#	WADA#15B6A6 MESH#
-WADAMESH	WADAMESH
+COMET	COMET
 Waiting for Wi-Fi...	Čekání na Wi-Fi…
-Welcome to WADAMESH	Vítejte ve WADAMESH
+Welcome to COMET	Vítejte ve COMET
 While this is on, anyone on your Wi-Fi can view and control this device. Uses plain HTTP (local network only).	Dokud je toto zapnuté, může kdokoli na vaší Wi-Fi toto zařízení zobrazit a ovládat. Používá prosté HTTP (pouze lokální síť).
 Wi-Fi	Wi-Fi
 Wi-Fi & Bluetooth	Wi-Fi a Bluetooth
@@ -1081,7 +1081,7 @@ EXPERIMENTAL. Boots into a text console with no graphical interface: type comman
 Enter text	Zadat text
 Entering console mode - rebooting...	Vstup do režimu konzole - restartování…
 Favorite	Oblíbené
-How tiles work:\nThe map is built from 256×256 "slippy" tiles. Only the tiles for the area you're viewing are fetched — there is no bulk pre-download.\n\nBecause this device can't do HTTPS (not enough heap after Wi-Fi starts) and decodes JPEG far more cheaply than PNG, tiles come from the wadamesh proxy: it fetches the upstream PNG over HTTPS with an identifying User-Agent, re-encodes it as JPEG, and caches it. Your device then caches each tile to its own flash, so a tile is only downloaded once.\n\nUse Options → Reload tiles to re-download the tiles currently in view if one looks corrupted.	Jak fungují dlaždice:\nMapa se skládá z dlaždic 256×256 typu „slippy“. Načítají se pouze dlaždice oblasti, kterou právě sledujete — žádné hromadné předstažení.\n\nProtože toto zařízení neumí HTTPS (po spuštění Wi-Fi nemá dostatek haldy) a JPEG dekóduje mnohem levněji než PNG, dlaždice pocházejí z proxy wadamesh: proxy stáhne zdrojové PNG přes HTTPS s identifikujícím User-Agentem, překóduje ho na JPEG a uloží do mezipaměti. Zařízení pak každou dlaždici ukládá do vlastní flash paměti, takže se dlaždice stáhne pouze jednou.\n\nPokud některá dlaždice vypadá poškozeně, použijte Možnosti → Znovu načíst dlaždice.
+How tiles work:\nThe map is built from 256×256 "slippy" tiles. Only the tiles for the area you're viewing are fetched — there is no bulk pre-download.\n\nBecause this device can't do HTTPS (not enough heap after Wi-Fi starts) and decodes JPEG far more cheaply than PNG, tiles come from the comet proxy: it fetches the upstream PNG over HTTPS with an identifying User-Agent, re-encodes it as JPEG, and caches it. Your device then caches each tile to its own flash, so a tile is only downloaded once.\n\nUse Options → Reload tiles to re-download the tiles currently in view if one looks corrupted.	Jak fungují dlaždice:\nMapa se skládá z dlaždic 256×256 typu „slippy“. Načítají se pouze dlaždice oblasti, kterou právě sledujete — žádné hromadné předstažení.\n\nProtože toto zařízení neumí HTTPS (po spuštění Wi-Fi nemá dostatek haldy) a JPEG dekóduje mnohem levněji než PNG, dlaždice pocházejí z proxy comet: proxy stáhne zdrojové PNG přes HTTPS s identifikujícím User-Agentem, překóduje ho na JPEG a uloží do mezipaměti. Zařízení pak každou dlaždici ukládá do vlastní flash paměti, takže se dlaždice stáhne pouze jednou.\n\nPokud některá dlaždice vypadá poškozeně, použijte Možnosti → Znovu načíst dlaždice.
 Init…	Inicializace…
 Leaving console mode - rebooting...	Ukončování režimu konzole - restartování…
 Link lost	Spojení ztraceno
@@ -1297,10 +1297,10 @@ Scanning...	Skenování…
 Stopped after 	Zastaveno po 
 They are Windows programs, scripts, shortcuts or autorun files. A mesh radio never uses them, and nothing else on the card is touched.	Jde o programy, skripty, zástupce nebo soubory autorun systému Windows. Mesh rádio je nikdy nepoužívá a nic jiného na kartě se nemění.
 This board has no SD card access for apps.	Tato deska nemá přístup aplikací k SD kartě.
-This firmware can only find them. Update wadamesh to remove them here.	Tento firmware je může pouze najít. Aktualizujte WADAMESH, abyste je zde mohli odstranit.
+This firmware can only find them. Update comet to remove them here.	Tento firmware je může pouze najít. Aktualizujte COMET, abyste je zde mohli odstranit.
 Finds and removes Windows programs, scripts, shortcuts and autorun files, like the worm on some ThinkNode M9 cards. A mesh radio never uses these.	Vyhledá a odstraní programy, skripty, zástupce a soubory autorun systému Windows, například červ na některých kartách ThinkNode M9. Mesh rádio tyto soubory nikdy nepoužívá.
 No known Windows malware found.	Nebyl nalezen žádný známý malware pro Windows.
-This firmware can find these but not remove them. Update wadamesh, or format the card: in Files, hold the SD card row.	Tento firmware je umí najít, ale ne odstranit. Aktualizujte WADAMESH nebo kartu naformátujte: v Souborech podržte řádek SD karty.
+This firmware can find these but not remove them. Update comet, or format the card: in Files, hold the SD card row.	Tento firmware je umí najít, ale ne odstranit. Aktualizujte COMET nebo kartu naformátujte: v Souborech podržte řádek SD karty.
 SD Scan only removes files it recognises. If the card may be infected, the safest fix is to copy off what you need and format it completely: in Files, hold the SD card row.	SD Scan odstraňuje pouze soubory, které rozpozná. Pokud může být karta napadena, nejbezpečnější je zkopírovat potřebná data a kartu kompletně naformátovat: v Souborech podržte řádek SD karty.
 and %d more	a %d dalších
 High contrast	High contrast
@@ -1488,7 +1488,7 @@ Tap the EN key on the keyboard to switch	Tap the EN key on the keyboard to switc
 Tells the matrix how many devices run this build, so a board with no reports can be told apart from a board nobody owns. Sends the board and the version, nothing else.	Tells the matrix how many devices run this build, so a board with no reports can be told apart from a board nobody owns. Sends the board and the version, nothing else.
 Terminal	Terminal
 Test report: %s	Test report: %s
-Thank you. Your report is on wadamesh.com/beta	Thank you. Your report is on wadamesh.com/beta
+Thank you. Your report is on cometmesh.org/beta	Thank you. Your report is on cometmesh.org/beta
 The PINs did not match	The PINs did not match
 The mesh around you instead of a dark screen. Every ring is a real packet.	The mesh around you instead of a dark screen. Every ring is a real packet.
 This is everything that leaves the device. No name, no contacts, no position.	This is everything that leaves the device. No name, no contacts, no position.
@@ -1720,7 +1720,7 @@ Typing	Typing
 Unreleased test firmware: newer features, less tested. The update check and Install update both follow it.	Přijímat nevydaný testovací firmware — novější funkce, ale méně otestované. Kontrola aktualizací i Instalovat aktualizaci používají beta kanál.
 Until	Until
 Up to date (beta_%d)	Up to date (beta_%d)
-Update available: beta_%d\nYou have beta_%d. Get it at flasher.wadamesh.com.	Update available: beta_%d\nYou have beta_%d. Get it at flasher.wadamesh.com.
+Update available: beta_%d\nYou have beta_%d. Get it at flasher.cometmesh.org.	Update available: beta_%d\nYou have beta_%d. Get it at flasher.cometmesh.org.
 Update available: beta_%d\nYou have beta_%d. Install it below.	Update available: beta_%d\nYou have beta_%d. Install it below.
 Used only when the time zone is Custom (UTC offset).	Used only when the time zone is Custom (UTC offset).
 Wallpaper	Wallpaper

@@ -1,4 +1,4 @@
--- Trip Odometer — wadamesh Lua app
+-- Trip Odometer — comet Lua app
 -- Tracks distance, time, speed, and altitude for a trip via GPS.
 -- Tap Start/Stop to track, Reset to clear. Saves your trip across app restarts.
 -- Contributed by samuelcoustet

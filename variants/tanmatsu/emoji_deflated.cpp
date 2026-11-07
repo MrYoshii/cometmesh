@@ -7,7 +7,7 @@
 // the inflated images there (one ~209 KB block, once) costs nothing visible.
 //
 // emoji_deflated.h is generated at build time from emoji_data.c by
-// scripts/build/gen-emoji-deflated.py (tanmatsu/components/wadamesh_app/
+// scripts/build/gen-emoji-deflated.py (tanmatsu/components/comet_app/
 // CMakeLists.txt), which also verifies the round trip. The IDF build leaves
 // emoji_data.c out and defines WADA_EMOJI_DEFLATED; nothing else compiles this.
 #if defined(WADA_EMOJI_DEFLATED) && WADA_EMOJI_DEFLATED

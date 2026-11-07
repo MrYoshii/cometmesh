@@ -102,7 +102,7 @@ CONFIG_ESP_HOSTED_SDIO_RESET_SLAVE_USING_CALLBACK=y
 # esp-iot-solution MIPI-DSI guide prescribes exactly these three for "can't fetch data from
 # external memory fast enough": a 256 KB L2 cache with 128 B lines (fewer, larger PSRAM
 # transactions -> more headroom for the continuous ~120 MB/s DSI fetch), and perf optimization.
-# The shared 'wadamesh' fragment sets -Os for the Tanmatsu's AppFS size ceiling; this board is a
+# The shared 'comet' fragment sets -Os for the Tanmatsu's AppFS size ceiling; this board is a
 # plain 4 MB OTA slot with ~1.1 MB free, so it can afford -O2 (build.sh orders this fragment last
 # so board overrides win). SPIRAM_SPEED_200M + XIP_FROM_PSRAM, the other two recommendations,
 # were already set.

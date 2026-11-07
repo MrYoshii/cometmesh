@@ -17,7 +17,7 @@ idf_component_register(
 		espressif__arduino-esp32
 		meshcore
 		lvgl
-		wadamesh_app
+		comet_app
 		${extra_requires}
 	INCLUDE_DIRS
 		"."
@@ -73,8 +73,8 @@ endif()
 idf_build_set_property(COMPILE_OPTIONS "-DFIRMWARE_RELEASE_TAG=\"${WADA_FW_TAG}\"" APPEND)
 idf_build_set_property(COMPILE_OPTIONS "-DFIRMWARE_BUILD_DATE=\"${WADA_FW_DATE}\"" APPEND)
 # The About page shows FIRMWARE_VERSION (not the tag). The S3 release.sh sets it to
-# "wadamesh <tag>"; without this the P4 build fell back to the MeshCore default
+# "comet <tag>"; without this the P4 build fell back to the MeshCore default
 # ("v1.16.0-touch") and the Tanmatsu never showed its beta number. Keep them in sync.
-idf_build_set_property(COMPILE_OPTIONS "-DFIRMWARE_VERSION=\"wadamesh ${WADA_FW_TAG}\"" APPEND)
-# (the adcAttachPin compat shim is force-included per-component in meshcore + wadamesh_app —
+idf_build_set_property(COMPILE_OPTIONS "-DFIRMWARE_VERSION=\"comet ${WADA_FW_TAG}\"" APPEND)
+# (the adcAttachPin compat shim is force-included per-component in meshcore + comet_app —
 #  NOT globally, which would feed the C++ header to FreeRTOS's .S assembly files and break them.)

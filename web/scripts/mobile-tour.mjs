@@ -1,4 +1,4 @@
-// web/scripts/mobile-tour.mjs: wadamesh on phones and tablets (Playwright device emulation).
+// web/scripts/mobile-tour.mjs: comet on phones and tablets (Playwright device emulation).
 //   node web/scripts/mobile-tour.mjs [--url http://localhost:8189/] [--shots web/docs]
 //                                    [--devices "iPhone 14,Pixel 7,iPad (gen 7)"]
 //   (web/build.sh mobiletest serves web/dist and runs it)
@@ -6,7 +6,7 @@
 // the bar at the device's own size (portrait upright); tap into a chat, type through the
 // phone keyboard path (the page's hidden field: UTF-8 with an emoji), send; turn to
 // landscape and back with the data intact; Connect shows what that device can use.
-// Taps go by label text (window.wadamesh.findText) or by canvas coordinates relative to
+// Taps go by label text (window.comet.findText) or by canvas coordinates relative to
 // the canvas size, so the tour runs at whatever size each device gets.
 // Screenshots: web/docs/mobile-<device>-*.png
 import { createRequire } from 'node:module';
@@ -29,9 +29,9 @@ const results = {};
 let failures = 0;
 
 async function booted(page) {
-  await page.waitForFunction(() => window.wadamesh && window.wadamesh.running(), null, { timeout: 60000 });
+  await page.waitForFunction(() => window.comet && window.comet.running(), null, { timeout: 60000 });
 }
-async function canvasSize(page) { return page.evaluate(() => window.wadamesh.size()); }
+async function canvasSize(page) { return page.evaluate(() => window.comet.size()); }
 // canvas pixels -> page pixels
 async function toPage(page, x, y) {
   const r = await page.locator('#screen').boundingBox();
@@ -40,11 +40,11 @@ async function toPage(page, x, y) {
 }
 async function tapAt(page, x, y) { const [px, py] = await toPage(page, x, y); await page.touchscreen.tap(px, py); await sleep(300); }
 async function tapText(page, text) {
-  const p = await page.evaluate((t) => window.wadamesh.findText(t), text);
+  const p = await page.evaluate((t) => window.comet.findText(t), text);
   if (!p) throw new Error(`no label "${text}" on screen`);
   await tapAt(page, p[0], p[1]);
 }
-async function hasText(page, text) { return !!(await page.evaluate((t) => window.wadamesh.findText(t), text)); }
+async function hasText(page, text) { return !!(await page.evaluate((t) => window.comet.findText(t), text)); }
 // How the canvas sits in the window: its size, how much of the space below the bar it
 // covers, the bar (one row), crisp scaling.
 async function fit(page) {
@@ -55,7 +55,7 @@ async function fit(page) {
     const ix = Math.max(0, Math.min(c.right, vw) - Math.max(c.left, 0));
     const iy = Math.max(0, Math.min(c.bottom, vh) - Math.max(c.top, bar.bottom));
     const btn = document.getElementById('btn-connect').getBoundingClientRect();
-    return { canvas: window.wadamesh.size().join('x'), css: `${Math.round(c.width)}x${Math.round(c.height)}`,
+    return { canvas: window.comet.size().join('x'), css: `${Math.round(c.width)}x${Math.round(c.height)}`,
              viewport: `${vw}x${vh}`, dpr: devicePixelRatio, bar: Math.round(bar.height),
              barOneRow: bar.height < 64 && Math.abs((btn.top + btn.bottom) / 2 - (bar.top + bar.bottom) / 2) < 8,
              cover: +((ix * iy) / (vw * (vh - bar.bottom))).toFixed(3),
@@ -105,17 +105,17 @@ for (const devName of DEVICES) {
           await page.evaluate(() => document.activeElement && document.activeElement.id === 'ime'));
     await page.keyboard.type(TEXT, { delay: 40 });
     await sleep(600);
-    check('the UI keeps its own keys down', await page.evaluate(() => window.wadamesh._m()._wadaWebOskShown() === 0));
-    const typed = await page.evaluate(() => window.wadamesh.editText());
+    check('the UI keeps its own keys down', await page.evaluate(() => window.comet._m()._wadaWebOskShown() === 0));
+    const typed = await page.evaluate(() => window.comet.editText());
     check('the field got the typed text, emoji included (UTF-8)', typed === TEXT, { typed });
     await snap('04-typing');
     await page.keyboard.press('Enter');
     await sleep(2500);
     check('Enter sends: the bubble shows the text', await hasText(page, TEXT), {});
-    check('the field is empty again', (await page.evaluate(() => window.wadamesh.editText())) === '');
+    check('the field is empty again', (await page.evaluate(() => window.comet.editText())) === '');
     await snap('05-sent');
-    await page.evaluate(() => window.wadamesh.flush());
-    check('the message is saved (UTF-8)', (await page.evaluate((t) => window.wadamesh.findInStorage(t), TEXT)).length > 0);
+    await page.evaluate(() => window.comet.flush());
+    check('the message is saved (UTF-8)', (await page.evaluate((t) => window.comet.findInStorage(t), TEXT)).length > 0);
     if (engine === 'chromium') {
       // A composing keyboard (Gboard, any IME): the word grows while composing, then the
       // keyboard commits its (autocorrected) choice; Backspace deletes, also past the start.
@@ -126,13 +126,13 @@ for (const devName of DEVICES) {
         await cdp.send('Input.imeSetComposition', { text: t, selectionStart: t.length, selectionEnd: t.length });
         await sleep(120);
       }
-      const composing = await page.evaluate(() => window.wadamesh.editText());
+      const composing = await page.evaluate(() => window.comet.editText());
       await cdp.send('Input.insertText', { text: 'welkom ' });
       await sleep(300);
-      const committed = await page.evaluate(() => window.wadamesh.editText());
+      const committed = await page.evaluate(() => window.comet.editText());
       for (let i = 0; i < 9; i++) { await page.keyboard.press('Backspace'); await sleep(60); }
       await sleep(300);
-      const cleared = await page.evaluate(() => window.wadamesh.editText());
+      const cleared = await page.evaluate(() => window.comet.editText());
       check('composition (IME) is followed, committed and deleted', composing === 'welk' && committed === 'welkom ' && cleared === '',
             { composing, committed, cleared });
       await page.evaluate(() => document.activeElement && document.activeElement.blur());

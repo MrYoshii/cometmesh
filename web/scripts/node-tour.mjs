@@ -40,14 +40,14 @@ async function tap(page, x, y) {
 async function shot(page, name) { await page.screenshot({ path: path.join(SHOTS, `node-${name}.png`) }); }
 const badge = (page) => page.locator('#mode').textContent();
 async function booted(page) {
-  await page.waitForFunction(() => window.wadamesh && window.wadamesh.running(), null, { timeout: 60000 });
+  await page.waitForFunction(() => window.comet && window.comet.running(), null, { timeout: 60000 });
 }
 async function waitBadge(page, re, ms = 20000) {
   const t0 = Date.now();
   while (Date.now() - t0 < ms) { if (re.test(await badge(page))) return true; await sleep(250); }
   return false;
 }
-const inStorage = (page, needle) => page.evaluate((n) => window.wadamesh.findInStorage(n), needle);
+const inStorage = (page, needle) => page.evaluate((n) => window.comet.findInStorage(n), needle);
 
 const browser = await pw.chromium.launch();
 // The visitor is in Ghent and lets the page use the location (step 6: the privacy rule).
@@ -81,7 +81,7 @@ await page.click('#connect-dlg [data-kind="ws"]');
 await page.waitForLoadState('load');
 await booted(page);
 check('connected', await waitBadge(page, /^Connected: Mock Node over Wi-Fi$/), { badge: await badge(page) });
-check('node data dir', (await page.evaluate(() => window.wadamesh.dataDir)).startsWith('/data/node-'));
+check('node data dir', (await page.evaluate(() => window.comet.dataDir)).startsWith('/data/node-'));
 await sleep(2500);
 await shot(page, '03-connected-home');
 await tap(page, 80, 456);   // Chats
@@ -102,23 +102,23 @@ await page.keyboard.type('hello from the browser', { delay: 20 });
 await page.keyboard.press('Enter');
 await sleep(5000);
 await shot(page, '06-dm-delivered');
-await page.evaluate(() => window.wadamesh.flush());
+await page.evaluate(() => window.comet.flush());
 check('DM reply from the node stored', (await inStorage(page, 'mock reply: got it')).length > 0);
 
 // 4. The live channel post the mock sends 8 s after connecting.
 await page.keyboard.press('Escape');
 await sleep(1500);
 await shot(page, '07-live');
-await page.evaluate(() => window.wadamesh.flush());
+await page.evaluate(() => window.comet.flush());
 check('live message received', (await inStorage(page, 'live hello from the mock')).length > 0);
 check('waiting message synced', (await inStorage(page, 'hello from the mock (waiting)')).length > 0);
-const nodeDir = await page.evaluate(() => window.wadamesh.dataDir);
+const nodeDir = await page.evaluate(() => window.comet.dataDir);
 
 // 5. Reload: reconnects by itself, into the node's own data dir (now keyed by the node).
 await page.reload({ waitUntil: 'load' });
 await booted(page);
 check('reconnects after reload', await waitBadge(page, /^Connected: Mock Node/), { badge: await badge(page) });
-const dir2 = await page.evaluate(() => window.wadamesh.dataDir);
+const dir2 = await page.evaluate(() => window.comet.dataDir);
 check('data dir keyed by the node', /^\/data\/node-[0-9a-f]{8}$/.test(dir2), { before: nodeDir, after: dir2 });
 await sleep(2000);
 await tap(page, 80, 456);

@@ -1,4 +1,4 @@
-# wadamesh language file
+# comet language file
 # canonical source - translators: edit this file and PR it
 # code: bg
 # ver: 22
@@ -316,7 +316,7 @@ Factory reset?\n\nErases identity, contacts,\nchannels, messages, Wi-Fi\nand eve
 Failed to save channel.	Каналът не можа да се запази.
 Favorites full (max %d)	Любимите са пълни (макс %d)
 Favorites unsupported	Любими не се поддържат
-Fetching the app list from firmware.wadamesh.com	Изтегляне на списъка с приложения от firmware.wadamesh.com
+Fetching the app list from firmware.cometmesh.org	Изтегляне на списъка с приложения от firmware.cometmesh.org
 Files	Файлове
 Find	Намери
 Finish	Готово
@@ -904,19 +904,19 @@ Up
 Update	Обнови
 Update bin saved to SD	Файлът за обновяване е записан на SD
 Update complete.\nRebooting...	Обновяването завърши.\nРестартиране...
-Update manually at flasher.wadamesh.com\n(Wi-Fi update is paused for now)	Обновете ръчно на flasher.wadamesh.com\n(Wi-Fi обновяването е спряно засега)
+Update manually at flasher.cometmesh.org\n(Wi-Fi update is paused for now)	Обновете ръчно на flasher.cometmesh.org\n(Wi-Fi обновяването е спряно засега)
 Update via the Launcher	Обнови през Launcher
-Update via the Launcher / flasher.wadamesh.com	Обнови през Launcher / flasher.wadamesh.com
-Update via the Launcher / flasher.wadamesh.com.	Обнови през Launcher / flasher.wadamesh.com.
+Update via the Launcher / flasher.cometmesh.org	Обнови през Launcher / flasher.cometmesh.org
+Update via the Launcher / flasher.cometmesh.org.	Обнови през Launcher / flasher.cometmesh.org.
 Updated - rebooting…	Обновено - рестартиране…
 Use	Избери
 Username (optional)	Потребителско име (по избор)
 Volume	Сила на звука
 W up  ·  A left  ·  D right  ·  Z down  ·  S select  ·  Q back	W нагоре  ·  A ляво  ·  D дясно  ·  Z надолу  ·  S избор  ·  Q назад
 WADA#15B6A6 MESH#	WADA#15B6A6 MESH#
-WADAMESH	WADAMESH
+COMET	COMET
 Waiting for Wi-Fi...	Изчакване на Wi-Fi...
-Welcome to WADAMESH	Добре дошли в WADAMESH
+Welcome to COMET	Добре дошли в COMET
 While this is on, anyone on your Wi-Fi can view and control this device. Uses plain HTTP (local network only).	Докато е включено, всеки в твоята Wi-Fi мрежа може да гледа и управлява устройството. Използва обикновен HTTP (само локална мрежа).
 Wi-Fi	Wi-Fi
 Wi-Fi & Bluetooth	Wi-Fi и Bluetooth
@@ -1055,7 +1055,7 @@ EXPERIMENTAL. Boots into a text console with no graphical interface: type comman
 Enter text	Enter text
 Entering console mode - rebooting...	Entering console mode - rebooting...
 Favorite	Favorite
-How tiles work:\nThe map is built from 256×256 "slippy" tiles. Only the tiles for the area you're viewing are fetched — there is no bulk pre-download.\n\nBecause this device can't do HTTPS (not enough heap after Wi-Fi starts) and decodes JPEG far more cheaply than PNG, tiles come from the wadamesh proxy: it fetches the upstream PNG over HTTPS with an identifying User-Agent, re-encodes it as JPEG, and caches it. Your device then caches each tile to its own flash, so a tile is only downloaded once.\n\nUse Options → Reload tiles to re-download the tiles currently in view if one looks corrupted.	How tiles work:\nThe map is built from 256×256 "slippy" tiles. Only the tiles for the area you're viewing are fetched — there is no bulk pre-download.\n\nBecause this device can't do HTTPS (not enough heap after Wi-Fi starts) and decodes JPEG far more cheaply than PNG, tiles come from the wadamesh proxy: it fetches the upstream PNG over HTTPS with an identifying User-Agent, re-encodes it as JPEG, and caches it. Your device then caches each tile to its own flash, so a tile is only downloaded once.\n\nUse Options → Reload tiles to re-download the tiles currently in view if one looks corrupted.
+How tiles work:\nThe map is built from 256×256 "slippy" tiles. Only the tiles for the area you're viewing are fetched — there is no bulk pre-download.\n\nBecause this device can't do HTTPS (not enough heap after Wi-Fi starts) and decodes JPEG far more cheaply than PNG, tiles come from the comet proxy: it fetches the upstream PNG over HTTPS with an identifying User-Agent, re-encodes it as JPEG, and caches it. Your device then caches each tile to its own flash, so a tile is only downloaded once.\n\nUse Options → Reload tiles to re-download the tiles currently in view if one looks corrupted.	How tiles work:\nThe map is built from 256×256 "slippy" tiles. Only the tiles for the area you're viewing are fetched — there is no bulk pre-download.\n\nBecause this device can't do HTTPS (not enough heap after Wi-Fi starts) and decodes JPEG far more cheaply than PNG, tiles come from the comet proxy: it fetches the upstream PNG over HTTPS with an identifying User-Agent, re-encodes it as JPEG, and caches it. Your device then caches each tile to its own flash, so a tile is only downloaded once.\n\nUse Options → Reload tiles to re-download the tiles currently in view if one looks corrupted.
 Init…	Init…
 Leaving console mode - rebooting...	Leaving console mode - rebooting...
 Link lost	Link lost

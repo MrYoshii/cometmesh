@@ -165,7 +165,7 @@ static void* wadaMp3Scratch() { return s_wada_mp3_scratch; }
 #include "NavSpatial.h"         // host-tested keypad spatial step (navMoveDir)
 #include "SdThreat.h"           // SD-card malware rules: the mount-time warning + wada.sd.remove
 #include "../CometHosts.h"     // the servers the firmware talks to (Comet: no update or report server yet)
-#include "UsbFilesSession.h"    // USB Files: files.wadamesh.com over the USB cable
+#include "UsbFilesSession.h"    // USB Files: files.cometmesh.org over the USB cable
 #include "UsbFilesPaint.h"      // host-tested: how often the USB Files screen repaints (e-paper)
 #include "SenderExtField.h"   // host-tested split/rejoin of a sender across the two on-disk fields
 #include "Constellation.h"    // the Constellation screensaver (drawing only; the mesh side is in this file)
@@ -692,7 +692,7 @@ static uint32_t COLOR_PANEL         = kNightPalette.panel;
 // Runtime-themeable accent (Settings -> Accent colour). NOT constexpr: the picker
 // rewrites these live and they're reloaded from the saved pref at boot. Every
 // accent site reads them through lv_color_hex(), so one write re-themes the UI.
-uint32_t COLOR_ACCENT       = 0x15B6A6;  // WADAMESH brand teal (default; the logo dots)
+uint32_t COLOR_ACCENT       = 0x15B6A6;  // COMET brand teal (default; the logo dots)
 uint32_t COLOR_ACCENT_PRESS = 0x0D766B;  // darker brand teal (default)
 static uint32_t COLOR_ON_ACCENT = kNightPalette.text;
 static uint32_t COLOR_ON_STATUS_OK = kNightPalette.text;
@@ -5899,13 +5899,13 @@ static void drawRemotePlaceholder(bool exit_armed = false) {
 #else
   #define RPH_INK(c) ((ColorVal)(c))
 #endif
-  // wadamesh mesh mark up top (same white-on-black artwork as the boot splash). The
+  // comet mesh mark up top (same white-on-black artwork as the boot splash). The
   // touch DisplayDriver runs at scale 1.0, so writePixelsRGB565 shares text coords.
   const int ly = (H >= 288) ? 46 : 14;   // portrait panels have room to breathe; landscape sits high
   display.writePixelsRGB565((W - COMET_MARK_W) / 2, ly,
                             COMET_MARK_W, COMET_MARK_H, COMET_MARK_RGB565);
   int y = ly + COMET_MARK_H + 18;
-  // Prominent title (the logo already carries the brand — no redundant "wadamesh" line).
+  // Prominent title (the logo already carries the brand — no redundant "comet" line).
   display.setColor(RPH_INK(0xFFFF));
   display.setTextSize(2);
   display.drawTextCentered(W / 2, y, "REMOTE MODE");
@@ -9509,7 +9509,7 @@ static void versionCheckUpdateUi() {
   } else if (s_update_available && s_verchk_latest_n >= 0) {
     // Where to get it: the Install button when this install has one, else the flasher.
     snprintf(b, sizeof b, s_ota_btn ? TR(LV_SYMBOL_DOWNLOAD "  Update available: beta_%d\nYou have beta_%d. Install it below.")
-                                    : TR(LV_SYMBOL_DOWNLOAD "  Update available: beta_%d\nYou have beta_%d. Get it at flasher.wadamesh.com."),
+                                    : TR(LV_SYMBOL_DOWNLOAD "  Update available: beta_%d\nYou have beta_%d. Get it at flasher.cometmesh.org."),
              s_verchk_latest_n, my_n);
     lv_obj_set_style_text_color(s_update_about_lbl, lightSurfaceTextColor(0xE2A23A), LV_PART_MAIN);
   } else if (s_verchk_latest_n >= 0) {
@@ -9571,7 +9571,7 @@ static void otaButtonRefreshState() {
 // false), so Wi-Fi OTA can't work there — but the Launcher itself can flash an
 // app-only bin straight from the SD card. This downloads the latest bin for
 // the ACTIVE update channel (stable, or beta when "Get test builds" is on)
-// into /BINS/wadamesh-beta_<N>-<stable|beta>.bin on the SD card. The download
+// into /BINS/comet-beta_<N>-<stable|beta>.bin on the SD card. The download
 // streams on the tile worker; this UI side mirrors the OTA poll pattern.
 // Wording is board-conditional and the two sets are SEPARATE TR() keys on purpose.
 // Only the T-Deck has bmorcelli's Launcher; now that this feature is gated on
@@ -14822,7 +14822,7 @@ static void rebootCb(lv_event_t* e) {
 
 #if defined(ESP32)
 // True when the running image has a spare OTA app slot BIG ENOUGH to write an
-// update into. Standalone wadamesh ships a dual-OTA (A/B) table with two equal
+// update into. Standalone comet ships a dual-OTA (A/B) table with two equal
 // ~3.875 MB slots -> true -> in-firmware + phone-app update works.
 //
 // Installed under bmorcelli's Launcher the app runs from a slot in the Launcher's
@@ -17412,7 +17412,7 @@ static void sysInfoTextRest(char* buf, size_t cap) {
   p += snprintf(buf + p, cap - p,
                 "Build\n  %s\n  %s\n  on meshcomod %s (MeshCore)\n  COMET\n",
                 FIRMWARE_VERSION, FIRMWARE_BUILD_DATE, FIRMWARE_CORE_VERSION);
-#if defined(WADAMESH_FORK_BUILD)
+#if defined(COMET_FORK_BUILD)
   // Defined in platformio.ini for this fork's builds; absent upstream.
   p += snprintf(buf + p, cap - p, "  unofficial fork build\n");
 #endif
@@ -30358,13 +30358,13 @@ static void openSignalInfoPopup() {
 // device to a third party). No JS / CSS / images by design. All network + parse work
 // runs on a core-0 worker task so LVGL never blocks; the UI loop polls s_reader_dirty.
 #if defined(ESP32) && defined(MULTI_TRANSPORT_COMPANION)
-static const char    kReaderDefaultUrl[] = "wadamesh.com";
+static const char    kReaderDefaultUrl[] = "github.com/MrYoshii/cometmesh";
 static const char    kReaderHomeUrl[] = "sd:/home.htm";
 // Online with no SD home page: what changed in each build, newest first (#622). The site
 // generates it from release-notes/ (scripts/build/gen-changelog.py) at every deploy. Plain
 // HTTP: the TLS handshake needs internal RAM the T-Deck Pro does not have to spare, so the
 // https page never opened there (#638). The site serves it over http without a redirect.
-static const char    kReaderChangelogUrl[] = "http://wadamesh.com/changelog.html";
+static const char    kReaderChangelogUrl[] = "https://github.com/MrYoshii/cometmesh/commits/main";
 static lv_obj_t*     s_reader_root   = nullptr;
 static lv_obj_t*     s_reader_url_ta = nullptr;
 static lv_obj_t*     s_reader_go     = nullptr;
@@ -30561,7 +30561,7 @@ static void readerFetchTaskFn(void*) {
       WiFiClientSecure scli; WiFiClient pcli; bool began;   // before the HTTPClient: ~HTTPClient may stop() its client
       HTTPClient httpc;
       httpc.setReuse(false); httpc.setConnectTimeout(9000); httpc.setTimeout(15000);
-      httpc.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS); httpc.setUserAgent("wadamesh-reader");
+      httpc.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS); httpc.setUserAgent("comet-reader");
       if (https) { scli.setInsecure(); began = httpc.begin(scli, url); }
       else       {                       began = httpc.begin(pcli, url); }
       if (began) { httpc.addHeader("Accept-Encoding", "identity"); code = httpc.GET(); }
@@ -30662,7 +30662,7 @@ static bool readerNavigate(const char* in, bool push) {
   snprintf(s_reader_url, sizeof s_reader_url, "%s", next_url);
   // Keep the address field in sync with what we're actually loading, so a failed load
   // shows the URL we tried (not the stale default that made it look like it "opened
-  // wadamesh.com").
+  // cometmesh.org").
   if (s_reader_url_ta) { lv_textarea_set_text(s_reader_url_ta, s_reader_url); s_reader_pristine = false; }
   s_reader_ok = false;
   s_reader_home_missing = false;
@@ -36297,7 +36297,7 @@ static void ensureTilesDirPath(uint8_t z, int32_t x, const char* root) {
 // ----- Firmware version check (reuses the core-0 fetch worker) -----
 // The web flasher lists releases under prebuilt/releases/TOUCH/ via the GitHub
 // API. The device can't do HTTPS, but the meshcomod proxy exposes that same API
-// over plain HTTP at firmware.wadamesh.com/releases/. We GET the TOUCH listing,
+// over plain HTTP at firmware.cometmesh.org/releases/. We GET the TOUCH listing,
 // scan for the highest pre-alpha_<N>, and compare to our embedded release tag.
 // (s_verchk_request / s_verchk_done / s_verchk_latest_n are declared globally
 // near the version-check UI helpers above.)
@@ -36322,9 +36322,9 @@ static int verchkFetchLatest(WiFiClient& client, HTTPClient& http) {
   http.setTimeout(12000);
 #if !COMET_HAS_UPDATE_SERVER
   (void)client; (void)http;
-  return -1;   // no Comet update server yet: never offer wadamesh's firmware
+  return -1;   // no Comet update server yet: never offer comet's firmware
 #endif
-  http.setUserAgent("wadamesh-touch");
+  http.setUserAgent("comet-touch");
   char listurl[72];
   snprintf(listurl, sizeof listurl, "http://" COMET_FIRMWARE_HOST "/releases/%s", updChannelArchive());
   if (!http.begin(client, listurl)) {
@@ -36427,7 +36427,7 @@ int luaStoreHttpReq(WiFiClient& client, HTTPClient& http, const char* url,
   http.setReuse(false);
   http.setConnectTimeout(8000);
   http.setTimeout(12000);
-  http.setUserAgent("wadamesh-touch");
+  http.setUserAgent("comet-touch");
   if (!http.begin(client, url)) return -1;
   int code;
   if (body) {
@@ -36523,7 +36523,7 @@ static bool luaStoreHttpToFile(WiFiClient& client, HTTPClient& http, const char*
   http.setReuse(false);
   http.setConnectTimeout(8000);
   http.setTimeout(12000);
-  http.setUserAgent("wadamesh-touch");
+  http.setUserAgent("comet-touch");
   if (!http.begin(client, url)) return false;
   const int code = http.GET();
   const int want = (code >= 200 && code <= 299) ? http.getSize() : -1;
@@ -36717,7 +36717,7 @@ static int langStreamToFile(WiFiClient& client, HTTPClient& http, const char* ur
   http.setReuse(false);
   http.setConnectTimeout(8000);
   http.setTimeout(12000);
-  http.setUserAgent("wadamesh-touch");
+  http.setUserAgent("comet-touch");
   if (!http.begin(client, url)) { heap_caps_free(chunk); return -1; }
   const int code = http.GET();
   if (code < 200 || code > 299) { http.end(); heap_caps_free(chunk); return -1; }
@@ -36996,7 +36996,7 @@ static int wifiScanWatchdogSafe(uint32_t cap_ms, uint16_t per_chan_ms = 300) {
 // HAS_TDECK_PRO as well and the Pro branch came first. One list, and the #else is
 // a build break, so the next board is added once or not at all.
 //
-// These ids are the release artifact names minus the "wadamesh-" prefix, and the
+// These ids are the release artifact names minus the "comet-" prefix, and the
 // report service validates them against the bins actually published for the tag.
 #if defined(HAS_TDECK_GT911)
 #define WADA_BOARD_ID "tdeck"
@@ -37080,7 +37080,7 @@ static int wifiScanWatchdogSafe(uint32_t cap_ms, uint16_t per_chan_ms = 300) {
 
 // ---- beta test reports -------------------------------------------------------
 // A tester says "this build works on my board" from the device, and that lands in
-// the matrix at wadamesh.com/beta which the next stable promote is decided on.
+// the matrix at cometmesh.org/beta which the next stable promote is decided on.
 //
 // It posts to our own host over plain HTTP, not to GitHub, for two reasons that
 // are not going to change: mbedTLS wants ~30 KB of internal heap for a handshake
@@ -37096,7 +37096,7 @@ static int wifiScanWatchdogSafe(uint32_t cap_ms, uint16_t per_chan_ms = 300) {
 // say who you are, so it is a salted SHA-256 of the public key, truncated to 64
 // bits. Nobody who does not already hold the key can work back to a node from it.
 static void reportDeviceId(char out[17]) {
-  static const char k_salt[] = "wadamesh-report-v1";
+  static const char k_salt[] = "comet-report-v1";
   uint8_t h[32];
   mesh::Utils::sha256(h, sizeof h,
                       the_mesh.self_id.pub_key, PUB_KEY_SIZE,
@@ -37185,11 +37185,11 @@ static bool reportPostWorker(WiFiClient& client, HTTPClient& http,
 // A missing entry does NOT 404. This chain used to end in a bare #else naming the Heltec V4 TFT,
 // so a board nobody added here silently fetched ANOTHER board's firmware -- and Update.end() only
 // checks the image is valid for an ESP32-S3, which the V4 build is. The Wio Tracker L2 shipped
-// exactly like that (beta_79's image carries "wadamesh-heltec-v4-tft"): an on-device update
+// exactly like that (beta_79's image carries "comet-heltec-v4-tft"): an on-device update
 // would flash V4 firmware onto Wio hardware. The T-Deck Pro would have followed it the moment it
 // was published. Every board is now listed explicitly and anything else refuses to compile, so
 // forgetting this table is a build break instead of a field brick.
-static const char* const OTA_BIN_NAME = "wadamesh-" WADA_BOARD_ID;
+static const char* const OTA_BIN_NAME = "comet-" WADA_BOARD_ID;
 // Download the latest published app-only bin over plain HTTP and flash it into the spare A/B slot
 // via the Arduino Update writer. Runs on the tile-fetcher worker (off the UI thread); reports
 // progress through s_ota_state / s_ota_pct / s_ota_msg for the UI poll timer. We fetch the
@@ -37209,7 +37209,7 @@ static void otaWorkerRun(WiFiClient& client, HTTPClient& http) {
   http.setReuse(false);
   http.setConnectTimeout(8000);
   http.setTimeout(20000);
-  http.setUserAgent("wadamesh-touch");
+  http.setUserAgent("comet-touch");
   Serial.printf("[OTA] GET %s\n", url);
   if (!http.begin(client, url)) { snprintf(s_ota_msg, sizeof s_ota_msg, "connect failed"); s_ota_state = 3; return; }
   const int code = http.GET();
@@ -37260,7 +37260,7 @@ static void otaWorkerRun(WiFiClient& client, HTTPClient& http) {
 
 #if CAP_SD && defined(ESP32) && defined(MULTI_TRANSPORT_COMPANION) && CAP_OTA
 // Stream the app-only bin for the active update channel onto the SD card
-// (/BINS/wadamesh-beta_<N>-<stable|beta>.bin) so the Launcher can flash it —
+// (/BINS/comet-beta_<N>-<stable|beta>.bin) so the Launcher can flash it —
 // the no-A/B-slot counterpart to otaWorkerRun above. Same immutable versioned
 // URL, same worker, but the bytes go to SD instead of the spare OTA slot.
 //
@@ -37282,7 +37282,7 @@ static void sdFwWorkerRun(WiFiClient& client, HTTPClient& http) {
     snprintf(s_sdfw_msg, sizeof s_sdfw_msg, "can't create /BINS"); s_sdfw_state = 3; return;
   }
   char path[56];
-  snprintf(path, sizeof path, "/BINS/wadamesh-beta_%d-%s.bin",
+  snprintf(path, sizeof path, "/BINS/comet-beta_%d-%s.bin",
            s_sdfw_target_n, touchPrefsGetBetaUpdates() ? "beta" : "stable");
   char url[176];
   snprintf(url, sizeof url, "http://" COMET_FIRMWARE_HOST "/releases/%s/beta_%d/%s.bin",
@@ -37290,7 +37290,7 @@ static void sdFwWorkerRun(WiFiClient& client, HTTPClient& http) {
   http.setReuse(false);
   http.setConnectTimeout(8000);
   http.setTimeout(20000);
-  http.setUserAgent("wadamesh-touch");
+  http.setUserAgent("comet-touch");
   if (!http.begin(client, url)) { snprintf(s_sdfw_msg, sizeof s_sdfw_msg, "connect failed"); s_sdfw_state = 3; return; }
   const int code = http.GET();
   if (code != 200) { snprintf(s_sdfw_msg, sizeof s_sdfw_msg, "HTTP %d", code); http.end(); s_sdfw_state = 3; return; }
@@ -37461,7 +37461,7 @@ static void tileFetchTaskFn(void* arg) {
   // wants ~30 KB internal heap during the handshake and after Wi-Fi
   // associates only ~5 KB is free. OSM itself only serves HTTPS, but a
   // tiny user-side proxy (Render / Fly / nginx — ~30 lines) forwards
-  // http://tiles.wadamesh.com/{z}/{x}/{y}.png  →  https://tile.osm.org.
+  // http://tiles.cometmesh.org/{z}/{x}/{y}.png  →  https://tile.osm.org.
   // Default base URL is hard-coded; user can override via Settings.
   WiFiClient client;
   HTTPClient http;
@@ -37810,7 +37810,7 @@ static void tileFetchTaskFn(void* arg) {
     http.setConnectTimeout(3000);
     http.setTimeout(2000);
     // OSM policy: identifying User-Agent required; vague UAs get blocked.
-    http.addHeader("User-Agent", "wadamesh-touch/0.4 (https://github.com/ALLFATHER-BV/wadamesh)");
+    http.addHeader("User-Agent", "comet-touch/0.4 (https://github.com/MrYoshii/cometmesh)");
     WIRE_DBG("[TILE] GET %s\n", url);
     s_tile_fetch_step = 'g';
     int code = http.GET();
@@ -38478,7 +38478,7 @@ static bool loadTileJpeg(uint8_t z, int32_t x, int32_t y,
   if (out_repairable_cache) *out_repairable_cache = false;
   // Format support:
   //   • JPEG (.jpg)  — decoded by SJPG/TJpgDec straight to RGB565 in stripes (cheap).
-  //                    The LittleFS online cache stores ONLY .jpg (the tiles.wadamesh.com
+  //                    The LittleFS online cache stores ONLY .jpg (the tiles.cometmesh.org
   //                    proxy transcodes OSM's PNG → JPEG, and the device fetches .jpg).
   //   • PNG  (.png)  — decoded directly via lodepng (decodePngToRgb565), bypassing LVGL's
   //                    lv_png (which renders noise on this board). Used by SD packs, which
@@ -40915,7 +40915,7 @@ static void mapOptInfoCb(lv_event_t* e) {
     "The map is built from 256\xC3\x97" "256 \"slippy\" tiles. Only the tiles for the "
     "area you're viewing are fetched \xE2\x80\x94 there is no bulk pre-download.\n\n"
     "Because this device can't do HTTPS (not enough heap after Wi-Fi starts) "
-    "and decodes JPEG far more cheaply than PNG, tiles come from the wadamesh "
+    "and decodes JPEG far more cheaply than PNG, tiles come from the comet "
     "proxy: it fetches the upstream PNG over HTTPS with an identifying "
     "User-Agent, re-encodes it as JPEG, and caches it. Your device then caches "
     "each tile to its own flash, so a tile is only downloaded once.\n\n"
@@ -43679,7 +43679,7 @@ static bool crashDumpExport(char* out_path, size_t out_cap) {
 
   bool used_sd = false;
   fs::FS* dst = nullptr;
-  const char* path = "/wadamesh-crash.elf";
+  const char* path = "/comet-crash.elf";
 #if CAP_SD || defined(TLORA_PAGER)
   if (fmSdTryMount()) { dst = &SD; used_sd = true; }
 #elif defined(HAS_TANMATSU) || defined(HAS_TDISPLAY_P4) || defined(HAS_CROWPANEL_P4_101)
@@ -51630,7 +51630,7 @@ static uint32_t rx24Sum() {
 #if CAP_LOCK_SCREEN
 // ---- Lock screen -------------------------------------------------------------
 // A full-screen overlay shown while the device is hard-locked, as in the
-// redesign: the wadamesh mark, a large light clock and the date, the mesh's
+// redesign: the comet mark, a large light clock and the date, the mesh's
 // activity over the last 24 hours, up to two unread conversations, and at the
 // bottom how to unlock and the battery. A custom wallpaper sits dimmed behind
 // it. Lifecycle: lockScreen() builds it (dark); a key/trackball press reveals it
@@ -51638,7 +51638,7 @@ static uint32_t rx24Sum() {
 // loop's button block).
 static lv_obj_t*    s_lock_root      = nullptr;
 static lv_obj_t*    s_lock_body      = nullptr;   // everything but the wallpaper; drifts against burn-in
-static lv_obj_t*    s_lock_mark      = nullptr;   // the wadamesh mark (lockMarkDrawCb)
+static lv_obj_t*    s_lock_mark      = nullptr;   // the comet mark (lockMarkDrawCb)
 static lv_obj_t*    s_lock_clock     = nullptr;
 static lv_obj_t*    s_lock_date      = nullptr;
 static lv_obj_t*    s_lock_spark     = nullptr;   // the 24 hour activity line (lockSparkDrawCb)
@@ -51951,7 +51951,7 @@ static void lockscreenUpdateClock() {
 #endif
 }
 
-// ---- The wadamesh mark ----------------------------------------------------------
+// ---- The comet mark ----------------------------------------------------------
 // Two zigzags crossing on a centre line, seven nodes, from its 180 x 120 drawing
 // (nodes inside x 3..177, y 5..115), scaled to the object's height. While the
 // screen is lit, light runs along both lines and each node sends out a ring
@@ -60133,7 +60133,7 @@ static void sdMalwareTick(uint32_t now) {
 
 #if CAP_USB_FILES
 // ============================================================================
-// USB Files app (app drawer -> APPACT_USB_FILES): files.wadamesh.com browses,
+// USB Files app (app drawer -> APPACT_USB_FILES): files.cometmesh.org browses,
 // uploads, downloads and deletes this device's files over the USB cable (Web
 // Serial). UsbFilesSession does the protocol and every file operation, and holds
 // the access rules; this is the board glue (which storages exist, mounting the
@@ -60240,7 +60240,7 @@ class UiUsbFilesHost : public UsbFilesHost {
 #elif defined(HELTEC_LORA_V4_TFT)
     static const char* kBoard = "Heltec V4 TFT";
 #else
-    static const char* kBoard = "wadamesh";
+    static const char* kBoard = "comet";
 #endif
     const char* fw = FIRMWARE_RELEASE_TAG[0] ? FIRMWARE_RELEASE_TAG : "dev";
     size_t pos = 0;
@@ -60461,7 +60461,7 @@ static const AppTileDef k_app_tiles[] = {
   { UI_ICON_SHARE_2,            "Transfer",  APPACT_FILE_TRANSFER, HUE_SYS }, // authenticated browser upload
 #endif
 #if CAP_USB_FILES
-  { UI_ICON_USB,                "USB Files", APPACT_USB_FILES, HUE_SYS },     // files.wadamesh.com over the cable
+  { UI_ICON_USB,                "USB Files", APPACT_USB_FILES, HUE_SYS },     // files.cometmesh.org over the cable
 #endif
 #if !CAP_LUA_APPS
   { UI_ICON_GAMEPAD_2,          "Snake",     APPACT_SNAKE,     HUE_MSG },     // native snake (Lua boards install it from the Store)
@@ -61803,13 +61803,13 @@ static void docCaptureTour() {
   // On-device web browser (8 MB boards only) + the chat-link menu + the QR popup.
   // The reader renders from the UI-update poll (which doesn't run while this tour
   // blocks the loop), so drive the fetch-wait + render inline here.
-  openReaderPage("wadamesh.com");
+  openReaderPage("cometmesh.org");
   { int _w = 0; while (s_reader_busy && _w < 700) { lv_timer_handler(); delay(22); ++_w; } wdtFeed(); }
   if (s_reader_ok) { readerRenderBody(); readerSetAddrExpanded(false); }
   else             { readerShowMessage(s_reader_msg[0] ? s_reader_msg : "Couldn't load page", 0xE0A0A0); readerSetAddrExpanded(true); }
   docSettle(8); captureScreenToSerial("app_web");       closeReaderPage(); docSettle(6);
-  openUrlMenu("https://wadamesh.com");            docSettle(10); captureScreenToSerial("app_web_links");  closeUrlMenu();    docSettle(6);
-  openUrlQrPopup("https://wadamesh.com");         docSettle(10); captureScreenToSerial("app_web_qr");     closeUrlQr();      docSettle(6);
+  openUrlMenu("https://cometmesh.org");            docSettle(10); captureScreenToSerial("app_web_links");  closeUrlMenu();    docSettle(6);
+  openUrlQrPopup("https://cometmesh.org");         docSettle(10); captureScreenToSerial("app_web_qr");     closeUrlQr();      docSettle(6);
 #endif
   docAuditTour();
 
@@ -69733,7 +69733,7 @@ static void touchThemeApplyCb(lv_theme_t* /*th*/, lv_obj_t* obj) {
 }
 static lv_theme_t s_touch_theme;   // our wrapper theme (parent = stock default)
 
-// Curated accent palette for the swatch grid: WADAMESH brand teal (default,
+// Curated accent palette for the swatch grid: COMET brand teal (default,
 // the logo dots) first, then stock grey + a colour spread.
 static const uint32_t kThemeColors[] = {
   0x15B6A6, 0x57585A, 0x3B82F6, 0x2DA8A0, 0x3FA34D, 0x8B5CF6,
@@ -77925,7 +77925,7 @@ bool UITask::sendComposerToActiveThread(const char* override_text) {
     // slot is valid. After a channel add/remove the indices shift, so a stale mesh_channel_slot can
     // resolve to a DIFFERENT but valid channel; the message would then appear here under the right
     // thread yet transmit on the WRONG channel's key. Re-bind by name if it doesn't match.
-    // (User report: a message typed in #wadamesh went out on #test.)
+    // (User report: a message typed in #comet went out on #test.)
     bool ok = (slot >= 0 && the_mesh.getChannel(slot, cd) && cd.name[0] &&
                strncmp(cd.name, thread_name, MAX_THREAD_NAME) == 0);
     if (!ok) {
@@ -86920,7 +86920,7 @@ static void docRadioAudit() {
 
 #if (defined(DOC_MUSIC_AUDIT) || defined(DOC_APPS_AUDIT)) && CAP_MICROSD
 // The Music Store app end to end on a card that may hold no music: two short
-// test tones go into /Music/wadamesh test/, the app scans, plays the first and
+// test tones go into /Music/comet test/, the app scans, plays the first and
 // must move to the second by itself when it ends (app.on_audio). Removed after.
 #include "doc_radio_apps.h"   // scripts/doc/gen-radio-audit-apps.py
 static bool docWriteToneWav(fs::FS& card, const char* path, int hz, int ms) {
@@ -86975,9 +86975,9 @@ static void docMusicAudit() {
   fs::FS& card = SD_MMC;
 #endif
   card.mkdir("/Music");
-  card.mkdir("/Music/wadamesh test");
-  const bool w1 = docWriteToneWav(card, "/Music/wadamesh test/Tone A.wav", 660, 1500);
-  const bool w2 = docWriteToneWav(card, "/Music/wadamesh test/Tone B.wav", 880, 1500);
+  card.mkdir("/Music/comet test");
+  const bool w1 = docWriteToneWav(card, "/Music/comet test/Tone A.wav", 660, 1500);
+  const bool w2 = docWriteToneWav(card, "/Music/comet test/Tone B.wav", 880, 1500);
   Serial.printf("DBG: MUSIC test tones written %d %d\n", w1, w2);
   // Sound on for the test only, in memory (never saved), so playback is not refused
   // as "muted" on a bench device with its sound switched off.
@@ -86993,9 +86993,9 @@ static void docMusicAudit() {
     luaAppDismiss(); docSettle(8);
   }
   if (np) np->buzzer_quiet = quiet_was;
-  card.remove("/Music/wadamesh test/Tone A.wav");
-  card.remove("/Music/wadamesh test/Tone B.wav");
-  card.rmdir("/Music/wadamesh test");
+  card.remove("/Music/comet test/Tone A.wav");
+  card.remove("/Music/comet test/Tone B.wav");
+  card.rmdir("/Music/comet test");
   Serial.println("DBG: MUSIC done, test tones removed");
 }
 #endif
@@ -87022,7 +87022,7 @@ static void docI18nAudit() {
 #endif
 
 #if defined(DOC_APPS_AUDIT) && CAP_MICROSD
-// One screenshot per Store app for wadamesh.com/apps.html: each catalog app is
+// One screenshot per Store app for cometmesh.org/apps.html: each catalog app is
 // launched from the embedded source, given ~3 s to settle and captured as
 // store_<id>. Music gets two short test tracks on the card (removed after) and a
 // press of Play, so its shot shows a list and playback rather than an empty card.

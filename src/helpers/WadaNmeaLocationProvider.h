@@ -1,6 +1,6 @@
 #pragma once
 
-// Wadamesh-owned NMEA location provider: the core's MicroNMEALocationProvider
+// Comet-owned NMEA location provider: the core's MicroNMEALocationProvider
 // plus the motion fields it keeps private.
 //
 // WHY A COPY: MeshCore's MicroNMEALocationProvider (helpers/sensors/) holds its

@@ -1,4 +1,4 @@
-# LilyGo T-Display P4 — wadamesh port tracker
+# LilyGo T-Display P4 — comet port tracker
 
 A phone-class ESP32-P4 + ESP32-C6 handheld with an SX1262 or LR2021. Essentially a **touchscreen
 Tanmatsu**, so we reuse the Tanmatsu P4/IDF/esp-hosted foundation (approach A: standalone IDF app
@@ -21,10 +21,10 @@ flashes over the right-side USB (USB-Serial-JTAG). LoRa region = EU 868.
 
 ## Scaffold state (DONE)
 - `tdisplay_p4/` created; `esp-idf`,`esp-idf-tools` + components `meshcore/ardlibs/lvgl/esp_hosted`
-  + `sdkconfigs/{general,wadamesh}` symlinked to `../tanmatsu/`
+  + `sdkconfigs/{general,comet}` symlinked to `../tanmatsu/`
 - `build.sh` (DEVICE=tdisplay_p4, target esp32p4, standalone), `CMakeLists.txt`
 - `main/CMakeLists.txt` — the full board WADA_DEFS (SX1262/LR2021, RM69A10, HI8561, XL9535 IOs)
-- `components/wadamesh_app/CMakeLists.txt` — builds `src/` + `variants/tdisplay_p4/`, no badge-bsp
+- `components/comet_app/CMakeLists.txt` — builds `src/` + `variants/tdisplay_p4/`, no badge-bsp
 - `sdkconfigs/tdisplay_p4` (P4/PSRAM/DSI/esp-hosted-SDIO_2), `partition_tables/tdisplay_p4_16M.csv`
 
 ## Remaining Phase 1 — bring-up (empirical, needs the device; do in this order)
@@ -82,7 +82,7 @@ runs: 32 MB PSRAM found, ESP-IDF 5.5.1. Two HW-integration issues seen on the se
   Wi-Fi/BLE stay down) instead of rebooting. The C6 SDIO pins (CLK18/CMD19/D0-3=14-17) + XL9535 power/
   enable/reset timing still need on-device verification — that's the next hardware task after pixels.
 
-### 🖥️ DISPLAY WORKING — 2026-07-14 (the RM69A10 AMOLED emits + the wadamesh UI renders)
+### 🖥️ DISPLAY WORKING — 2026-07-14 (the RM69A10 AMOLED emits + the comet UI renders)
 The panel came up only after matching the **pelgraine/Meck-P4** `screen_lvgl` reference EXACTLY (my
 config matched LilyGo's config.h — pin map, 568×1232, DSI timing, init array — but the *bring-up
 sequence* was wrong). The non-obvious, must-keep recipe (all in Xl9535.cpp + RM69A10Display.cpp):

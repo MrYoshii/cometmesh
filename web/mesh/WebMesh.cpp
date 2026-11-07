@@ -88,7 +88,7 @@ void MyMesh::loadPrefs() {
   // Defaults: src/MyMesh.cpp's constructor values.
   _prefs = NodePrefs{};
   _prefs.airtime_factor = 1.0f;
-  StrHelper::strncpy(_prefs.node_name, "wadamesh web", sizeof(_prefs.node_name));
+  StrHelper::strncpy(_prefs.node_name, "comet web", sizeof(_prefs.node_name));
   _prefs.freq = LORA_FREQ;
   _prefs.sf = LORA_SF;
   _prefs.bw = LORA_BW;
@@ -405,7 +405,7 @@ bool MyMesh::getAdvertPath(const uint8_t* pubkey_prefix, int prefix_len, uint8_t
   return false;
 }
 // ---- settings backup (Settings > Backups) ---------------------------------------------
-// src/MyMesh.cpp's file, field for field (the MeshCore app's shape plus wadamesh's own
+// src/MyMesh.cpp's file, field for field (the MeshCore app's shape plus comet's own
 // blocks), so a backup moves between the browser, a device and the phone app. Two
 // deliberate differences: no private key ("private_key" is empty, which every importer
 // skips): the demo has none and a node keeps its own (MeshCore exports it only on the
@@ -440,7 +440,7 @@ void MyMesh::uiExportBackup(Print& out, double node_lat, double node_lon) {
   out.print("  \"other_settings\": null,\n");
   out.print("  \"auto_add_settings\": null,\n");
   snprintf(l, sizeof l,
-    "  \"wadamesh_settings\": {\"version\": 1, \"airtime_factor\": %.3f, \"rx_boosted_gain\": %u, "
+    "  \"comet_settings\": {\"version\": 1, \"airtime_factor\": %.3f, \"rx_boosted_gain\": %u, "
     "\"multi_acks\": %u, \"manual_add_contacts\": %u, \"autoadd_config\": %u, \"autoadd_max_hops\": %u, ",
     (double)p->airtime_factor, (unsigned)p->rx_boosted_gain, (unsigned)p->multi_acks,
     (unsigned)p->manual_add_contacts, (unsigned)p->autoadd_config, (unsigned)p->autoadd_max_hops);
@@ -539,7 +539,7 @@ bool MyMesh::uiImportBackup(Stream& in, uint8_t sections, bool replace_channels,
       if (!r["coding_rate"].isNull())      { _prefs.cr = (uint8_t)r["coding_rate"].as<int>(); dirty = true; }
       if (!r["tx_power"].isNull())         { _prefs.tx_power_dbm = (int8_t)r["tx_power"].as<int>(); dirty = true; }
     }
-    JsonObjectConst w = root["wadamesh_settings"].as<JsonObjectConst>();
+    JsonObjectConst w = root["comet_settings"].as<JsonObjectConst>();
     if (!w.isNull()) {
       auto u8 = [&](const char* k, uint8_t& dst, int max_v) {
         if (w[k].isNull()) return;

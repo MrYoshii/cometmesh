@@ -2,7 +2,7 @@
 // c6_at — AT-over-SDIO client for the T-Display P4's ESP32-C6 (ESP-AT firmware). See c6_at.h.
 // SDIO framing follows LilyGo's GPL-3.0 EspAt transport at pinned commit
 // ff99314e37f125fe9f18b41340639f000c2f1e83. The AT worker and Wi-Fi/socket
-// layers on top remain WadaMesh-owned.
+// layers on top remain Comet-owned.
 #include "c6_at.h"
 #include <string.h>
 #include <stdio.h>
@@ -189,7 +189,7 @@ static bool sdio_write_u32(uint32_t address, uint32_t value) {
 
 static bool transport_configure(void) {
     // Match LilyGo's EspAt CCCR/function setup: functions 1+2, master IRQ, and
-    // 512-byte block sizes. WadaMesh currently exchanges data on function 1.
+    // 512-byte block sizes. Comet currently exchanges data on function 1.
     if (!sdio_write_byte(0, C6_SDIO_FN_ENABLE, 6) ||
         !sdio_write_byte(0, C6_SDIO_FN_READY, 6) ||
         !sdio_write_byte(0, C6_SDIO_INT_ENABLE, 7) ||

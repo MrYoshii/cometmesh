@@ -1,4 +1,4 @@
-# wadamesh language file
+# comet language file
 # canonical source - translators: edit this file and PR it
 # code: hu
 # ver: 25
@@ -348,7 +348,7 @@ Factory reset?\n\nErases identity, contacts,\nchannels, messages, Wi-Fi\nand eve
 Failed to save channel.	Nem sikerült menteni a csatornát.
 Favorites full (max %d)	Kedvencek megteltek (max. %d)
 Favorites unsupported	Kedvencek nem támogatottak
-Fetching the app list from firmware.wadamesh.com	Applista letöltése: firmware.wadamesh.com
+Fetching the app list from firmware.cometmesh.org	Applista letöltése: firmware.cometmesh.org
 Files	Fájlok
 Find	Keresés
 Finish	Befejezés
@@ -954,10 +954,10 @@ Up	Fel
 Update	Frissít
 Update bin saved to SD	A frissítési láda SD-kártyára mentve
 Update complete.\nRebooting...	Frissítés kész.\nÚjraindítás...
-Update manually at flasher.wadamesh.com\n(Wi-Fi update is paused for now)	Frissítsd manuálisan a flasher.wadamesh.com oldalon\n(A Wi-Fi frissítés egyelőre szünetel)
+Update manually at flasher.cometmesh.org\n(Wi-Fi update is paused for now)	Frissítsd manuálisan a flasher.cometmesh.org oldalon\n(A Wi-Fi frissítés egyelőre szünetel)
 Update via the Launcher	Frissítés a Launcher
-Update via the Launcher / flasher.wadamesh.com	Frissítés a Launcher / flasher.wadamesh.com oldalon
-Update via the Launcher / flasher.wadamesh.com.	Frissítés a Launcher / flasher.wadamesh.com oldalon.
+Update via the Launcher / flasher.cometmesh.org	Frissítés a Launcher / flasher.cometmesh.org oldalon
+Update via the Launcher / flasher.cometmesh.org.	Frissítés a Launcher / flasher.cometmesh.org oldalon.
 Updated - rebooting…	Frissítve - újraindítás…
 Up to date	Naprakész
 Use	Használ
@@ -965,9 +965,9 @@ Username (optional)	Felhasználónév (nem kötelező)
 Volume	Hangerő
 W up  ·  A left  ·  D right  ·  Z down  ·  S select  ·  Q back	W fel · A balra · D jobbra · Z le · S kiválasztás · Q vissza
 WADA#15B6A6 MESH#	WADA#15B6A6 MESH#
-WADAMESH	WADAMESH
+COMET	COMET
 Waiting for Wi-Fi...	Várakozás Wi-Fire...
-Welcome to WADAMESH	Üdvözöl a WADAMESH
+Welcome to COMET	Üdvözöl a COMET
 While this is on, anyone on your Wi-Fi can view and control this device. Uses plain HTTP (local network only).	Amíg be van kapcsolva, a Wi-Fi hálózatodon bárki láthatja és vezérelheti az eszközt. Sima HTTP-t használ (csak helyi hálózat).
 Wi-Fi	Wi-Fi
 Wi-Fi & Bluetooth	Wi-Fi és Bluetooth
@@ -1104,7 +1104,7 @@ sensors	érzékelők
 Auto-add on for %s — new %s land in Contacts automatically.	Automatikus hozzáadás bekapcsolva: %s — az új %s automatikusan a Névjegyek közé kerülnek.
 Map data © OpenStreetMap contributors.\nopenstreetmap.org/copyright\nLicensed under the Open Database License (ODbL).\n\n	Térkép adatok © OpenStreetMap közreműködői.\nopenstreetmap.org/copyright\nAz Open Database License (ODbL) licenc alatt.\n\n
 Map style © OpenTopoMap (CC-BY-SA) — opentopomap.org\nMap data © OpenStreetMap contributors (ODbL) + SRTM.\n\n	Térkép stílus © OpenTopoMap (CC-BY-SA) — opentopomap.org\nTérkép adatok © OpenStreetMap közreműködői (ODbL) + SRTM.\n\n
-How tiles work:\nThe map is built from 256×256 "slippy" tiles. Only the tiles for the area you're viewing are fetched — there is no bulk pre-download.\n\nBecause this device can't do HTTPS (not enough heap after Wi-Fi starts) and decodes JPEG far more cheaply than PNG, tiles come from the wadamesh proxy: it fetches the upstream PNG over HTTPS with an identifying User-Agent, re-encodes it as JPEG, and caches it. Your device then caches each tile to its own flash, so a tile is only downloaded once.\n\nUse Options → Reload tiles to re-download the tiles currently in view if one looks corrupted.	A csempék működése:\nA térkép 256×256 képpontos "slippy" csempékből épül fel. Csak a megtekintett területhez szükséges csempék töltődnek le — nincs tömeges előzetes letöltés.\n\nMivel az eszköz nem támogatja a HTTPS-t (a Wi-Fi elindítása után nincs elegendő heap memória), és a JPEG képek dekódolása sokkal kevesebb erőforrást igényel, mint a PNG-é, a csempék a wadamesh proxyn keresztül érkeznek: a proxy HTTPS-en keresztül lekéri a forrásból a PNG-t egy azonosító User-Agent használatával, JPEG formátumba kódolja át, majd eltárolja a gyorsítótárban. Az eszköz ezután minden csempét a saját flash memóriájában is eltárol, így egy csempét csak egyszer kell letölteni.\n\nAz Options → Reload tiles lehetőséggel újra letöltheted a jelenleg megtekintett terület csempéit, ha valamelyik hibásan jelenik meg.
+How tiles work:\nThe map is built from 256×256 "slippy" tiles. Only the tiles for the area you're viewing are fetched — there is no bulk pre-download.\n\nBecause this device can't do HTTPS (not enough heap after Wi-Fi starts) and decodes JPEG far more cheaply than PNG, tiles come from the comet proxy: it fetches the upstream PNG over HTTPS with an identifying User-Agent, re-encodes it as JPEG, and caches it. Your device then caches each tile to its own flash, so a tile is only downloaded once.\n\nUse Options → Reload tiles to re-download the tiles currently in view if one looks corrupted.	A csempék működése:\nA térkép 256×256 képpontos "slippy" csempékből épül fel. Csak a megtekintett területhez szükséges csempék töltődnek le — nincs tömeges előzetes letöltés.\n\nMivel az eszköz nem támogatja a HTTPS-t (a Wi-Fi elindítása után nincs elegendő heap memória), és a JPEG képek dekódolása sokkal kevesebb erőforrást igényel, mint a PNG-é, a csempék a comet proxyn keresztül érkeznek: a proxy HTTPS-en keresztül lekéri a forrásból a PNG-t egy azonosító User-Agent használatával, JPEG formátumba kódolja át, majd eltárolja a gyorsítótárban. Az eszköz ezután minden csempét a saját flash memóriájában is eltárol, így egy csempét csak egyszer kell letölteni.\n\nAz Options → Reload tiles lehetőséggel újra letöltheted a jelenleg megtekintett terület csempéit, ha valamelyik hibásan jelenik meg.
 "%s" wants to send discovery probes.\n\nEach probe asks every node in range to reply, so it uses airtime on the whole local mesh, not just yours.\n\nNothing is sent under your name and no message is transmitted.	"%s" felfedezési probe-ok küldését kéri.\n\nMinden probe válaszra kéri a hatótávolságon belüli node-okat, ezért a teljes helyi mesh hálózat airtime-ját használja, nem csak a tiédet.\n\nSemmi sem kerül elküldésre a nevedben, és üzenet sem kerül továbbításra.
 ?	?
 Auth failed	Auth failed
@@ -1319,10 +1319,10 @@ Scanning...	Scanning...
 Stopped after 	Stopped after 
 They are Windows programs, scripts, shortcuts or autorun files. A mesh radio never uses them, and nothing else on the card is touched.	They are Windows programs, scripts, shortcuts or autorun files. A mesh radio never uses them, and nothing else on the card is touched.
 This board has no SD card access for apps.	This board has no SD card access for apps.
-This firmware can only find them. Update wadamesh to remove them here.	This firmware can only find them. Update wadamesh to remove them here.
+This firmware can only find them. Update comet to remove them here.	This firmware can only find them. Update comet to remove them here.
 Finds and removes Windows programs, scripts, shortcuts and autorun files, like the worm on some ThinkNode M9 cards. A mesh radio never uses these.	Finds and removes Windows programs, scripts, shortcuts and autorun files, like the worm on some ThinkNode M9 cards. A mesh radio never uses these.
 No known Windows malware found.	No known Windows malware found.
-This firmware can find these but not remove them. Update wadamesh, or format the card: in Files, hold the SD card row.	This firmware can find these but not remove them. Update wadamesh, or format the card: in Files, hold the SD card row.
+This firmware can find these but not remove them. Update comet, or format the card: in Files, hold the SD card row.	This firmware can find these but not remove them. Update comet, or format the card: in Files, hold the SD card row.
 SD Scan only removes files it recognises. If the card may be infected, the safest fix is to copy off what you need and format it completely: in Files, hold the SD card row.	SD Scan only removes files it recognises. If the card may be infected, the safest fix is to copy off what you need and format it completely: in Files, hold the SD card row.
 and %d more	and %d more
 # beta_89: new strings, English placeholders until translated (value = key)
@@ -1482,7 +1482,7 @@ Tap the EN key on the keyboard to switch	Tap the EN key on the keyboard to switc
 Tells the matrix how many devices run this build, so a board with no reports can be told apart from a board nobody owns. Sends the board and the version, nothing else.	Tells the matrix how many devices run this build, so a board with no reports can be told apart from a board nobody owns. Sends the board and the version, nothing else.
 Terminal	Terminal
 Test report: %s	Test report: %s
-Thank you. Your report is on wadamesh.com/beta	Thank you. Your report is on wadamesh.com/beta
+Thank you. Your report is on cometmesh.org/beta	Thank you. Your report is on cometmesh.org/beta
 The PINs did not match	The PINs did not match
 The mesh around you instead of a dark screen. Every ring is a real packet.	The mesh around you instead of a dark screen. Every ring is a real packet.
 This is everything that leaves the device. No name, no contacts, no position.	This is everything that leaves the device. No name, no contacts, no position.
@@ -1714,7 +1714,7 @@ Typing	Typing
 Unreleased test firmware: newer features, less tested. The update check and Install update both follow it.	Kiadatlan teszt firmware-t kapsz – újabb funkciók, de kevésbé teszteltek. A frissítések ellenőrzése és a frissítések telepítése is a béta verziót követi.
 Until	Until
 Up to date (beta_%d)	Up to date (beta_%d)
-Update available: beta_%d\nYou have beta_%d. Get it at flasher.wadamesh.com.	Update available: beta_%d\nYou have beta_%d. Get it at flasher.wadamesh.com.
+Update available: beta_%d\nYou have beta_%d. Get it at flasher.cometmesh.org.	Update available: beta_%d\nYou have beta_%d. Get it at flasher.cometmesh.org.
 Update available: beta_%d\nYou have beta_%d. Install it below.	Update available: beta_%d\nYou have beta_%d. Install it below.
 Used only when the time zone is Custom (UTC offset).	Used only when the time zone is Custom (UTC offset).
 Wallpaper	Wallpaper

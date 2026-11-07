@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
-// RM69A10 AMOLED (MIPI-DSI, 568x1232 portrait) — wadamesh DisplayDriver for the LilyGo T-Display P4.
+// RM69A10 AMOLED (MIPI-DSI, 568x1232 portrait) — comet DisplayDriver for the LilyGo T-Display P4.
 // begin() runs the full P4 DSI bring-up: internal LDO (DSI PHY power) -> DSI bus -> DBI IO -> DPI
 // panel -> RM69A10 vendor init (esp_lcd_rm69a10.*, ported from LilyGo) -> reset/init/on. LVGL's
 // lvglFlush() -> writePixelsRGB565() blits the dirty area via esp_lcd_panel_draw_bitmap. Mirrors

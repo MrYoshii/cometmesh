@@ -328,7 +328,7 @@ show_results = function()
     return
   end
   if not CAN_CLEAN then
-    _, y = text(tr("This firmware can find these but not remove them. Update wadamesh, or format the card: in Files, hold the SD card row."),
+    _, y = text(tr("This firmware can find these but not remove them. Update comet, or format the card: in Files, hold the SD card row."),
                 y, 12, C.text)
   end
   -- Buttons first, list after: they are the first focus stops on a keyboard board
@@ -356,7 +356,7 @@ show_intro = function()
               y, 12, C.text)
   _, y = text(NOTICE, y, 12, C.text)
   if not CAN_CLEAN then
-    _, y = text(tr("This firmware can only find them. Update wadamesh to remove them here."), y, 12, C.sub)
+    _, y = text(tr("This firmware can only find them. Update comet to remove them here."), y, 12, C.sub)
   end
   local by = button_row(y)
   ui.button(tr("Scan"), M, by, 100, 32, function()

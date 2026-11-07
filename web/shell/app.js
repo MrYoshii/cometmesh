@@ -1,4 +1,4 @@
-// wadamesh in the browser: the page side of web/platform/web_main.cpp.
+// comet in the browser: the page side of web/platform/web_main.cpp.
 //
 //  - checks the page is cross-origin isolated (the build uses wasm threads, which need
 //    SharedArrayBuffer, which needs COOP: same-origin + COEP: require-corp)
@@ -84,9 +84,9 @@
   var resetting = false;   // a "Reset demo data" reload is under way: write nothing more
 
   // ---- which mesh: the demo or a node ----------------------------------------------
-  var CHOICE_KEY = 'wadamesh.backend';   // {kind, arg, key?, name?}: the node to connect to
-  var NODES_KEY = 'wadamesh.nodes';      // kind|arg -> the node key last seen there
-  var HOST_KEY = 'wadamesh.wsHost';
+  var CHOICE_KEY = 'comet.backend';   // {kind, arg, key?, name?}: the node to connect to
+  var NODES_KEY = 'comet.nodes';      // kind|arg -> the node key last seen there
+  var HOST_KEY = 'comet.wsHost';
   function lsGet(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
   function lsSet(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
   var choice = lsGet(CHOICE_KEY);
@@ -631,12 +631,12 @@
     host.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); goWs(); } });
   })();
 
-  // The hosted client has two names: app.wadamesh.com (https, behind Cloudflare) and
-  // wifi.app.wadamesh.com, which answers plain http only. Chrome upgrades a typed or linked
+  // The hosted client has two names: app.cometmesh.org (https, behind Cloudflare) and
+  // wifi.app.cometmesh.org, which answers plain http only. Chrome upgrades a typed or linked
   // http:// to https whenever the name answers https, which would bring Wi-Fi visitors
   // straight back to the copy that may not open ws://; a name with no https stays http.
   // (function declarations, not a var: the chooser above calls these before this runs)
-  function wifiHosts() { return { 'app.wadamesh.com': 'wifi.app.wadamesh.com' }; }
+  function wifiHosts() { return { 'app.cometmesh.org': 'wifi.app.cometmesh.org' }; }
   function wifiCopyUrl(addr) {
     var h = wifiHosts()[location.hostname] || location.host;
     return 'http://' + h + location.pathname + (addr ? '#wifi=' + encodeURIComponent(addr) : '#wifi=');
@@ -812,7 +812,7 @@
   // ---- "Back up this browser" / "Restore": the active backend's whole data dir --------
   // One tar file (ustar), so it moves to another browser or computer. The map tile cache
   // is left out (it downloads again). A marker file names what it is.
-  var TAR_MARK = 'wadamesh-browser-backup.json';
+  var TAR_MARK = 'comet-browser-backup.json';
   function tarFiles(entries) {   // [{path, data:Uint8Array}] -> Uint8Array
     var enc = new TextEncoder(), blocks = [], total = 0;
     var oct = function (n, len) { var t = n.toString(8); while (t.length < len - 1) t = '0' + t; return t + '\0'; };
@@ -863,16 +863,16 @@
     walk(M.FS, dataDir, '', files);
     var who = choice ? (choice.name || 'node') : 'demo';
     files.unshift({ path: TAR_MARK, data: new TextEncoder().encode(JSON.stringify({
-      kind: 'wadamesh-browser-backup', version: 1, backend: choice ? choice.kind : 'demo', node: choice ? (choice.name || '') : '',
+      kind: 'comet-browser-backup', version: 1, backend: choice ? choice.kind : 'demo', node: choice ? (choice.name || '') : '',
       dataDir: dataDir, created: new Date().toISOString(), build: BUILD, files: files.length }, null, 1)) });
     var day = new Date().toISOString().slice(0, 10);
-    download(tarFiles(files), 'wadamesh-browser-' + who.replace(/[^A-Za-z0-9_-]+/g, '-') + '-' + day + '.tar', 'application/x-tar');
+    download(tarFiles(files), 'comet-browser-' + who.replace(/[^A-Za-z0-9_-]+/g, '-') + '-' + day + '.tar', 'application/x-tar');
     toast('Saved ' + (files.length - 1) + ' files. Restore them from this menu in any browser.');
   }
   function restoreBrowser(bytes, fname) {
     var files = untar(bytes), mark = null;
     files.forEach(function (f) { if (f.path === TAR_MARK) { try { mark = JSON.parse(new TextDecoder().decode(f.data)); } catch (e) {} } });
-    if (!mark || mark.kind !== 'wadamesh-browser-backup') { toast(fname + ' is not a wadamesh browser backup.'); return; }
+    if (!mark || mark.kind !== 'comet-browser-backup') { toast(fname + ' is not a comet browser backup.'); return; }
     var into = choice ? 'your node\'s data in this browser' : 'the demo';
     if (!confirm('Restore ' + fname + '? It replaces ' + into + ' (messages, contacts, settings, apps), then restarts.')) return;
     if (!M || !M.FS) return;
@@ -907,7 +907,7 @@
 
   // ---- boot --------------------------------------------------------------------------------
   if (typeof WebAssembly !== 'object') {
-    fatal('This browser cannot run wadamesh', 'It needs WebAssembly. Any current Chrome, Edge, Firefox or Safari has it.');
+    fatal('This browser cannot run comet', 'It needs WebAssembly. Any current Chrome, Edge, Firefox or Safari has it.');
     return;
   }
   // Two bundles (WEB_BUILD.md "Two copies"): with cross-origin isolation (https, or a
@@ -919,11 +919,11 @@
   var devHost = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
   function cannotLoad() {
     if (devHost) {
-      fatal('Could not load wadamesh', 'The ' + (isolated ? 'threaded' : 'no-threads') + ' bundle (<code>' + BUNDLE +
-        'wadamesh.js</code>) did not load. <code>web/build.sh web</code> builds both; <code>web/build.sh serve</code> serves ' +
+      fatal('Could not load comet', 'The ' + (isolated ? 'threaded' : 'no-threads') + ' bundle (<code>' + BUNDLE +
+        'comet.js</code>) did not load. <code>web/build.sh web</code> builds both; <code>web/build.sh serve</code> serves ' +
         'the no-threads one at <code>nt/</code>.', true);
     } else {
-      fatal('wadamesh could not start here', 'This browser blocks something the web client needs. Try a current ' +
+      fatal('comet could not start here', 'This browser blocks something the web client needs. Try a current ' +
         'Chrome, Edge, Firefox or Safari.', true);
     }
   }
@@ -982,9 +982,9 @@
     load();
   }
 
-  setStatus('Loading wadamesh', '', true);
+  setStatus('Loading comet', '', true);
   var script = document.createElement('script');
-  script.src = BUNDLE + 'wadamesh.js?v=' + BUILD;
+  script.src = BUNDLE + 'comet.js?v=' + BUILD;
   script.onerror = cannotLoad;
   script.onload = function () {
     var t0 = performance.now();
@@ -1008,7 +1008,7 @@
         window.addEventListener('offline', online);
       },
       onAbort: function (what) {
-        fatal('wadamesh stopped', 'Something went wrong: <code>' + String(what).replace(/</g, '&lt;') + '</code>', true);
+        fatal('comet stopped', 'Something went wrong: <code>' + String(what).replace(/</g, '&lt;') + '</code>', true);
       },
       wadaPresent: present,
       wadaSize: [W, H],
@@ -1033,16 +1033,16 @@
         persist(function () { location.reload(); });
       },
     };
-    createWadamesh(Mod).then(function (m) { M = m; }, function (e) {
-      fatal('wadamesh could not start', String(e).replace(/</g, '&lt;'), true);
+    createComet(Mod).then(function (m) { M = m; }, function (e) {
+      fatal('comet could not start', String(e).replace(/</g, '&lt;'), true);
     });
     // The module's own functions are reachable once its runtime is up (main runs then).
     M = Mod;
   };
   document.head.appendChild(script);
 
-  // For tests and the curious: window.wadamesh.stats, .persist(), .idle()
-  window.wadamesh = {
+  // For tests and the curious: window.comet.stats, .persist(), .idle()
+  window.comet = {
     build: BUILD,
     threads: function () { return isolated; },
     stats: stats,

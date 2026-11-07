@@ -52,17 +52,17 @@ mkdir -p "$OUT"
 
 # name | build dir | env assignments ("-" = none) [| project dir, default tdisplay_p4]
 VARIANTS=(
-  "wadamesh-tdisplay-p4|tdisplay_p4|-"
-  "wadamesh-tdisplay-p4-lr2021|tdisplay_p4_lr2021|WADA_P4_LR2021=1"
-  "wadamesh-tdisplay-p4-lcd|tdisplay_p4_lcd|WADA_P4_LCD=1"
-  "wadamesh-tdisplay-p4-lcd-lr2021|tdisplay_p4_lcd_lr2021|WADA_P4_LCD=1 WADA_P4_LR2021=1"
-  "wadamesh-tdisplay-p4-at|tdisplay_p4|WADA_P4_LEGACY_AT=1"
-  "wadamesh-tdisplay-p4-lr2021-at|tdisplay_p4_lr2021|WADA_P4_LR2021=1 WADA_P4_LEGACY_AT=1"
-  "wadamesh-tdisplay-p4-lcd-at|tdisplay_p4_lcd|WADA_P4_LCD=1 WADA_P4_LEGACY_AT=1"
-  "wadamesh-tdisplay-p4-lcd-lr2021-at|tdisplay_p4_lcd_lr2021|WADA_P4_LCD=1 WADA_P4_LR2021=1 WADA_P4_LEGACY_AT=1"
-  "wadamesh-crowpanel-p4-101-v12|crowpanel_p4_101_v12|WADA_CP_REV=1.2|crowpanel_p4_101"
-  "wadamesh-crowpanel-p4-101-v11|crowpanel_p4_101_v11|WADA_CP_REV=1.1|crowpanel_p4_101"
-  "wadamesh-crowpanel-p4-101-v10|crowpanel_p4_101_v10|WADA_CP_REV=1.0|crowpanel_p4_101"
+  "comet-tdisplay-p4|tdisplay_p4|-"
+  "comet-tdisplay-p4-lr2021|tdisplay_p4_lr2021|WADA_P4_LR2021=1"
+  "comet-tdisplay-p4-lcd|tdisplay_p4_lcd|WADA_P4_LCD=1"
+  "comet-tdisplay-p4-lcd-lr2021|tdisplay_p4_lcd_lr2021|WADA_P4_LCD=1 WADA_P4_LR2021=1"
+  "comet-tdisplay-p4-at|tdisplay_p4|WADA_P4_LEGACY_AT=1"
+  "comet-tdisplay-p4-lr2021-at|tdisplay_p4_lr2021|WADA_P4_LR2021=1 WADA_P4_LEGACY_AT=1"
+  "comet-tdisplay-p4-lcd-at|tdisplay_p4_lcd|WADA_P4_LCD=1 WADA_P4_LEGACY_AT=1"
+  "comet-tdisplay-p4-lcd-lr2021-at|tdisplay_p4_lcd_lr2021|WADA_P4_LCD=1 WADA_P4_LR2021=1 WADA_P4_LEGACY_AT=1"
+  "comet-crowpanel-p4-101-v12|crowpanel_p4_101_v12|WADA_CP_REV=1.2|crowpanel_p4_101"
+  "comet-crowpanel-p4-101-v11|crowpanel_p4_101_v11|WADA_CP_REV=1.1|crowpanel_p4_101"
+  "comet-crowpanel-p4-101-v10|crowpanel_p4_101_v10|WADA_CP_REV=1.0|crowpanel_p4_101"
 )
 
 fail=0
@@ -138,7 +138,7 @@ for v in "${VARIANTS[@]}"; do
   # they have what they need, which SIGPIPEs `strings`, and under `set -o
   # pipefail` that non-zero status reads as "check failed" on a perfectly good
   # image. Read the whole stream and decide afterwards.
-  ids="$(strings -a "$app" | grep -oE 'wadamesh-(tdisplay-p4|crowpanel-p4-101)[a-z0-9-]*' | sort -u || true)"
+  ids="$(strings -a "$app" | grep -oE 'comet-(tdisplay-p4|crowpanel-p4-101)[a-z0-9-]*' | sort -u || true)"
   got="$(printf '%s\n' "$ids" | sed -n '1p')"
   if [ "$got" != "$name" ]; then
     echo "   FAIL: image identifies as '$got', expected '$name'"

@@ -92,10 +92,10 @@ const char* k_replies[] = {
   "Received loud and clear.",
 };
 
-// A stable public key per name: sha256("wadamesh-demo:" + name). Not a real keypair,
+// A stable public key per name: sha256("comet-demo:" + name). Not a real keypair,
 // which is fine: the demo never encrypts.
 void demoKey(const char* name, uint8_t out[PUB_KEY_SIZE]) {
-  std::string s = std::string("wadamesh-demo:") + name;
+  std::string s = std::string("comet-demo:") + name;
   mesh::Utils::sha256(out, PUB_KEY_SIZE, (const uint8_t*)s.data(), (int)s.size());
 }
 int32_t absCoord(int32_t base, double d) { return d == 0.0 ? 0 : (int32_t)(base + d * 1000000.0); }

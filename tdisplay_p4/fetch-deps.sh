@@ -68,5 +68,5 @@ vend "ESPAsyncWebServer"
 vend "AsyncElegantOTA"
 
 touch components/meshcore/CMakeLists.txt components/ardlibs/CMakeLists.txt \
-      components/RadioLib/CMakeLists.txt components/wadamesh_app/CMakeLists.txt 2>/dev/null || true
+      components/RadioLib/CMakeLists.txt components/comet_app/CMakeLists.txt 2>/dev/null || true
 echo "done."

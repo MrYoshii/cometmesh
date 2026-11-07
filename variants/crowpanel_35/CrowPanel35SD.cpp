@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2025-2026 Michael A. Cojocari and contributors
-// Adapted from Camillia-MT's sd_soft_spi.cpp for WadaMesh's SD filesystem API.
+// Adapted from Camillia-MT's sd_soft_spi.cpp for Comet's SD filesystem API.
 #include "CrowPanel35SD.h"
 #include "CrowPanel35SdCodec.h"
 

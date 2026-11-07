@@ -2,24 +2,24 @@
 
 ## Decision
 
-Use Espressif esp-hosted as the normal WadaMesh backend for current T-Display P4
+Use Espressif esp-hosted as the normal Comet backend for current T-Display P4
 V1 units, which ship C6 hosted firmware 2.12.3. Retain the existing ESP-AT
 backend only for older units carrying LilyGo's now-deprecated AT images.
 
 Older AT units need a guided two-stage conversion because the P4 can reset the
 C6 but cannot press its documented physical BOOT control. Current hosted units
 need no C6 reflash. After any legacy conversion, C6 firmware updates should be
-delivered and verified by the P4 over SDIO so normal WadaMesh updates remain a
+delivered and verified by the P4 over SDIO so normal Comet updates remain a
 one-device operation.
 
 ## Goals
 
-- Expose the C6 Bluetooth LE radio to WadaMesh.
+- Expose the C6 Bluetooth LE radio to Comet.
 - Run the existing MeshCore Bluetooth companion transport without an AT-to-BLE
   protocol translation layer.
 - Preserve P4 Wi-Fi scanning, station mode, TCP clients, the companion TCP
   server, HTTP, SNTP, and simultaneous Wi-Fi/BLE operation.
-- Make the one-time C6 conversion understandable from the WadaMesh installer.
+- Make the one-time C6 conversion understandable from the Comet installer.
 - Make every later P4 installation or update automatically enforce a compatible
   C6 firmware version.
 - Provide A/B update, verification, rollback, and a wired recovery route for the
@@ -38,7 +38,7 @@ one-device operation.
 
 ### Processors
 
-- ESP32-P4: runs WadaMesh, LVGL, LoRa, GPS, storage, and the companion logic.
+- ESP32-P4: runs Comet, LVGL, LoRa, GPS, storage, and the companion logic.
 - ESP32-C6: owns the physical 2.4 GHz Wi-Fi and Bluetooth LE radio.
 
 The P4 itself has no Wi-Fi or Bluetooth radio.
@@ -61,7 +61,7 @@ connection to the C6 IO9 boot strap.
 
 ### Current software generations
 
-- Current V1 factory/release firmware uses esp-hosted MCU 2.12.3. WadaMesh uses
+- Current V1 factory/release firmware uses esp-hosted MCU 2.12.3. Comet uses
   the matching local host fork (`2.12.3~1`) and standard remote Wi-Fi/NimBLE
   paths.
 - Older V1 units may carry LilyGo's deprecated ESP-AT SDIO firmware.
@@ -90,7 +90,7 @@ partition after measuring the final C6 image size.
 
 ## Target architecture
 
-### C6 firmware: `wadamesh-c6`
+### C6 firmware: `comet-c6`
 
 Create a separately versioned ESP-IDF project for the ESP32-C6. Start from the
 same esp-hosted slave generation already proven by the Tanmatsu target.
@@ -113,7 +113,7 @@ routing. This keeps one MeshCore BLE implementation across boards.
 
 ### Management protocol
 
-Add a narrow WadaMesh management channel alongside the hosted data path. It must
+Add a narrow Comet management channel alongside the hosted data path. It must
 support at least:
 
 - `GET_INFO`: protocol version, firmware version, build hash, active OTA slot,
@@ -150,7 +150,7 @@ For the hosted backend:
 
 The host must query `GET_INFO` before enabling Wi-Fi or Bluetooth. An unsupported
 protocol should produce a clear Settings/About diagnostic and keep the rest of
-WadaMesh operational.
+Comet operational.
 
 ## First-time conversion
 
@@ -172,18 +172,18 @@ Until then, use the C6 USB downloader.
 
 ### Guided web installer
 
-Extend the WadaMesh install page with a P4-specific two-stage flow:
+Extend the Comet install page with a P4-specific two-stage flow:
 
 1. **Install C6 radio firmware**
    - Explain which USB connector reaches the C6.
    - Explain the required BOOT/IO9 and reset sequence with board photographs.
    - Launch an ESP Web Tools manifest with `chipFamily: ESP32-C6`.
-   - Flash a full merged `wadamesh-c6` image containing bootloader, partition
+   - Flash a full merged `comet-c6` image containing bootloader, partition
      table, OTA metadata, and app.
    - Verify the chip and image before showing success.
-2. **Install WadaMesh P4 firmware**
+2. **Install Comet P4 firmware**
    - Move the cable to the P4 USB connector.
-   - Launch the existing `ESP32-P4` WadaMesh manifest.
+   - Launch the existing `ESP32-P4` Comet manifest.
    - On first boot, require the expected C6 protocol handshake and show the
      detected C6 version in About/Diagnostics.
 
@@ -199,7 +199,7 @@ C6_FLASH_HELPER=1 ./tdisplay_p4/build.sh build
 ./tdisplay_p4/build.sh flash -p <P4-port>
 ```
 
-Then place the C6 in ROM download mode and flash `wadamesh-c6` through the C6
+Then place the C6 in ROM download mode and flash `comet-c6` through the C6
 USB port. After the C6 image is installed, flash a normal hosted-backend P4
 build.
 
@@ -208,7 +208,7 @@ write.
 
 ## Future seamless C6 updates
 
-Once `wadamesh-c6` is installed, subsequent updates should not require the C6
+Once `comet-c6` is installed, subsequent updates should not require the C6
 USB connector.
 
 ### Image delivery
@@ -268,8 +268,8 @@ tdisplay_p4/c6_firmware/
 
 Release artifacts:
 
-- `wadamesh-c6-full.bin`: first-time USB conversion
-- `wadamesh-c6-ota.bin`: later in-band update
+- `comet-c6-full.bin`: first-time USB conversion
+- `comet-c6-ota.bin`: later in-band update
 - `manifest-tdisplay-p4-c6.json`: ESP Web Tools C6 manifest
 - `c6-version.json`: protocol, firmware version, hash, signature, minimum P4
   version, and release channel
@@ -288,7 +288,7 @@ present in the staged C6 metadata.
 
 ## Security and integrity
 
-- Sign C6 images with a WadaMesh release key.
+- Sign C6 images with a Comet release key.
 - Verify the signature on the C6 before selecting the pending slot.
 - Pin the expected SHA-256 in release metadata and report it in diagnostics.
 - Reject downgrade unless a physical recovery flow explicitly requests it.
@@ -401,9 +401,9 @@ once through XL9535 IO14, then classify the C6.
 
 The migration is complete when:
 
-- a fresh user can follow one WadaMesh page to flash both chips without command
+- a fresh user can follow one Comet page to flash both chips without command
   line tools
-- normal later WadaMesh updates need only the P4 connection or on-device OTA
+- normal later Comet updates need only the P4 connection or on-device OTA
 - About reports compatible P4 and C6 versions
 - Wi-Fi feature parity is maintained
 - the MeshCore phone app can discover, connect, exchange packets, and reconnect

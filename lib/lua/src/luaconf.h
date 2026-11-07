@@ -122,7 +122,7 @@
 /*
 @@ LUA_32BITS enables Lua with 32-bit integers and 32-bit floats.
 */
-#define LUA_32BITS	1	/* wadamesh: int32 + float fit the S3/P4; baked here (not a
+#define LUA_32BITS	1	/* comet: int32 + float fit the S3/P4; baked here (not a
 				   build flag) so the VM and every embedder share one ABI */
 
 

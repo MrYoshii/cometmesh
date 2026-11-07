@@ -86,7 +86,7 @@ function app.on_open(w, h)
   sendline = row(y, "mesh.send: not tried yet", C.sub); y = y + 22
 
   ui.button("Send to Public", 6, y, 130, 30, function()
-    local sok, serr = wada.mesh.send("Public", "wadamesh SDK self-test")
+    local sok, serr = wada.mesh.send("Public", "comet SDK self-test")
     sendline:set("mesh.send: " .. tostring(sok) .. "  " .. tostring(serr))
     sendline:color(sok and C.good or C.bad)
   end)

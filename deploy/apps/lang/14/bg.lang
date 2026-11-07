@@ -1,4 +1,4 @@
-# wadamesh language file
+# comet language file
 # canonical source - translators: edit this file and PR it
 # code: bg
 # ver: 14
@@ -309,7 +309,7 @@ Factory reset?\n\nErases identity, contacts,\nchannels, messages, Wi-Fi\nand eve
 Failed to save channel.	Каналът не можа да се запази.
 Favorites full (max %d)	Любимите са пълни (макс %d)
 Favorites unsupported	Любими не се поддържат
-Fetching the app list from firmware.wadamesh.com	Изтегляне на списъка с приложения от firmware.wadamesh.com
+Fetching the app list from firmware.cometmesh.org	Изтегляне на списъка с приложения от firmware.cometmesh.org
 Files	Файлове
 Find	Намери
 Finish	Готово
@@ -888,19 +888,19 @@ Up
 Update	Обнови
 Update bin saved to SD	Файлът за обновяване е записан на SD
 Update complete.\nRebooting...	Обновяването завърши.\nРестартиране...
-Update manually at flasher.wadamesh.com\n(Wi-Fi update is paused for now)	Обновете ръчно на flasher.wadamesh.com\n(Wi-Fi обновяването е спряно засега)
+Update manually at flasher.cometmesh.org\n(Wi-Fi update is paused for now)	Обновете ръчно на flasher.cometmesh.org\n(Wi-Fi обновяването е спряно засега)
 Update via the Launcher	Обнови през Launcher
-Update via the Launcher / flasher.wadamesh.com	Обнови през Launcher / flasher.wadamesh.com
-Update via the Launcher / flasher.wadamesh.com.	Обнови през Launcher / flasher.wadamesh.com.
+Update via the Launcher / flasher.cometmesh.org	Обнови през Launcher / flasher.cometmesh.org
+Update via the Launcher / flasher.cometmesh.org.	Обнови през Launcher / flasher.cometmesh.org.
 Updated - rebooting…	Обновено - рестартиране…
 Use	Избери
 Username (optional)	Потребителско име (по избор)
 Volume	Сила на звука
 W up  ·  A left  ·  D right  ·  Z down  ·  S select  ·  Q back	W нагоре  ·  A ляво  ·  D дясно  ·  Z надолу  ·  S избор  ·  Q назад
 WADA#15B6A6 MESH#	WADA#15B6A6 MESH#
-WADAMESH	WADAMESH
+COMET	COMET
 Waiting for Wi-Fi...	Изчакване на Wi-Fi...
-Welcome to WADAMESH	Добре дошли в WADAMESH
+Welcome to COMET	Добре дошли в COMET
 While this is on, anyone on your Wi-Fi can view and control this device. Uses plain HTTP (local network only).	Докато е включено, всеки в твоята Wi-Fi мрежа може да гледа и управлява устройството. Използва обикновен HTTP (само локална мрежа).
 Wi-Fi	Wi-Fi
 Wi-Fi & Bluetooth	Wi-Fi и Bluetooth

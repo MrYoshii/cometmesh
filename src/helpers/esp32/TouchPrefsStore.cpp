@@ -536,7 +536,7 @@ bool touchPrefsSetScreenTimeoutSecs(uint16_t seconds) {
 // can't make the probe run hot or effectively never run.
 //
 // NOT A FLOOD. This comment used to describe the probe as a flood, which is where the
-// "wadamesh spams the mesh every 5 minutes" worry came from (issue #80). It is a ZERO-HOP
+// "comet spams the mesh every 5 minutes" worry came from (issue #80). It is a ZERO-HOP
 // CTL_TYPE_NODE_DISCOVER_REQ (MyMesh::uiSendSignalProbe) — the same node-discovery packet
 // the other MeshCore GUIs use. Repeaters answer it DIRECTLY and never re-broadcast it, so
 // nothing propagates beyond our immediate neighbours; the fallback when no repeater path is
@@ -962,7 +962,7 @@ bool touchPrefsSetMapTileDebug(bool on) {
 }
 
 // UI accent colour (buttons, active tab, keyboard, highlights) as 0xRRGGBB.
-// Default = the WADAMESH brand teal (the logo dots). The picker clamps it dark
+// Default = the COMET brand teal (the logo dots). The picker clamps it dark
 // enough that the off-white button text stays readable on any hue.
 uint32_t touchPrefsGetAccentColor() {
   if (!s_begun) touchPrefsBegin();

@@ -16,7 +16,7 @@ if [[ $# -ne 0 ]]; then
 fi
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-work_dir=$(mktemp -d "${TMPDIR:-/tmp}/wadamesh-touch-fonts.XXXXXX")
+work_dir=$(mktemp -d "${TMPDIR:-/tmp}/comet-touch-fonts.XXXXXX")
 trap 'rm -rf "$work_dir"' EXIT
 
 download() {

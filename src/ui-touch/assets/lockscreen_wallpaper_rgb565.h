@@ -4,7 +4,7 @@
 #pragma once
 #include <stdint.h>
 
-// 320x240, gradient + padlock + WADAMESH wordmark (#228 rebrand).
+// 320x240, gradient + padlock + COMET wordmark (#228 rebrand).
 #define LOCKSCREEN_WALLPAPER_W 320
 #define LOCKSCREEN_WALLPAPER_H 240
 

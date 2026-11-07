@@ -1,4 +1,4 @@
--- ProTreck 1.2 — wadamesh outdoor watch
+-- ProTreck 1.2 — comet outdoor watch
 -- 5 tabs: ASTRO · CMPAS · CHRONO · TIMER · ALTI
 -- Permanent status bar on every tab: local time · GPS sats · battery %
 --

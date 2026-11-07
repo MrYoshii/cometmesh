@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
-# Publish the WADAMESH web client to app.wadamesh.com.
+# Publish the COMET web client to app.cometmesh.org.
 #   web/dist/           (pthreads build, https)   -> <root>/
 #   web/dist-nothreads/ (no-threads build, http)  -> <root>/nt/   (when built)
-# Nginx vhost: deploy/nginx/app.wadamesh.com.conf (installed separately, once).
+# Nginx vhost: deploy/nginx/app.cometmesh.org.conf (installed separately, once).
 #
 # Usage:
-#   WADAMESH_VPS=user@your-vps scripts/deploy-webclient.sh             # build + deploy
-#   WADAMESH_VPS=user@your-vps scripts/deploy-webclient.sh --dry-run   # preview only
-#   WADAMESH_WEB_NOBUILD=1 ...                                         # deploy what is built
+#   COMET_VPS=user@your-vps scripts/deploy-webclient.sh             # build + deploy
+#   COMET_VPS=user@your-vps scripts/deploy-webclient.sh --dry-run   # preview only
+#   COMET_WEB_NOBUILD=1 ...                                         # deploy what is built
 #
 # The VPS target comes from the environment; never commit it.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DEST="${WADAMESH_VPS:?set WADAMESH_VPS=user@host}"
-DEST_PATH="${WADAMESH_APP_PATH:-/srv/wadamesh/app}"
+DEST="${COMET_VPS:?set COMET_VPS=user@host}"
+DEST_PATH="${COMET_APP_PATH:-/srv/comet/app}"
 DRY=""
 [ "${1:-}" = "--dry-run" ] && DRY="--dry-run"
 
-if [ -z "${WADAMESH_WEB_NOBUILD:-}" ]; then
+if [ -z "${COMET_WEB_NOBUILD:-}" ]; then
   "$ROOT/web/build.sh" web
   [ -x "$ROOT/web/build.sh" ] && grep -q "web-nothreads" "$ROOT/web/build.sh" && "$ROOT/web/build.sh" web-nothreads || true
 fi

@@ -3,8 +3,8 @@
 Current hardware support, install paths and maturity. "Stable" means the board
 ships on the stable release channel; "Beta" means it is new and lives on the
 test channel until the next stable promote. Install links:
-[flasher.wadamesh.com](https://flasher.wadamesh.com) (browser, Chrome/Edge over
-USB) and the [GitHub releases](https://github.com/ALLFATHER-BV/wadamesh/releases).
+[flasher.cometmesh.org](https://flasher.cometmesh.org) (browser, Chrome/Edge over
+USB) and the [GitHub releases](https://github.com/MrYoshii/cometmesh/releases).
 
 | Device | MCU / radio | Display and input | Install | Channel | Status |
 |---|---|---|---|---|---|

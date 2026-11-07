@@ -2598,7 +2598,7 @@ void MyMesh::uiExportBackup(Print& out, double node_lat, double node_lon) {
   if (p) {
     char l[256];
     snprintf(l, sizeof l,
-      "  \"wadamesh_settings\": {\"version\": 1, \"airtime_factor\": %.3f, \"rx_boosted_gain\": %u, "
+      "  \"comet_settings\": {\"version\": 1, \"airtime_factor\": %.3f, \"rx_boosted_gain\": %u, "
       "\"multi_acks\": %u, \"manual_add_contacts\": %u, \"autoadd_config\": %u, \"autoadd_max_hops\": %u, ",
       (double)p->airtime_factor, (unsigned)p->rx_boosted_gain, (unsigned)p->multi_acks,
       (unsigned)p->manual_add_contacts, (unsigned)p->autoadd_config, (unsigned)p->autoadd_max_hops);
@@ -2741,8 +2741,9 @@ bool MyMesh::uiImportBackup(Stream& in, uint8_t sections,
       if (!r["tx_power"].isNull())         { _prefs.tx_power_dbm = (int8_t)r["tx_power"].as<int>(); prefs_dirty = true; }
     }
   }
-  if (sections & 0x02) {  // radio + mesh behaviour exported by wadamesh (absent in stock-app files)
-    JsonObjectConst w = root["wadamesh_settings"].as<JsonObjectConst>();
+  if (sections & 0x02) {  // radio + mesh behaviour exported by comet (absent in stock-app files)
+    JsonObjectConst w = root["comet_settings"].as<JsonObjectConst>();
+    if (w.isNull()) w = root["wadamesh_settings"].as<JsonObjectConst>();   // exports made before the rename
     if (!w.isNull()) {
       auto u8 = [&](const char* k, uint8_t& dst, int max_v) {
         if (w[k].isNull()) return;

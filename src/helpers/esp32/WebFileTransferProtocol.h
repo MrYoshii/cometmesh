@@ -102,8 +102,8 @@ inline bool pngSignatureValid(const uint8_t* data, size_t len) {
 
 inline bool firmwareExportName(const char* name) {
   if (!fileNameValid(name)) return false;
-  if (strcmp(name, "wadamesh-crash.elf") == 0 ||
-      strcmp(name, "wadamesh-crash.elf.txt") == 0) return true;
+  if (strcmp(name, "comet-crash.elf") == 0 ||
+      strcmp(name, "comet-crash.elf.txt") == 0) return true;
   const size_t len = strlen(name);
   return len > 14 && strncmp(name, "meshcore-", 9) == 0 &&
          strcmp(name + len - 5, ".json") == 0;

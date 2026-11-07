@@ -1,5 +1,5 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
--- Space Invaders for WADAMESH
+-- Space Invaders for COMET
 -- Move: left/right (or A/D) keys, trackball/swipe left-right, or tap left/right third
 -- Fire: up / Enter / space / swipe up / tap the middle third
 -- Start/restart: Enter, space, swipe up or tap

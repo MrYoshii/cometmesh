@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- The home-screen icon of the web app (web/shell/manifest.webmanifest): the wadamesh
+  <!-- The home-screen icon of the web app (web/shell/manifest.webmanifest): the comet
        mark in the accent on the page's night background, full bleed, so the same image
        works as a plain, an Apple touch and a maskable icon (the mark stays inside the
        maskable safe circle). PNGs: web/shell/icons/render.mjs. -->

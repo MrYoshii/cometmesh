@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""USB Files from the command line: the same protocol files.wadamesh.com speaks.
+"""USB Files from the command line: the same protocol files.cometmesh.org speaks.
 
 Open USB Files on the device first (app drawer), then:
 

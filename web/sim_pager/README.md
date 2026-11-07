@@ -8,13 +8,13 @@ screens without flashing a device after every layout change.
 ```bash
 web/fetch-deps.sh
 cmake -S web -B web/build-pager -G Ninja -DCMAKE_BUILD_TYPE=Release -DWADA_SIM_PAGER=ON
-cmake --build web/build-pager --target wadamesh-host
+cmake --build web/build-pager --target comet-host
 
 # interactive (SDL window, 2x)
-WADA_DATA_DIR=/tmp/pager-data web/build-pager/wadamesh-host --size 480x222 --scale 2
+WADA_DATA_DIR=/tmp/pager-data web/build-pager/comet-host --size 480x222 --scale 2
 
 # headless screenshots
-WADA_DATA_DIR=/tmp/pager-data web/build-pager/wadamesh-host --headless --size 480x222 \
+WADA_DATA_DIR=/tmp/pager-data web/build-pager/comet-host --headless --size 480x222 \
   --script web/sim_pager/tour.wada --shots /tmp/pager-shots
 ```
 

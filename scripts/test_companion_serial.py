@@ -450,7 +450,7 @@ def build_meshcomod_cli(command: str) -> bytes:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Probe WADAMESH companion protocol over serial")
+    parser = argparse.ArgumentParser(description="Probe COMET companion protocol over serial")
     parser.add_argument("--port", required=True, help="Serial port, e.g. COM4")
     parser.add_argument("--baud", type=int, default=115200, help="Serial baud rate")
     args = parser.parse_args()
@@ -464,7 +464,7 @@ def main():
             pass
 
         device_query = bytes([CMD_DEVICE_QUERY, 3])
-        app_start = bytes([CMD_APP_START]) + bytes(7) + b"wadamesh-probe"
+        app_start = bytes([CMD_APP_START]) + bytes(7) + b"comet-probe"
 
         send_and_collect(ser, "CMD_DEVICE_QUERY", device_query, listen_s=0.8)
         send_and_collect(ser, "CMD_APP_START", app_start, listen_s=0.8)

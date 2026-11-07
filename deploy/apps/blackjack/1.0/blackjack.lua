@@ -1,4 +1,4 @@
--- Blackjack 21 — WADAMESH Lua app for LilyGo T-Deck, T-Display P4 (AMOLED & LCD), & MeshCore boards
+-- Blackjack 21 — COMET Lua app for LilyGo T-Deck, T-Display P4 (AMOLED & LCD), & MeshCore boards
 -- Controls:
 --   Touch:     Tap any bottom-bar button, or tap the table after a hand to deal
 --   Keyboard:  [H] Hit  [S] Stand  [D] Double/Deal  [P] Split  [Enter/Space] Select/Deal
@@ -48,7 +48,7 @@ local L = {
   card_rad = 4,
 }
 
--- Palette tailored for casino table on dark WadaMesh UI
+-- Palette tailored for casino table on dark Comet UI
 local COL_FELT       = 0x0B2B1E
 local COL_FELT_DARK  = 0x082016
 local COL_FELT_LINE  = 0x164A35
@@ -145,7 +145,7 @@ local function text_h(sz)
   return fsz + 4
 end
 
--- Auto-detect WADAMESH device (T-Display P4 AMOLED, T-Display P4 LCD, T-Deck, Heltec V4, Pager, etc.)
+-- Auto-detect COMET device (T-Display P4 AMOLED, T-Display P4 LCD, T-Deck, Heltec V4, Pager, etc.)
 -- Note: LuaAppHost passes body_w, body_h (where body_h = screen_h - app_bar_h).
 --   LilyGo T-Display P4 AMOLED: native 568x1232 (portrait) or 1232x568 (landscape)
 --   LilyGo T-Display P4 LCD:    native 540x1168 (portrait) or 1168x540 (landscape)
@@ -1352,7 +1352,7 @@ local function trigger_focused()
   end
 end
 
--- WADAMESH Lifecycle Callbacks
+-- COMET Lifecycle Callbacks
 function app.on_open(w, h)
   local brd = (sys.board and sys.board()) or {}
   W = I((w and w > 0) and w or ((brd.w and brd.w > 0) and brd.w or 320))

@@ -1,4 +1,4 @@
-# wadamesh language file
+# comet language file
 # canonical source - translators: edit this file and PR it
 # code: sr
 # ver: 12
@@ -309,7 +309,7 @@ Factory reset?\n\nErases identity, contacts,\nchannels, messages, Wi-Fi\nand eve
 Failed to save channel.	Чување канала није успело.
 Favorites full (max %d)	Омиљени пуни (макс %d)
 Favorites unsupported	Омиљени нису подржани
-Fetching the app list from firmware.wadamesh.com	Преузимање листе апликација са firmware.wadamesh.com
+Fetching the app list from firmware.cometmesh.org	Преузимање листе апликација са firmware.cometmesh.org
 Files	Фајлови
 Find	Пронађи
 Finish	Заврши
@@ -888,19 +888,19 @@ Up
 Update	Ажурирај
 Update bin saved to SD	Датотека ажурирања сачувана на SD
 Update complete.\nRebooting...	Ажурирање завршено.\nПоновно покретање...
-Update manually at flasher.wadamesh.com\n(Wi-Fi update is paused for now)	Ажурирајте ручно на flasher.wadamesh.com\n(Wi-Fi ажурирање је за сада паузирано)
+Update manually at flasher.cometmesh.org\n(Wi-Fi update is paused for now)	Ажурирајте ручно на flasher.cometmesh.org\n(Wi-Fi ажурирање је за сада паузирано)
 Update via the Launcher	Ажурирај преко Launcher-а
-Update via the Launcher / flasher.wadamesh.com	Ажурирај преко Launcher-а / flasher.wadamesh.com
-Update via the Launcher / flasher.wadamesh.com.	Ажурирај преко Launcher-а / flasher.wadamesh.com.
+Update via the Launcher / flasher.cometmesh.org	Ажурирај преко Launcher-а / flasher.cometmesh.org
+Update via the Launcher / flasher.cometmesh.org.	Ажурирај преко Launcher-а / flasher.cometmesh.org.
 Updated - rebooting…	Ажурирано - рестартовање…
 Use	Користи
 Username (optional)	Корисничко име (опционо)
 Volume	Јачина звука
 W up  ·  A left  ·  D right  ·  Z down  ·  S select  ·  Q back	W горе  ·  A лево  ·  D десно  ·  Z доле  ·  S избор  ·  Q назад
 WADA#15B6A6 MESH#	WADA#15B6A6 MESH#
-WADAMESH	WADAMESH
+COMET	COMET
 Waiting for Wi-Fi...	Чекање Wi-Fi...
-Welcome to WADAMESH	Добро дошли у WADAMESH
+Welcome to COMET	Добро дошли у COMET
 While this is on, anyone on your Wi-Fi can view and control this device. Uses plain HTTP (local network only).	Док је ово укључено, свако на твом Wi-Fi-ју може да види и контролише уређај. Користи обичан HTTP (само локална мрежа).
 Wi-Fi	Wi-Fi
 Wi-Fi & Bluetooth	Wi-Fi и Bluetooth

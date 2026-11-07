@@ -1,4 +1,4 @@
-# wadamesh language file
+# comet language file
 # canonical source - translators: edit this file and PR it
 # code: el
 # ver: 16
@@ -309,7 +309,7 @@ Factory reset?\n\nErases identity, contacts,\nchannels, messages, Wi-Fi\nand eve
 Failed to save channel.	Αποτυχία αποθήκευσης καναλιού.
 Favorites full (max %d)	Αγαπημένα γεμάτα (μέγ %d)
 Favorites unsupported	Τα αγαπημένα δεν υποστηρίζονται
-Fetching the app list from firmware.wadamesh.com	Λήψη λίστας εφαρμογών από firmware.wadamesh.com
+Fetching the app list from firmware.cometmesh.org	Λήψη λίστας εφαρμογών από firmware.cometmesh.org
 Files	Αρχεία
 Find	Εύρεση
 Finish	Τέλος
@@ -888,19 +888,19 @@ Up
 Update	Ενημέρωση
 Update bin saved to SD	Το αρχείο ενημέρωσης αποθηκεύτηκε στη SD
 Update complete.\nRebooting...	Η ενημέρωση ολοκληρώθηκε.\nΕπανεκκίνηση...
-Update manually at flasher.wadamesh.com\n(Wi-Fi update is paused for now)	Ενημερώστε χειροκίνητα στο flasher.wadamesh.com\n(η ενημέρωση Wi-Fi είναι σε παύση)
+Update manually at flasher.cometmesh.org\n(Wi-Fi update is paused for now)	Ενημερώστε χειροκίνητα στο flasher.cometmesh.org\n(η ενημέρωση Wi-Fi είναι σε παύση)
 Update via the Launcher	Ενημέρωση μέσω του Launcher
-Update via the Launcher / flasher.wadamesh.com	Ενημέρωση μέσω του Launcher / flasher.wadamesh.com
-Update via the Launcher / flasher.wadamesh.com.	Ενημέρωση μέσω του Launcher / flasher.wadamesh.com.
+Update via the Launcher / flasher.cometmesh.org	Ενημέρωση μέσω του Launcher / flasher.cometmesh.org
+Update via the Launcher / flasher.cometmesh.org.	Ενημέρωση μέσω του Launcher / flasher.cometmesh.org.
 Updated - rebooting…	Ενημερώθηκε - επανεκκίνηση…
 Use	Χρήση
 Username (optional)	Όνομα χρήστη (προαιρετικό)
 Volume	Ένταση
 W up  ·  A left  ·  D right  ·  Z down  ·  S select  ·  Q back	W πάνω  ·  A αριστερά  ·  D δεξιά  ·  Z κάτω  ·  S επιλογή  ·  Q πίσω
 WADA#15B6A6 MESH#	WADA#15B6A6 MESH#
-WADAMESH	WADAMESH
+COMET	COMET
 Waiting for Wi-Fi...	Αναμονή για Wi-Fi...
-Welcome to WADAMESH	Καλώς ήρθατε στο WADAMESH
+Welcome to COMET	Καλώς ήρθατε στο COMET
 While this is on, anyone on your Wi-Fi can view and control this device. Uses plain HTTP (local network only).	Όσο είναι ενεργό, οποιοσδήποτε στο Wi-Fi σας μπορεί να βλέπει και να ελέγχει τη συσκευή. Απλό HTTP (μόνο τοπικό δίκτυο).
 Wi-Fi	Wi-Fi
 Wi-Fi & Bluetooth	Wi-Fi & Bluetooth

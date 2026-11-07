@@ -17,10 +17,10 @@
 import os
 import sys
 
-MARKER = "wadamesh-real-txt-timestamp-patch"
+MARKER = "comet-real-txt-timestamp-patch"
 OLD = """  g->random(w, 4);
   _txt_last_ts = (uint32_t)w[0] | ((uint32_t)w[1] << 8) | ((uint32_t)w[2] << 16) | ((uint32_t)w[3] << 24);"""
-NEW = """  // wadamesh-real-txt-timestamp-patch: this field is a semantic Unix
+NEW = """  // comet-real-txt-timestamp-patch: this field is a semantic Unix
   // timestamp, not a nonce. sendMessage() seeds it from the validated RTC on
   // first use and ratchets it only for later sends in this boot.
   _txt_last_ts = 0;"""

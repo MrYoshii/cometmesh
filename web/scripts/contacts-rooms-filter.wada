@@ -1,5 +1,5 @@
 # #740: the Contacts "Rooms" filter, web host build, demo backend (one room: Harbor Room).
-#   web/build-host/wadamesh-host --headless --script web/scripts/contacts-rooms-filter.wada --shots <dir>
+#   web/build-host/comet-host --headless --script web/scripts/contacts-rooms-filter.wada --shots <dir>
 # Expect: rooms-1-sheet lists Rooms under Repeaters; rooms-2-list shows only Harbor Room
 # with the header button reading "Room"; rooms-3-sheet has Rooms highlighted.
 wait 5000

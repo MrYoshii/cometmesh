@@ -130,9 +130,9 @@ struct Hooks {
 };
 
 static void arduinoFsCases() {
-  const std::vector<uint8_t> img = payload(3212345);   // about a wadamesh app bin
+  const std::vector<uint8_t> img = payload(3212345);   // about a comet app bin
   uint8_t bounce[4096];
-  const char* path = "/BINS/wadamesh-beta_100-beta.bin";
+  const char* path = "/BINS/comet-beta_100-beta.bin";
   {  // the beta_100 check, reproduced: the open file reports 0 bytes, not the image size
     FakeVfs v; FakeFs fs{v};
     FakeFile f = fs.open(path, "w");

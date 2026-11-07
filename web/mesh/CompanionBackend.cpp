@@ -4,7 +4,7 @@
 // Shape of the link:
 //   * One command in flight at a time (the protocol answers each command with one reply
 //     frame, except the contact list, which streams). Pushes (codes >= 0x80) arrive any
-//     time, and wadamesh also pushes message frames (16/17) live, so those are only taken
+//     time, and comet also pushes message frames (16/17) live, so those are only taken
 //     as the reply when CMD_SYNC_NEXT_MESSAGE is the command in flight.
 //   * On link up: DEVICE_QUERY, APP_START, the device clock, every contact, every
 //     channel slot, then the waiting messages; after that MSG_WAITING drives the sync.
@@ -40,18 +40,18 @@ using namespace companion;
 // is there, so nothing is delivered twice); new ones get "wadaweb-" + 8 random characters.
 EM_JS(int, wada_js_client_id, (char* out, int cap), {
   var id = null;
-  try { id = localStorage.getItem('wadamesh.syncId'); } catch (e) {}
+  try { id = localStorage.getItem('comet.syncId'); } catch (e) {}
   if (!id || !/^[A-Za-z0-9-]{1,31}$/.test(id)) {
     var legacy = false;
-    try { legacy = !!localStorage.getItem('wadamesh.nodes'); } catch (e) {}
-    if (legacy) id = 'wadamesh-web';
+    try { legacy = !!localStorage.getItem('comet.nodes'); } catch (e) {}
+    if (legacy) id = 'comet-web';
     else {
       var a = new Uint8Array(8), abc = 'abcdefghijklmnopqrstuvwxyz0123456789';
       crypto.getRandomValues(a);
       id = 'wadaweb-';
       for (var i = 0; i < 8; i++) id += abc[a[i] % 36];
     }
-    try { localStorage.setItem('wadamesh.syncId', id); } catch (e) {}
+    try { localStorage.setItem('comet.syncId', id); } catch (e) {}
   }
   stringToUTF8(id, out, cap);
   return 1;
@@ -63,7 +63,7 @@ const char* companion::clientId() {
 #if defined(__EMSCRIPTEN__)
   if (!id[0]) wada_js_client_id(id, sizeof id);
 #endif
-  if (!id[0]) strcpy(id, "wadamesh-web");
+  if (!id[0]) strcpy(id, "comet-web");
   return id;
 }
 
@@ -112,7 +112,7 @@ bool parseContact(const uint8_t* f, size_t len, ContactInfo& c) {
   c.lastmod = len >= CONTACT_FRAME_LEN ? rd32(f + 144) : 0;
   return true;
 }
-// wadamesh appends a local "Meshcomod" command contact (pub key "MESHCM" + zeros) to
+// comet appends a local "Meshcomod" command contact (pub key "MESHCM" + zeros) to
 // the contact list; it is the node's own console, not a mesh contact.
 bool isMeshcomodPseudo(const ContactInfo& c) {
   static const uint8_t k[6] = {0x4D, 0x45, 0x53, 0x48, 0x43, 0x4D};
@@ -558,7 +558,7 @@ private:
     const bool msg = code == RESP_CONTACT_MSG_RECV || code == RESP_CONTACT_MSG_RECV_V3 ||
                      code == RESP_CHANNEL_MSG_RECV || code == RESP_CHANNEL_MSG_RECV_V3;
     const uint8_t want = _inflight ? _q.front().code : 0;
-    if (msg && want != CMD_SYNC_NEXT_MESSAGE) { onMessageFrame(f, n); return; }   // a live push (wadamesh)
+    if (msg && want != CMD_SYNC_NEXT_MESSAGE) { onMessageFrame(f, n); return; }   // a live push (comet)
     if (!_inflight) {
       if (_debug) fprintf(stderr, "[companion] stray reply 0x%02x\n", code);
       return;
@@ -725,7 +725,7 @@ private:
       if (_sync_again) syncMessages();
     });
   }
-  // A received message, whichever way it came (sync reply or wadamesh's live push).
+  // A received message, whichever way it came (sync reply or comet's live push).
   void onMessageFrame(const uint8_t* f, size_t n) {
     // The same message can arrive both ways: drop repeats (snr byte excluded).
     {

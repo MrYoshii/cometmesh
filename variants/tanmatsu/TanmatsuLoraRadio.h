@@ -4,7 +4,7 @@
 // `tanmatsu-lora` component. On the Tanmatsu the LoRa modem (SX1262/SX1268) lives
 // on the ESP32-C6 radio coprocessor and is reached "remote" over the C6<->P4 link,
 // so we do NOT use MeshCore's RadioLib-over-SPI wrapper here — this class is the
-// drop-in replacement. Everything above mesh::Radio (the whole wadamesh app) is
+// drop-in replacement. Everything above mesh::Radio (the whole comet app) is
 // unchanged; the Tanmatsu variant just instantiates this instead of a RadioLibWrapper.
 //
 // Written against esp32-component-tanmatsu-lora v0.3.0 (include/lora.h) WITHOUT the
@@ -80,10 +80,10 @@ private:
   // under continuous-RX load, so a live lora_set_config() from the UI/companion thread
   // (mid-RX) risked freezing the app — which is why this used to no-op once RX started,
   // making a frequency/SF/BW change only take effect on the next reboot ("receives
-  // nothing on the new frequency", and wadamesh's settings never overrode the Tanmatsu
+  // nothing on the new frequency", and comet's settings never overrode the Tanmatsu
   // OS's). Now: boot bring-up pushes directly; a runtime change marks _cfg dirty and
   // recvRaw() applies it on the RX-poll thread, between polls (standby → push → re-arm),
-  // so wadamesh's settings actually reach the modem and win.
+  // so comet's settings actually reach the modem and win.
   void pushConfig() {
     if (!_started) return;
     if (_rx_polling) { _cfg_dirty = true; return; }   // defer to recvRaw() (RX-poll thread)

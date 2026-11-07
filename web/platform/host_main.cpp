@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// wadamesh-host: the real touch UI in an SDL2 window (phase 1 of WEB_BUILD.md).
+// comet-host: the real touch UI in an SDL2 window (phase 1 of WEB_BUILD.md).
 //
 // The native front end of the web board: board.cpp owns the board globals and the
 // boot/loop order (shared with web_main.cpp, the Emscripten front end); this file is
 // the SDL window, the event pump and the scripted tour.
 //
-//   wadamesh-host [--headless] [--script FILE] [--shots DIR] [--scale N] [--size WxH]
+//   comet-host [--headless] [--script FILE] [--shots DIR] [--scale N] [--size WxH]
 //                 [--serial PATH | --tcp HOST:PORT] [--read-only]
 //     --headless   no window (CI / release gate); the framebuffer is still rendered
 //     --script     scripted input: wait/tap/drag/key/type/shot/quit, one per line
@@ -14,7 +14,7 @@
 //     --serial PATH     drive a real MeshCore companion node over USB instead of the demo
 //     --tcp HOST[:PORT] the same over the node's TCP companion server (default port 5000)
 //     --read-only       never change the node's settings, contacts, channels or clock
-//   $WADA_DATA_DIR  the virtual flash (SPIFFS, LittleFS, NVS), default ./wadamesh-data
+//   $WADA_DATA_DIR  the virtual flash (SPIFFS, LittleFS, NVS), default ./comet-data
 #include <Arduino.h>
 #include "WebDisplay.h"
 #include "WebInput.h"
@@ -83,7 +83,7 @@ void keyDown(const SDL_Keysym& k) {
     case SDLK_DOWN: webKeyPush(0xB6); break;
     case SDLK_RIGHT: webKeyPush(0xB7); break;
     case SDLK_F12: {
-      char name[64]; snprintf(name, sizeof name, "/wadamesh-%lu.png", (unsigned long)millis());
+      char name[64]; snprintf(name, sizeof name, "/comet-%lu.png", (unsigned long)millis());
       savePng(s_shot_dir + name);
       break;
     }
@@ -258,7 +258,7 @@ int main(int argc, char** argv) {
   if (!headless) {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) { fprintf(stderr, "SDL_Init: %s\n", SDL_GetError()); return 1; }
     if (scale < 1) scale = 1;
-    s_win = SDL_CreateWindow("wadamesh", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+    s_win = SDL_CreateWindow("comet", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                              WADA_WEB_W * scale, WADA_WEB_H * scale, SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     s_ren = SDL_CreateRenderer(s_win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (!s_ren) s_ren = SDL_CreateRenderer(s_win, -1, 0);

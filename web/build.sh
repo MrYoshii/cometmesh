@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# web/build.sh host   build the native SDL2 app   -> web/build-host/wadamesh-host
+# web/build.sh host   build the native SDL2 app   -> web/build-host/comet-host
 # web/build.sh run    build, then start it (extra args are passed to the app)
 # web/build.sh shots  run the acceptance tour headless -> web/docs/*.png
 # web/build.sh smoke  the same tour, screenshots discarded (exit status only)
@@ -24,10 +24,10 @@ target="${1:-host}"; shift || true
 case "$target" in
   host|run)
     cmake -S "$WEB" -B "$WEB/build-host" -G Ninja -DCMAKE_BUILD_TYPE="${WADA_BUILD_TYPE:-RelWithDebInfo}" >/dev/null
-    cmake --build "$WEB/build-host" --target wadamesh-host
+    cmake --build "$WEB/build-host" --target comet-host
     if [ "$target" = run ]; then
       mkdir -p "$WEB/data"
-      WADA_DATA_DIR="${WADA_DATA_DIR:-$WEB/data}" exec "$WEB/build-host/wadamesh-host" "$@"
+      WADA_DATA_DIR="${WADA_DATA_DIR:-$WEB/data}" exec "$WEB/build-host/comet-host" "$@"
     fi
     ;;
   shots|smoke)
@@ -36,29 +36,29 @@ case "$target" in
     "$SELF" host
     tmp="$(mktemp -d)"
     out="$WEB/docs"; [ "$target" = smoke ] && out="$tmp/shots"
-    WADA_DATA_DIR="$tmp/data" "$WEB/build-host/wadamesh-host" --headless \
+    WADA_DATA_DIR="$tmp/data" "$WEB/build-host/comet-host" --headless \
       --script "$WEB/scripts/tour.wada" --shots "$out"
     rm -rf "$tmp"
     ;;
   web-nothreads)
     # The bundle for a page that is not cross-origin isolated (the http copy, which reaches
     # a node's ws:// over Wi-Fi): no pthreads, the FreeRTOS tasks as cooperative fibers
-    # (WADA_NO_THREADS, Asyncify). Only wadamesh.js/.wasm -> web/dist-nothreads/, served at
+    # (WADA_NO_THREADS, Asyncify). Only comet.js/.wasm -> web/dist-nothreads/, served at
     # nt/ next to the page (app.js loads it when the page is not isolated).
     command -v emcmake >/dev/null || { echo "web/build.sh web-nothreads: emcmake not found (brew install emscripten)" >&2; exit 1; }
     bdir="$WEB/build-web-nothreads"; dist="$WEB/dist-nothreads"
     emcmake cmake -S "$WEB" -B "$bdir" -G Ninja -DCMAKE_BUILD_TYPE=Release -DWADA_NO_THREADS=ON \
       -DWADA_WEB_OPT="${WADA_WEB_OPT:--O2}" >/dev/null
-    cmake --build "$bdir" --target wadamesh-host
+    cmake --build "$bdir" --target comet-host
     mkdir -p "$dist"; find "$dist" -mindepth 1 -delete
-    cp "$bdir/wadamesh.js" "$bdir/wadamesh.wasm" "$dist/"
-    for f in wadamesh.wasm wadamesh.js; do
+    cp "$bdir/comet.js" "$bdir/comet.wasm" "$dist/"
+    for f in comet.wasm comet.js; do
       gzip -9 -k -n -f "$dist/$f"
       if command -v brotli >/dev/null; then brotli -q 11 -f -k "$dist/$f"; fi
     done
     sz() { stat -f %z "$1" 2>/dev/null || stat -c %s "$1"; }
     printf 'no-threads bundle -> %s\n' "$dist"
-    for f in wadamesh.wasm wadamesh.js; do printf '  %-14s %9s B  gzip %9s B\n' "$f" "$(sz "$dist/$f")" "$(sz "$dist/$f.gz")"; done
+    for f in comet.wasm comet.js; do printf '  %-14s %9s B  gzip %9s B\n' "$f" "$(sz "$dist/$f")" "$(sz "$dist/$f.gz")"; done
     ;;
   web|web-debug)
     # Emscripten 3.1.50+ (brew install emscripten). Same CMakeLists.txt as the host build.
@@ -70,27 +70,27 @@ case "$target" in
     if [ "$target" = web ] && [ -z "${WADA_NO_NT:-}" ]; then "$SELF" web-nothreads; fi
     emcmake cmake -S "$WEB" -B "$bdir" -G Ninja -DCMAKE_BUILD_TYPE="$bt" \
       -DWADA_WEB_OPT="${WADA_WEB_OPT:--O2}" >/dev/null
-    cmake --build "$bdir" --target wadamesh-host
+    cmake --build "$bdir" --target comet-host
     mkdir -p "$dist"; find "$dist" -mindepth 1 -delete   # keep the folder: a running serve keeps serving it
-    cp "$bdir/wadamesh.js" "$bdir/wadamesh.wasm" "$dist/"
+    cp "$bdir/comet.js" "$bdir/comet.wasm" "$dist/"
     cp "$WEB/shell/app.js" "$WEB/shell/app.css" "$dist/"
-    cp "$WEB/../deploy/site/wadamesh-mark.svg" "$WEB/../deploy/site/favicon.ico" \
+    cp "$WEB/../deploy/site/comet-mark.svg" "$WEB/../deploy/site/favicon.ico" \
        "$WEB/shell/manifest.webmanifest" "$dist/"
     mkdir -p "$dist/icons"   # the home-screen icons (web/shell/icons/render.mjs)
     cp "$WEB/shell/icons/"*.png "$WEB/shell/icons/app-icon.svg" "$dist/icons/"
     # Cache key: the page asks for every file with ?v=<hash>, so a CDN can keep them for good.
-    nt=""; [ -f "$WEB/dist-nothreads/wadamesh.wasm" ] && nt="$WEB/dist-nothreads/wadamesh.wasm $WEB/dist-nothreads/wadamesh.js"
+    nt=""; [ -f "$WEB/dist-nothreads/comet.wasm" ] && nt="$WEB/dist-nothreads/comet.wasm $WEB/dist-nothreads/comet.js"
     # shellcheck disable=SC2086
-    build="$(cat "$dist/wadamesh.wasm" "$dist/wadamesh.js" "$dist/app.js" "$dist/app.css" $nt | shasum -a 256 | cut -c1-12)"
+    build="$(cat "$dist/comet.wasm" "$dist/comet.js" "$dist/app.js" "$dist/app.css" $nt | shasum -a 256 | cut -c1-12)"
     sed "s/__WADA_BUILD__/$build/g" "$WEB/shell/index.html" > "$dist/index.html"
     sed -i.bak "s/__WADA_BUILD__/$build/g" "$dist/app.js" && rm -f "$dist/app.js.bak"
-    for f in wadamesh.wasm wadamesh.js app.js app.css index.html; do
+    for f in comet.wasm comet.js app.js app.css index.html; do
       gzip -9 -k -n -f "$dist/$f"
       if command -v brotli >/dev/null; then brotli -q 11 -f -k "$dist/$f"; fi
     done
     sz() { stat -f %z "$1" 2>/dev/null || stat -c %s "$1"; }
     printf 'web build %s (%s, %s) -> %s\n' "$build" "$bt" "${WADA_WEB_OPT:--O2}" "$dist"
-    for f in wadamesh.wasm wadamesh.js; do
+    for f in comet.wasm comet.js; do
       printf '  %-14s %9s B  gzip %9s B' "$f" "$(sz "$dist/$f")" "$(sz "$dist/$f.gz")"
       [ -f "$dist/$f.br" ] && printf '  brotli %9s B' "$(sz "$dist/$f.br")"
       printf '\n'

@@ -1,6 +1,6 @@
 # Tanmatsu port — working tracker
 
-Goal: run the **full** wadamesh UI + functionality on the **Tanmatsu** (Nicolai
+Goal: run the **full** comet UI + functionality on the **Tanmatsu** (Nicolai
 Electronics), kept as **one codebase** with the existing S3 boards so a UI change
 ships everywhere at once. This file is the running plan/status — update it as we go.
 
@@ -13,10 +13,10 @@ indev, then on-device install via BadgeLink/AppFS.**
 
 ---
 
-## Decision (architecture) — UPDATED 2026-06-20: wadamesh is an APP on the launcher
+## Decision (architecture) — UPDATED 2026-06-20: comet is an APP on the launcher
 
 On the Tanmatsu **everything is an app** (badge.team OS + GUI launcher + **AppFS** app
-store). So wadamesh ships as a **launcher app, NOT a firmware that replaces the OS.**
+store). So comet ships as a **launcher app, NOT a firmware that replaces the OS.**
 AppFS apps are **standard ESP-IDF app binaries** installed into an AppFS flash partition
 (via `appfs_add_file.py` / BadgeLink / the badge.team app store) and started from the
 launcher; a running app owns the screen + input via `badge-bsp` and returns to the
@@ -40,7 +40,7 @@ wiring carry over.
 
 IDF-app build lives in **`tanmatsu/`** (badge.team Makefile + project-local IDF **v5.5.1**
 in `tanmatsu/esp-idf`, gitignored). Build via **`./tanmatsu/build.sh <target>`** (wraps
-`idf.py -DDEVICE=tanmatsu -DSDKCONFIG_DEFAULTS="sdkconfigs/general;sdkconfigs/tanmatsu;sdkconfigs/wadamesh;sdkconfigs/wadamesh_tanmatsu" -DIDF_TARGET=esp32p4`).
+`idf.py -DDEVICE=tanmatsu -DSDKCONFIG_DEFAULTS="sdkconfigs/general;sdkconfigs/tanmatsu;sdkconfigs/comet;sdkconfigs/comet_tanmatsu" -DIDF_TARGET=esp32p4`).
 Toolchain: PlatformIO already had the riscv32-esp P4 toolchain; IDF cloned via the Makefile
 + `idf_tools.py install cmake ninja` (the targeted `install.sh esp32p4` skips those).
 
@@ -50,7 +50,7 @@ Proven end-to-end:
   esp32p4 first-class in arduino since 3.1.3. ⇒ the "one shared `src/` via arduino-on-P4"
   architecture is **validated** — this was the make-or-break risk.
 
-**Fixes (all in `tanmatsu/sdkconfigs/wadamesh`, our overlay — badge.team files kept pristine):**
+**Fixes (all in `tanmatsu/sdkconfigs/comet`, our overlay — badge.team files kept pristine):**
 1. `CONFIG_FREERTOS_HZ=1000` — arduino-esp32 hard-requires it (badge.team defaults 100).
 2. `CONFIG_BT_ENABLED=n` (+ `BT_NIMBLE_ENABLED=n`, `ESP_HOSTED_ENABLE_BT_NIMBLE=n`) — arduino's
    bundled BLE won't compile vs IDF 5.5.1 NimBLE (`ble_gap_read_local_irk` renamed). P4 has no
@@ -95,7 +95,7 @@ RV3028, CayenneLPP, ArduinoJson) all go in ONE committed **`ardlibs`** component
    `-I src -I src/ui-touch -I include`. DROP every S3-board define (`HELTEC_LORA_V4*`, `USE_SX1262`,
    `RADIO_CLASS`/`WRAPPER_CLASS`, all `P_LORA_*`/`PIN_*`/TFT/CHSC6x, `ST7789_*`, `RADIOLIB_*`). Give
    the Tanmatsu its own board/display identity (badge-bsp, NOT `DISPLAY_CLASS=ST7789`).
-2. **`wadamesh_app` component** — glob `src/` MINUS `main.cpp` (own app_main) + the S3 input helpers
+2. **`comet_app` component** — glob `src/` MINUS `main.cpp` (own app_main) + the S3 input helpers
    (`HeltecV4CapTouch`, `TDeckKeyboard/Touch/Trackball` → Tanmatsu input is `bsp_input`); add
    `ui-touch/` once LVGL is in.
 3. **LVGL component** — vendor lvgl 8.3 + the repo `lv_conf.h`.
@@ -147,9 +147,9 @@ ESPAsyncWebServer (WDT fix), and (only if telemetry wanted) the Adafruit sensor 
 - `config.bandwidth` = kHz, valid {7,10,15,20,31,41,62,125,250,500} (62.5→62); `config.coding_rate` = 5..8 → 4/5..4/8. `setParams()` is correct. ✓
 - Only remaining radio tuning (small, MeshCore-side): `sync_word` / `preamble_length` / `power` to match `RadioLibWrappers.cpp` so it interoperates with the existing mesh.
 
-**Display/input — DECISION: keep wadamesh's LVGL 8.3 and write our own flush; do NOT adopt `badge-bsp-lvgl`.**
+**Display/input — DECISION: keep comet's LVGL 8.3 and write our own flush; do NOT adopt `badge-bsp-lvgl`.**
 - `badge-bsp` exposes the screen as an `esp_lcd` panel (`bsp_display_get_panel` / `_get_panel_io` / `_get_parameters` → h_res/v_res/color_format) and the keyboard as a FreeRTOS event queue (`bsp_input_get_queue`). Reference wiring: `badgeteam/konsool-template-lvgl`.
-- BUT the badge LVGL component (`badgeteam/esp32-component-badge-bsp-lvgl`) targets **LVGL 9.3**, and wadamesh's UITask is **LVGL 8.3**. Adopting it forces an 8→9 migration of ~30k lines — not worth it. So: bring up our own LVGL 8.3 (esp_lvgl_port supports 8.x, or a manual `flush_cb`) flushing to the badge-bsp `esp_lcd` panel, + an `lv_indev` that reads the `bsp_input` queue.
+- BUT the badge LVGL component (`badgeteam/esp32-component-badge-bsp-lvgl`) targets **LVGL 9.3**, and comet's UITask is **LVGL 8.3**. Adopting it forces an 8→9 migration of ~30k lines — not worth it. So: bring up our own LVGL 8.3 (esp_lvgl_port supports 8.x, or a manual `flush_cb`) flushing to the badge-bsp `esp_lcd` panel, + an `lv_indev` that reads the `bsp_input` queue.
 - **UI layout target: 800×480 landscape** — make UITask responsive for it (it already branches on `hor_res`).
 
 **Repos:** `badgeteam/esp32-component-badge-bsp` (BSP) · `badgeteam/konsool-template-lvgl` (LVGL-on-bsp reference) · `Nicolai-Electronics/esp32-component-tanmatsu-lora` (lora.c).
@@ -170,7 +170,7 @@ ESPAsyncWebServer (WDT fix), and (only if telemetry wanted) the Adafruit sensor 
 - [ ] LVGL display driver: flush → `bsp_display_blit`; LVGL indev ← `bsp/input` (keyboard)
 - [ ] Make UITask responsive for the larger screen (it already branches on `hor_res`)
 - [ ] Tune the `TanmatsuLoraRadio` TODO(device) items
-- [ ] Release path (separate bin; not covered by the `wadamesh-release` skill yet)
+- [ ] Release path (separate bin; not covered by the `comet-release` skill yet)
 
 ## What's done this session (no hardware)
 
@@ -225,7 +225,7 @@ build_flags =
 ## Risks / open questions
 1. **IDF components inside PlatformIO** (`badge-bsp`/`tanmatsu-lora`) — the fiddliest part; pioarduino supports the component manager but expect friction. **Still the #1 risk.**
 2. **Display = our own LVGL 8.3 flush onto the badge-bsp `esp_lcd` panel** (decided; don't use the LVGL-9.3 `badge-bsp-lvgl`). Work = the flush_cb + the `bsp_input`→`lv_indev` glue + an 800×480 layout pass on UITask. Bounded now that the BSP API + konsool reference are known.
-3. **WiFi/BLE via the C6** (`esp_wifi_remote` + `esp_hosted` over SDIO). Arduino `WiFi.h` on the P4 *is* backed by `esp_wifi_remote` in arduino-esp32 3.x, so wadamesh's WiFi (tile fetch, setup wizard, network tab) can likely run **mostly unchanged** — but it needs the C6 on the right `esp_hosted` slave firmware + the components wired in, and it's a **known-finicky area** in practice (cf. esphome#10956). The template uses IDF wifi helpers (`wifi_remote.h`), not Arduino `WiFi.h`, so confirm Arduino WiFi coexists with `tanmatsu-wifi`'s C6 bring-up during the spike. A real task + risk, not free — but not a rewrite.
+3. **WiFi/BLE via the C6** (`esp_wifi_remote` + `esp_hosted` over SDIO). Arduino `WiFi.h` on the P4 *is* backed by `esp_wifi_remote` in arduino-esp32 3.x, so comet's WiFi (tile fetch, setup wizard, network tab) can likely run **mostly unchanged** — but it needs the C6 on the right `esp_hosted` slave firmware + the components wired in, and it's a **known-finicky area** in practice (cf. esphome#10956). The template uses IDF wifi helpers (`wifi_remote.h`), not Arduino `WiFi.h`, so confirm Arduino WiFi coexists with `tanmatsu-wifi`'s C6 bring-up during the spike. A real task + risk, not free — but not a rewrite.
 4. **Heap/PSRAM** — fine: **32 MB PSRAM**, and an 800×480 RGB565 buffer is only ~768 KB. Lots of headroom vs the S3 boards.
 
 ## References

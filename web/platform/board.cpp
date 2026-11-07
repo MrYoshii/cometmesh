@@ -75,7 +75,7 @@ void WebBoard::reboot() { esp_restart(); }
 void WebBoard::powerOff() { esp_restart(); }
 
 void wadaBoardBegin(const WadaBackendChoice& choice) {
-  Serial.printf("[web] wadamesh %s, data dir %s\n", FIRMWARE_VERSION, wadaHostDataDir().c_str());
+  Serial.printf("[web] comet %s, data dir %s\n", FIRMWARE_VERSION, wadaHostDataDir().c_str());
   // Storage, then the mesh, then the UI: src/main.cpp's setup() order.
   SPIFFS.begin(true);
   LittleFS.begin(true);

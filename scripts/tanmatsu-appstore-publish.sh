@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Publish the Tanmatsu build of WadaMesh to the Nicolai-Electronics app-repository
+# Publish the Tanmatsu build of Comet to the Nicolai-Electronics app-repository
 # (the official Tanmatsu launcher app-store). Run this as part of cutting a beta.
 #
 #   scripts/tanmatsu-appstore-publish.sh beta_17               # -> version 1.0.17, revision 17
@@ -10,13 +10,13 @@
 # What it does:
 #   1. builds the Tanmatsu app (unless --skip-build) and verifies it
 #   2. syncs our fork (B0N3-GD/app-repository) to upstream main
-#   3. (re)stages deploy/tanmatsu-app/com.wadamesh.wadamesh/ + the fresh binary,
+#   3. (re)stages deploy/tanmatsu-app/com.comet.comet/ + the fresh binary,
 #      setting `version` and every application `revision`
-#   4. pushes an `update-wadamesh-<version>` branch and opens/updates a PR to
+#   4. pushes an `update-comet-<version>` branch and opens/updates a PR to
 #      Nicolai-Electronics/app-repository
 #
 # NB:
-#  - WadaMesh on the Tanmatsu is KEYBOARD-driven (no touchscreen). Keep the
+#  - Comet on the Tanmatsu is KEYBOARD-driven (no touchscreen). Keep the
 #    listing wording free of "touch" — the canonical text lives in the template.
 #  - For an update you MUST bump BOTH `version` AND `revision` or the launcher
 #    won't offer it. This script bumps both.
@@ -42,15 +42,15 @@ else
 fi
 
 # ---- paths --------------------------------------------------------------
-SLUG=com.wadamesh.wadamesh
-WADAMESH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"          # repo root
-TPL="$WADAMESH/deploy/tanmatsu-app/$SLUG"                            # versioned template (icons/README/metadata)
-BIN="$WADAMESH/tanmatsu/build/tanmatsu/application.bin"              # IDF build output
-FORK_DIR="${WADAMESH_APPSTORE_FORK:-/Users/kaj/wadamesh-appstore-fork}"
+SLUG=com.comet.comet
+COMET="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"          # repo root
+TPL="$COMET/deploy/tanmatsu-app/$SLUG"                            # versioned template (icons/README/metadata)
+BIN="$COMET/tanmatsu/build/tanmatsu/application.bin"              # IDF build output
+FORK_DIR="${COMET_APPSTORE_FORK:-/Users/kaj/comet-appstore-fork}"
 UPSTREAM=Nicolai-Electronics/app-repository
 GHUSER="$(gh api user -q .login)"
 
-echo "==> WadaMesh app-store publish: version $VERSION, revision $REVISION"
+echo "==> Comet app-store publish: version $VERSION, revision $REVISION"
 
 # ---- 1. build + verify the Tanmatsu app --------------------------------
 if [ "$SKIP_BUILD" -eq 0 ]; then
@@ -60,7 +60,7 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
   [[ "$ARG" =~ ^beta_([0-9]+)$ ]] && export WADA_FW_TAG="$ARG"
   echo "==> building Tanmatsu app (./build.sh build)..."
   LOG="$(mktemp)"
-  if ! ( cd "$WADAMESH/tanmatsu" && ./build.sh build ) >"$LOG" 2>&1; then
+  if ! ( cd "$COMET/tanmatsu" && ./build.sh build ) >"$LOG" 2>&1; then
     cat "$LOG"
     echo "!! Tanmatsu build failed — aborting"
     rm -f "$LOG"
@@ -92,9 +92,9 @@ git -C "$FORK_DIR" reset -q --hard upstream/main
 APP="$FORK_DIR/$SLUG"
 mkdir -p "$APP"
 cp "$TPL/icon16.png" "$TPL/icon32.png" "$TPL/icon64.png" "$TPL/README.md" "$APP/"
-cp "$WADAMESH/LICENSE" "$APP/LICENSE"
-cp "$WADAMESH/NOTICE"  "$APP/NOTICE"      # MeshCore (MIT) + other third-party attribution
-cp "$BIN" "$APP/wadamesh.bin"
+cp "$COMET/LICENSE" "$APP/LICENSE"
+cp "$COMET/NOTICE"  "$APP/NOTICE"      # MeshCore (MIT) + other third-party attribution
+cp "$BIN" "$APP/comet.bin"
 python3 - "$TPL/metadata.json" "$APP/metadata.json" "$VERSION" "$REVISION" <<'PY'
 import json, sys, re
 src, dst, ver, rev = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4])
@@ -115,16 +115,16 @@ PY
 echo "==> staged $SLUG (version $VERSION, revision $REVISION)"
 
 # ---- 4. commit on a branch, push, open/update the PR -------------------
-BR="update-wadamesh-$VERSION"
+BR="update-comet-$VERSION"
 git -C "$FORK_DIR" checkout -qB "$BR"
 git -C "$FORK_DIR" add "$SLUG"
 GIT_COMMITTER_NAME="Kaj Schittecat" GIT_COMMITTER_EMAIL="kaj@schittecat.com" \
   git -C "$FORK_DIR" commit -q --author="Kaj Schittecat <kaj@schittecat.com>" \
-    -m "Update WadaMesh to $VERSION (revision $REVISION)" || echo "   (nothing new to commit)"
+    -m "Update Comet to $VERSION (revision $REVISION)" || echo "   (nothing new to commit)"
 git -C "$FORK_DIR" push -fq -u origin "$BR"
 if gh pr create --repo "$UPSTREAM" --base main --head "$GHUSER:$BR" \
-     --title "Update WadaMesh to $VERSION" \
-     --body "Updates WadaMesh ($SLUG) to v$VERSION (revision $REVISION), a new Tanmatsu build." 2>/dev/null; then
+     --title "Update Comet to $VERSION" \
+     --body "Updates Comet ($SLUG) to v$VERSION (revision $REVISION), a new Tanmatsu build." 2>/dev/null; then
   echo "==> opened PR for $VERSION"
 else
   echo "==> PR already open for $BR (force-push updated it)"

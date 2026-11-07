@@ -1,6 +1,6 @@
 # A fake MeshCore companion node for testing the companion backend without hardware:
 #   python3 web/mesh/test/mock_companion_node.py 15000 &
-#   WADA_DATA_DIR=/tmp/wm web/build-host/wadamesh-host --tcp 127.0.0.1:15000
+#   WADA_DATA_DIR=/tmp/wm web/build-host/comet-host --tcp 127.0.0.1:15000
 # Contacts (Alice, Bob, a repeater, a room), Public + #wadatest, two waiting messages;
 # DMs are ACKed and answered, status / telemetry / trace / login / CLI answer, a channel
 # post is echoed by two 'repeaters' as raw RX (needs the openssl CLI).

@@ -73,8 +73,8 @@ int main() {
 
   assert(readablePath("/screenshots/capture.png"));
   assert(readablePath("/transfer/archive.bin"));
-  assert(readablePath("/wadamesh-crash.elf"));
-  assert(readablePath("/wadamesh-crash.elf.txt"));
+  assert(readablePath("/comet-crash.elf"));
+  assert(readablePath("/comet-crash.elf.txt"));
   assert(readablePath("/meshcore-backup.json"));
   assert(readablePath("/meshcore-20260907-120000.json"));
   assert(readablePath("/meshcore-backup-123.json"));

@@ -34,7 +34,7 @@ The touch controller is identified at boot: `[BOOT] T-Deck Pro e-paper ready tou
 
 ## GPS power
 
-The GPS supply follows the Pro's behaviour: off at boot, on when GPS is enabled, off when it is disabled. On the Pro the provider drives GPIO 39 for this; on the Max `TDeckMaxGps` (a subclass of the wadamesh provider) switches XL9555 line 2 around the provider's `begin()`/`stop()` and reports `isEnabled()` from the rail state.
+The GPS supply follows the Pro's behaviour: off at boot, on when GPS is enabled, off when it is disabled. On the Pro the provider drives GPIO 39 for this; on the Max `TDeckMaxGps` (a subclass of the comet provider) switches XL9555 line 2 around the provider's `begin()`/`stop()` and reports `isEnabled()` from the rail state.
 
 ## LoRa antenna
 

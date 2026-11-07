@@ -13,7 +13,7 @@
  * tinyusb_enable_interface() for it — this firmware (and the Arduino core init
  * for a CDC-on-boot build) only ever registers CDC. Verified in the linker map:
  * the ONLY referencer of these objects is usbd.c.obj's driver table, and the
- * wadamesh tree contains no USBMSC / FirmwareMSC / DFU usage. usbd still calls
+ * comet tree contains no USBMSC / FirmwareMSC / DFU usage. usbd still calls
  * every table entry's init()/reset() on startup and bus reset, which is why
  * these are no-ops rather than absent; open() returning 0 means "interface not
  * claimed" and is never reached anyway (no such interface descriptor exists).

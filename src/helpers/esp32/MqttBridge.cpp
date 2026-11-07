@@ -137,8 +137,8 @@ bool MqttBridge::reconnect() {
     }
 
     char clientId[32], lwtTopic[80];
-    snprintf(clientId, sizeof(clientId), "wadamesh-%s", _nodeHex);
-    snprintf(lwtTopic, sizeof(lwtTopic), "wadamesh/%s/status", _nodeHex);
+    snprintf(clientId, sizeof(clientId), "comet-%s", _nodeHex);
+    snprintf(lwtTopic, sizeof(lwtTopic), "comet/%s/status", _nodeHex);
 
     bool ok = _user[0]
         ? _mqtt.connect(clientId, _user, _pwd, lwtTopic, 0, true, "offline")
@@ -243,7 +243,7 @@ bool MqttBridge::sealToB64(const char* plain, char* out, size_t outCap) {
 void MqttBridge::pub(const char* subtopic, const char* json) {
     if (!_enabled || _connecting || !_mqtt.connected()) return;
     char topic[80];
-    snprintf(topic, sizeof(topic), "wadamesh/%s/%s", _nodeHex, subtopic);
+    snprintf(topic, sizeof(topic), "comet/%s/%s", _nodeHex, subtopic);
     if (_encOn) {
         char b64[720];                            // base64 of the ~508-byte sealed blob
         if (sealToB64(json, b64, sizeof(b64))) _mqtt.publish(topic, b64);

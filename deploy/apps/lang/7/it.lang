@@ -1,4 +1,4 @@
-# wadamesh language file
+# comet language file
 # canonical source - translators: edit this file and PR it
 # code: it
 # ver: 7
@@ -249,7 +249,7 @@ Still analyzing the previous\npath… try again in a moment.	Analisi del percors
 This contact hasn't shared\na GPS position.	Questo contatto non ha condiviso\nuna posizione GPS.
 Tip: you can scan for networks in Settings → Network after setup.	Suggerimento: cerca reti in Impostazioni → Rete dopo la configurazione.
 Type your network name — or switch to Wi-Fi in Settings to scan	Digita il nome della rete — o passa al Wi-Fi in Impostazioni per scansionare
-Update manually at flasher.wadamesh.com\n(Wi-Fi update is paused for now)	Aggiorna su flasher.wadamesh.com\n(l'aggiornamento Wi-Fi è in pausa)
+Update manually at flasher.cometmesh.org\n(Wi-Fi update is paused for now)	Aggiorna su flasher.cometmesh.org\n(l'aggiornamento Wi-Fi è in pausa)
 Wi-Fi needed to fetch the\nterrain profile for this path.\nConnect in Settings → Wi-Fi.	Wi-Fi necessario per il profilo\ndel terreno di questo percorso.\nConnetti in Impostazioni → Wi-Fi.
 You can run setup later in Settings → Device	Puoi eseguire la configurazione dopo in Impostazioni → Dispositivo
 Your location is unknown.\nSet GPS / position in\nSettings → Profile first.	Posizione sconosciuta.\nImposta prima GPS / posizione in\nImpostazioni → Profilo.
@@ -304,7 +304,7 @@ Sound on	Suono acceso
 Sound off	Suono spento
 TCP on	TCP acceso
 TCP off	TCP spento
-Welcome to WADAMESH	Benvenuto in WADAMESH
+Welcome to COMET	Benvenuto in COMET
 Get Started	Inizia
 Choose your name	Scegli il tuo nome
 Your name	Il tuo nome
@@ -700,13 +700,13 @@ Unsupported WAV (need 16-bit PCM)	WAV non supportato (serve PCM a 16 bit)
 Update bin saved to SD	Bin di aggiornamento salvato su SD
 Update complete.\nRebooting...	Aggiornamento completato.\nRiavvio...
 Update via the Launcher	Aggiorna tramite il Launcher
-Update via the Launcher / flasher.wadamesh.com	Aggiorna tramite il Launcher / flasher.wadamesh.com
-Update via the Launcher / flasher.wadamesh.com.	Aggiorna tramite il Launcher / flasher.wadamesh.com.
+Update via the Launcher / flasher.cometmesh.org	Aggiorna tramite il Launcher / flasher.cometmesh.org
+Update via the Launcher / flasher.cometmesh.org.	Aggiorna tramite il Launcher / flasher.cometmesh.org.
 Username (optional)	Nome utente (facoltativo)
 Volume	Volume
 W up  ·  A left  ·  D right  ·  Z down  ·  S select  ·  Q back	W su  ·  A sinistra  ·  D destra  ·  Z giù  ·  S scegli  ·  Q indietro
 WADA#15B6A6 MESH#	WADA#15B6A6 MESH#
-WADAMESH	WADAMESH
+COMET	COMET
 Wi-Fi not connected	Wi-Fi non connesso
 Wi-Fi on, scanning…	Wi-Fi attivo, scansione…
 Yesterday	Ieri
@@ -748,7 +748,7 @@ Catalog unavailable	Catalogo non disponibile
 Loading catalog…	Caricamento catalogo…
 Loading the language catalog…	Caricamento catalogo lingue…
 Language catalog unavailable - check Wi-Fi, then reopen this tab.	Catalogo lingue non disponibile - controlla il Wi-Fi e riapri questa scheda.
-Fetching the app list from firmware.wadamesh.com	Recupero elenco app da firmware.wadamesh.com
+Fetching the app list from firmware.cometmesh.org	Recupero elenco app da firmware.cometmesh.org
 Turn Wi-Fi on, then tap refresh. Apps already installed still work.	Attiva il Wi-Fi e aggiorna. Le app già installate continuano a funzionare.
 Installing…	Installazione…
 Install failed (network?)	Installazione non riuscita (rete?)

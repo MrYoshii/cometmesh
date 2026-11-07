@@ -1,4 +1,4 @@
--- Blackjack 21 (ver 1.2.2) — WADAMESH Lua app for LilyGo T-Deck, T-Display P4 (AMOLED/LCD), & MeshCore boards
+-- Blackjack 21 (ver 1.2.2) — COMET Lua app for LilyGo T-Deck, T-Display P4 (AMOLED/LCD), & MeshCore boards
 local ui, sys, store, timer = wada.ui, wada.sys, wada.store, wada.timer
 local C = ui.colors
 local app = {}

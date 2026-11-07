@@ -10,7 +10,7 @@ Pinned upstream and local file hashes:
 - local `minimp3.h` with the hook below: `3f59a7f29de636ca0db0aab8a5b86739c43ac8bf9ac902010e7220f783c0ae0a`
 - `LICENSE`: `6a1ee543e5282cd9061881edf462e6fdab181f328da71fc2c9a6950a80e94d01`
 
-Wadamesh adds one opt-in `MINIMP3_SCRATCH` hook around the decoder's local
+Comet adds one opt-in `MINIMP3_SCRATCH` hook around the decoder's local
 scratch object. The Lua audio worker uses it to place the roughly 16 KB decoder
 workspace in PSRAM instead of its FreeRTOS task stack. Builds that do not define
 the hook retain upstream behavior.

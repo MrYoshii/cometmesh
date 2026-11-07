@@ -1,4 +1,4 @@
--- ProTreck — wadamesh outdoor watch: Astro · Chrono · Timer · Altimeter
+-- ProTreck — comet outdoor watch: Astro · Chrono · Timer · Altimeter
 -- Swipe left/right to change tab
 -- ASTRO: sunrise/sunset + moon phase from GPS fix
 -- CHRONO: tap start/stop, swipe-up lap, swipe-down reset

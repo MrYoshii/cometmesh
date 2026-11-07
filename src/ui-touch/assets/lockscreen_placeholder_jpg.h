@@ -1,5 +1,5 @@
 // Auto-generated from lockscreen_placeholder.jpg — do not edit by hand.
-// 320x240 JPEG wallpaper (gradient + padlock + WADAMESH), seeded to SPIFFS
+// 320x240 JPEG wallpaper (gradient + padlock + COMET), seeded to SPIFFS
 // /lock/placeholder.jpg for the file manager / picker. The lock screen itself
 // renders the crisp pre-dithered RGB565 embed (lockscreen_wallpaper_rgb565.h).
 #pragma once

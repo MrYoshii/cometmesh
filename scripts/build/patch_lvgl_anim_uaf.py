@@ -30,13 +30,13 @@
 import os
 import sys
 
-MARKER = "wadamesh-lvgl-anim-uaf-patch"
+MARKER = "comet-lvgl-anim-uaf-patch"
 OLD = """                /*If the time is elapsed the animation is ready*/
                 if(a->act_time >= a->time) {
                     anim_ready_handler(a);
                 }"""
 NEW = """                /*If the time is elapsed the animation is ready.
-                 *wadamesh-lvgl-anim-uaf-patch: exec_cb may have deleted `a` (a scroll
+                 *comet-lvgl-anim-uaf-patch: exec_cb may have deleted `a` (a scroll
                  *handler that scrolls the same object without animation does), so do not
                  *read it when the list changed. It completes on the next round (LVGL 9).*/
                 if(!anim_list_changed && a->act_time >= a->time) {

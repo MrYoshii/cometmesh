@@ -28,7 +28,7 @@ ESP32RTCClock fallback_clock;
 // without the module behaves exactly as before.
 HardwareRtcClock     hw_rtc(fallback_clock);
 ClockFloorRTC        rtc_clock(hw_rtc);
-// Wadamesh's provider for its UART probe: T-Deck Plus receivers talk 38400 or 9600
+// Comet's provider for its UART probe: T-Deck Plus receivers talk 38400 or 9600
 // depending on the unit, so the speed is found while the user has not picked one in
 // Settings (CAP_GPS_BAUD_FIND). No enable or reset line on this board; the ESP
 // receives on PIN_GPS_TX (the core's naming).

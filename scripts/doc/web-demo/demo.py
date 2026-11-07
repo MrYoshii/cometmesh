@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Representative demo data for the wadamesh web-control-panel doc harness.
+Representative demo data for the comet web-control-panel doc harness.
 
 Field names + shapes here MUST match the firmware's webPush* emitters in
 src/ui-touch/UITask.cpp. See serve.py for the @-command -> payload mapping.
@@ -290,7 +290,7 @@ def terminal_reply(now, cmd):
             "  reboot bootloader\n"
         )
     if cl == "ver":
-        return "wadamesh " + FIRMWARE_VERSION + " (demo)\n"
+        return "comet " + FIRMWARE_VERSION + " (demo)\n"
     if cl == "clock":
         return clk + "\n"
     if cl == "status":

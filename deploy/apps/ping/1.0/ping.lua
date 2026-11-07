@@ -1,4 +1,4 @@
--- Ping — wadamesh Lua app
+-- Ping — comet Lua app
 -- Send a DM to any contact and measure round-trip time.
 -- Both devices exchange their GPS position; the result shows RTT,
 -- distance and cardinal bearing when both have a fix.

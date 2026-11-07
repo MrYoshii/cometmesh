@@ -5,7 +5,7 @@
 // It speaks the companion frame protocol, the one the MeshCore phone apps use and
 // src/MyMesh.cpp's handleCmdFrame() serves, over any CompanionTransport (USB serial and
 // TCP natively; Web Serial, Web Bluetooth and WebSocket in a browser). It matches
-// STOCK MeshCore 1.17 / 1.18 companion behaviour; the wadamesh extras it meets (live
+// STOCK MeshCore 1.17 / 1.18 companion behaviour; the comet extras it meets (live
 // message pushes alongside MSG_WAITING, the trailing "Meshcomod" pseudo contact, the
 // per-client sync cursor) are handled where they differ.
 //
@@ -49,9 +49,9 @@ enum : uint8_t {
 };
 // The protocol version this client speaks (CMD_DEVICE_QUERY): v3+ message frames carry SNR.
 static const uint8_t APP_TARGET_VER = 3;
-// The per-client sync cursor id wadamesh / meshcomod keep for us (stock ignores it): one per
+// The per-client sync cursor id comet / meshcomod keep for us (stock ignores it): one per
 // browser profile and page origin (each keeps its own copy of the chats), so every copy gets
 // every message it has not had yet, whichever app or browser picked it up first.
 const char* clientId();
-static const char* const APP_NAME = "wadamesh web";
+static const char* const APP_NAME = "comet web";
 }  // namespace companion

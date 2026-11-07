@@ -299,7 +299,7 @@ show_results = function()
   local again_x = M
   if n > 0 then
     local note = not CAN_CLEAN and
-      tr("This firmware can find these but not remove them. Update wadamesh, or format the card: in Files, hold the SD card row.")
+      tr("This firmware can find these but not remove them. Update comet, or format the card: in Files, hold the SD card row.")
     local note_h = 0
     if note then
       note_h = (ui.text_lines and ui.text_lines(note, W - 2 * M, 12) or 3) * (ui.text_h and ui.text_h(12) or 16) + 4
@@ -336,7 +336,7 @@ show_intro = function()
               y, 12, C.text)
   _, y = text(NOTICE, y, 12, C.text)
   if not CAN_CLEAN then
-    _, y = text(tr("This firmware can only find them. Update wadamesh to remove them here."), y, 12, C.sub)
+    _, y = text(tr("This firmware can only find them. Update comet to remove them here."), y, 12, C.sub)
   end
   local by = button_row(y)
   ui.button(tr("Scan"), M, by, 100, 32, function()

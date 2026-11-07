@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# wadamesh: compile every board this repo can produce firmware for. Builds only —
+# comet: compile every board this repo can produce firmware for. Builds only —
 # nothing is flashed, uploaded or published.
 #
 # WHY THIS SCRIPT EXISTS: "does it still build?" spans two toolchains. The

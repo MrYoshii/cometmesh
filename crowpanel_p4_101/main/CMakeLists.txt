@@ -15,7 +15,7 @@ idf_component_register(
 		meshcore
 		lvgl
 		RadioLib           # target.h (included by main.cpp) pulls <RadioLib.h>
-		wadamesh_app
+		comet_app
 	INCLUDE_DIRS
 		"."
 )
@@ -41,13 +41,13 @@ idf_build_set_property(COMPILE_OPTIONS "${_co}")
 #   - the C6 SDIO data-pin order (sdkconfig fragment, build.sh).
 if(NOT DEFINED ENV{WADA_CP_REV} OR "$ENV{WADA_CP_REV}" STREQUAL "1.2")
   set(CP_REV_DEFS CP_REV=12 P_LORA_DIO_1=27 P_LORA_RESET=28)
-  message(STATUS "wadamesh: CrowPanel P4 10.1 board revision V1.2")
+  message(STATUS "comet: CrowPanel P4 10.1 board revision V1.2")
 elseif("$ENV{WADA_CP_REV}" STREQUAL "1.1")
   set(CP_REV_DEFS CP_REV=11 P_LORA_DIO_1=53 P_LORA_RESET=54)
-  message(STATUS "wadamesh: CrowPanel P4 10.1 board revision V1.1")
+  message(STATUS "comet: CrowPanel P4 10.1 board revision V1.1")
 elseif("$ENV{WADA_CP_REV}" STREQUAL "1.0")
   set(CP_REV_DEFS CP_REV=10 P_LORA_DIO_1=53 P_LORA_RESET=54)
-  message(STATUS "wadamesh: CrowPanel P4 10.1 board revision V1.0")
+  message(STATUS "comet: CrowPanel P4 10.1 board revision V1.0")
 else()
   message(FATAL_ERROR "WADA_CP_REV must be 1.0, 1.1 or 1.2 (got '$ENV{WADA_CP_REV}')")
 endif()
@@ -93,6 +93,6 @@ if(NOT WADA_FW_DATE)
 endif()
 idf_build_set_property(COMPILE_OPTIONS "-DFIRMWARE_RELEASE_TAG=\"${WADA_FW_TAG}\"" APPEND)
 idf_build_set_property(COMPILE_OPTIONS "-DFIRMWARE_BUILD_DATE=\"${WADA_FW_DATE}\"" APPEND)
-idf_build_set_property(COMPILE_OPTIONS "-DFIRMWARE_VERSION=\"wadamesh ${WADA_FW_TAG}\"" APPEND)
+idf_build_set_property(COMPILE_OPTIONS "-DFIRMWARE_VERSION=\"comet ${WADA_FW_TAG}\"" APPEND)
 # NOTE: no FIRMWARE_OTA_ENV on purpose. This is an experimental board with no release artifact on
-# firmware.wadamesh.com yet, so the on-device update UI stays hidden (CAP_OTA 0 in device_caps.h).
+# firmware.cometmesh.org yet, so the on-device update UI stays hidden (CAP_OTA 0 in device_caps.h).

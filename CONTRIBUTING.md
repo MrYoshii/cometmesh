@@ -1,11 +1,11 @@
-# Contributing to wadamesh
+# Contributing to comet
 
-Thanks for your interest — wadamesh is open and collaborative by design, and
+Thanks for your interest — comet is open and collaborative by design, and
 contributions are very welcome.
 
 ## License of contributions
 
-wadamesh is licensed under **GPL-3.0-or-later** (see [LICENSE](LICENSE)). By
+comet is licensed under **GPL-3.0-or-later** (see [LICENSE](LICENSE)). By
 submitting a contribution you agree that it is licensed under the same terms
 (inbound = outbound). This keeps every build and fork open.
 
@@ -35,7 +35,7 @@ A few principles (borrowed from how this project is built):
   could come next — just don't bundle it into the same diff.
 - **Prefer pulling in a library over hand-rolling.** If a maintained library
   solves it, depend on it (and add it to [NOTICE](NOTICE)) rather than reinventing.
-- **Don't regress what ships.** wadamesh runs on real devices; changes should keep
+- **Don't regress what ships.** comet runs on real devices; changes should keep
   both boards (LilyGo T-Deck and Heltec V4 TFT) building and behaving.
 
 ## Building

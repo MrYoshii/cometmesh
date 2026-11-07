@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// wadamesh web build: the browser side of the companion transports.
+// comet web build: the browser side of the companion transports.
 //
 // Linked into the Emscripten build with --pre-js (web/CMakeLists.txt), so it shares the
 // module's scope (HEAPU8, the wada_* C entry points). It only moves bytes; the framing

@@ -1,6 +1,6 @@
 #pragma once
 // =============================================================================
-// USB Files, device side: serves files.wadamesh.com over the USB serial port
+// USB Files, device side: serves files.cometmesh.org over the USB serial port
 // while the USB Files app is open. Protocol in helpers/esp32/UsbFilesProtocol.h.
 //
 // The session owns the port for as long as it runs (g_usb_files_owns_serial

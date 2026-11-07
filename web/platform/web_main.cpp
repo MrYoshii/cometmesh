@@ -6,7 +6,7 @@
 //     per animation frame (LVGL and the UI never leave the main thread; the UI's
 //     background tasks are pthreads via compat/freertos)
 //   - the panel: the changed rectangle of the RGB565 framebuffer, as RGBA, handed to
-//     the page's Module.wadaPresent (web/shell/wadamesh.js puts it on the <canvas>)
+//     the page's Module.wadaPresent (web/shell/comet.js puts it on the <canvas>)
 //   - input: the page calls wadaWebPointer / wadaWebKey (canvas pixels, CardKB codes)
 //   - storage: the page persists the IDBFS mount when wadaWebFsGeneration() moves
 //   - restart: esp_restart() asks the page to persist and reload
@@ -180,7 +180,7 @@ EMSCRIPTEN_KEEPALIVE int wadaWebTextareaAt(int x, int y) { return webTextareaAt(
 // Is a text field being edited (the UI's keyboard is bound to one)?
 EMSCRIPTEN_KEEPALIVE int wadaWebEditing() { return webEditing() ? 1 : 0; }
 EMSCRIPTEN_KEEPALIVE int wadaWebOskShown() { return webOskShown() ? 1 : 0; }
-// Tests: where a label with this text is (web/shell/app.js wadamesh.findText).
+// Tests: where a label with this text is (web/shell/app.js comet.findText).
 EMSCRIPTEN_KEEPALIVE int wadaWebFindText(const char* text) { return webFindText(text); }
 EMSCRIPTEN_KEEPALIVE const char* wadaWebEditText() { return webEditText(); }
 // The mouse wheel / a two-finger trackpad scroll over (x, y), in canvas pixels.

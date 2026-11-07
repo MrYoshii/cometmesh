@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-wadamesh tile transcode service.
+comet tile transcode service.
 
 Why this exists
 ---------------
@@ -15,7 +15,7 @@ OpenStreetMap only serves PNG. So this service sits between nginx and OSM:
 it fetches the PNG from OSM (HTTPS, with the policy-required identifying
 User-Agent) and re-encodes it as JPEG, which is what the device asks for.
 
-nginx (see tiles.wadamesh.com.conf) reverse-proxies tiles.wadamesh.com
+nginx (see tiles.cometmesh.org.conf) reverse-proxies tiles.cometmesh.org
 to this service on 127.0.0.1:5005 and caches the JPEG result on disk, so OSM
 is only hit on a cache miss and transcoding only happens once per tile.
 
@@ -24,7 +24,7 @@ Run
     pip install flask pillow requests
     python3 tile-transcode.py          # listens on 127.0.0.1:5005
 
-Production: use the systemd unit (wadamesh-tile-transcode.service).
+Production: use the systemd unit (comet-tile-transcode.service).
 """
 
 import io
@@ -50,7 +50,7 @@ OSM_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
 OPENTOPO_URL = "https://tile.opentopomap.org/{z}/{x}/{y}.png"
 # Tile policy: identify yourself with a contactable UA. This is what the upstream
 # tile servers see — the device never talks to them directly.
-OSM_UA = "wadamesh-tile-proxy/1.0 (+https://wadamesh.com)"
+OSM_UA = "comet-tile-proxy/1.0 (+https://cometmesh.org)"
 JPEG_QUALITY = 80          # slippy tiles compress well; 80 ≈ visually lossless
 MAX_TILE_BYTES = 256 * 1024
 REQUEST_TIMEOUT = 12       # seconds for the OSM fetch

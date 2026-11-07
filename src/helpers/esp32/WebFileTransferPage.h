@@ -16,7 +16,7 @@ R"FILEPAGE(<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>WADAMESH File Transfer</title>
+<title>COMET File Transfer</title>
 <style>
 :root{color-scheme:dark;--bg:#0b0d0e;--panel:#15191a;--line:#303738;--text:#edf2f1;--muted:#929b99;--accent:#15b6a6;--danger:#ef6a67}
 *{box-sizing:border-box}body{margin:0;min-height:100vh;background:linear-gradient(150deg,#0b0d0e,#111817);color:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
@@ -26,7 +26,7 @@ section{border:1px solid var(--line);background:var(--panel);border-radius:8px;p
 </style>
 </head>
 <body><main>
-<header><i></i><b>WADAMESH FILE TRANSFER</b></header>
+<header><i></i><b>COMET FILE TRANSFER</b></header>
 <section>
   <label for="code">Session code shown on the device</label>
   <input id="code" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code">
@@ -81,7 +81,7 @@ function requestCancel(text='Transfer cancelled.',kind=''){if(state==='cancellin
 function cancel(){requestCancel()}
 function fail(text){if(state==='starting'||state==='uploading'||state==='downloading'||state==='listing'){requestCancel(text,'err');return}resetUpload();status(text,'err')}
 function refreshList(){if(!authed||state!=='ready')return;entries=[];state='listing';controls();status('Reading file list…');ws.send('LIST')}
-function fileKind(path){if(path.startsWith('/screenshots/'))return'screenshots';if(path.startsWith('/transfer/'))return'transfers';if(path.startsWith('/wadamesh-crash.'))return'crashes';if(path.startsWith('/meshcore-')&&path.endsWith('.json'))return'backups';return'other'}
+function fileKind(path){if(path.startsWith('/screenshots/'))return'screenshots';if(path.startsWith('/transfer/'))return'transfers';if(path.startsWith('/comet-crash.'))return'crashes';if(path.startsWith('/meshcore-')&&path.endsWith('.json'))return'backups';return'other'}
 function renderFiles(){const box=E('files'),filter=E('filter').value,shown=entries.filter(item=>filter==='all'||fileKind(item.path)===filter);box.textContent='';box.className=shown.length?'':'empty';if(!shown.length){box.textContent=entries.length?'No files match this filter.':'No files found.';return}shown.forEach(item=>{const row=document.createElement('div');row.className='file';const info=document.createElement('span');const title=document.createElement('b');title.textContent=item.path;const size=document.createElement('small');size.textContent=item.size.toLocaleString()+' bytes';if(fileKind(item.path)==='backups'){size.textContent+=' (contains your private key and channel secrets)';size.style.color='var(--danger)'}info.append(title,size);const actions=document.createElement('div');actions.className='actions';const download=document.createElement('button');download.textContent='Download';download.onclick=()=>startDownload(item.path);const remove=document.createElement('button');remove.className='danger';remove.textContent='Delete';remove.onclick=()=>deleteDeviceFile(item.path);actions.append(download,remove);row.append(info,actions);box.append(row)})}
 function startDownload(path){if(!authed||state!=='ready')return;state='starting';controls();status('Opening '+path+'…');ws.send('GET '+path)}
 function deleteDeviceFile(path){if(!authed||state!=='ready'||!confirm('Delete '+path+' from the device?'))return;entries=[];state='listing';controls();status('Deleting '+path+'…');ws.send('DELETE '+path)}

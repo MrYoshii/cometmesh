@@ -12,7 +12,7 @@ TAG="${1:?usage: matrix-check.sh <tag>}"
 command -v curl >/dev/null 2>&1 || exit 0
 command -v python3 >/dev/null 2>&1 || exit 0
 
-curl -fsS --max-time 8 "http://firmware.wadamesh.com/report/matrix.json?tag=$TAG" 2>/dev/null \
+curl -fsS --max-time 8 "http://firmware.cometmesh.org/report/matrix.json?tag=$TAG" 2>/dev/null \
   | python3 -c '
 import json, sys
 try:
@@ -30,11 +30,11 @@ for b in d.get("boards", []):
               % (b.get("board", "?"), b.get("status"), b.get("works", 0), b.get("issues", 0),
                  b.get("devices") or "?"))
 if s.get("promote_ready"):
-    print("every board anyone is known to be running has been vouched for. wadamesh.com/beta")
+    print("every board anyone is known to be running has been vouched for. cometmesh.org/beta")
 elif not s.get("reports"):
-    print("NOBODY has reported on this build. wadamesh.com/beta")
+    print("NOBODY has reported on this build. cometmesh.org/beta")
 else:
     print("NOT vouched for: %s" % (", ".join(s.get("blocked_by", [])) or "no board is green yet"))
-    print("promoting anyway is a choice, not an error. wadamesh.com/beta")
+    print("promoting anyway is a choice, not an error. cometmesh.org/beta")
 print("")
 '

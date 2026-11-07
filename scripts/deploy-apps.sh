@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# wadamesh app+language store deploy: publish deploy/apps/ to the firmware VPS.
+# comet app+language store deploy: publish deploy/apps/ to the firmware VPS.
 #
 # The device reads BOTH catalogs from the firmware host, NOT the site host:
-#   http://firmware.wadamesh.com/apps/apps.json          <- Store > Apps
-#   http://firmware.wadamesh.com/apps/langs.json         <- Store > Languages
-#   http://firmware.wadamesh.com/apps/lang/<ver>/<code>.lang
+#   http://firmware.cometmesh.org/apps/apps.json          <- Store > Apps
+#   http://firmware.cometmesh.org/apps/langs.json         <- Store > Languages
+#   http://firmware.cometmesh.org/apps/lang/<ver>/<code>.lang
 # so this tree lives under the FIRMWARE web root, alongside releases/ and latest*/.
 #
 # WHY THIS SCRIPT EXISTS: there wasn't one. release.sh rsyncs out/firmware/ (which
@@ -15,19 +15,19 @@
 # running this is.
 #
 # Usage:
-#   WADAMESH_VPS=user@your-vps scripts/deploy-apps.sh             # deploy
-#   WADAMESH_VPS=user@your-vps scripts/deploy-apps.sh --dry-run   # preview only
+#   COMET_VPS=user@your-vps scripts/deploy-apps.sh             # deploy
+#   COMET_VPS=user@your-vps scripts/deploy-apps.sh --dry-run   # preview only
 #
 # Optional:
-#   WADAMESH_FW_PATH=/srv/wadamesh/firmware   # override the firmware web root
+#   COMET_FW_PATH=/srv/comet/firmware   # override the firmware web root
 #
 # The VPS target comes from the environment — never commit it.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/deploy/apps/"
-DEST="${WADAMESH_VPS:?set WADAMESH_VPS=user@host}"
-DEST_PATH="${WADAMESH_FW_PATH:-/srv/wadamesh/firmware}/apps"
+DEST="${COMET_VPS:?set COMET_VPS=user@host}"
+DEST_PATH="${COMET_FW_PATH:-/srv/comet/firmware}/apps"
 
 DRY=""
 [ "${1:-}" = "--dry-run" ] && DRY="--dry-run"
@@ -87,6 +87,6 @@ if [ -z "$DRY" ]; then
   echo
   echo "deployed deploy/apps/ -> $DEST:$DEST_PATH"
   echo "verify:"
-  echo "  curl -s http://firmware.wadamesh.com/apps/langs.json"
-  echo "  curl -s http://firmware.wadamesh.com/apps/apps.json"
+  echo "  curl -s http://firmware.cometmesh.org/apps/langs.json"
+  echo "  curl -s http://firmware.cometmesh.org/apps/apps.json"
 fi

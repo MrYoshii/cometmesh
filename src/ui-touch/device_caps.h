@@ -256,7 +256,7 @@
   #define CAP_SD           0   // card is SD_MMC (slot 0), exposed through CAP_FILESYSTEM like the T-Display P4
   #define CAP_FILESYSTEM   1   // internal LittleFS 'storage' + SD_MMC
   #define CAP_GPS          0   // no GPS fitted
-  #define CAP_OTA          1   // released per revision from beta_97 (wadamesh-crowpanel-p4-101-v1x.bin)
+  #define CAP_OTA          1   // released per revision from beta_97 (comet-crowpanel-p4-101-v1x.bin)
   #define CAP_LOCK_SCREEN  0   // no wake/unlock path wired yet (the BOOT key on GPIO35 could become one)
   #define CAP_BATTERY      0   // battery charging + sensing belong to the on-board STC8, not the P4
 
@@ -773,7 +773,7 @@
 #endif
 
 // ---- USB Files ---------------------------------------------------------------
-// files.wadamesh.com browses and edits the SD card and internal storage over the
+// files.cometmesh.org browses and edits the SD card and internal storage over the
 // USB cable (Web Serial) while the USB Files app is open (UsbFilesSession.h).
 // Every ESP32-S3 board whose USB socket is the chip's own USB (ARDUINO_USB_CDC_ON_BOOT):
 // UsbFilesSession handles both of its serial drivers (HW-CDC and TinyUSB CDC), proven on
@@ -872,7 +872,7 @@
 
 // Settings > Contact Management: delete contacts not heard from in N days (#719).
 // On every board; the Tanmatsu got room for it back when its image shrank by
-// ~195 KB (silent asserts, deflated emoji), see sdkconfigs/wadamesh_tanmatsu.
+// ~195 KB (silent asserts, deflated emoji), see sdkconfigs/comet_tanmatsu.
 #ifndef CAP_CONTACT_PURGE
   #define CAP_CONTACT_PURGE 1
 #endif

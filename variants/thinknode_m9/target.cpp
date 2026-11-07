@@ -34,7 +34,7 @@ ESP32RTCClock fallback_clock;
 HardwareRtcClock hw_rtc(fallback_clock);
 ClockFloorRTC rtc_clock(
     hw_rtc); // wraps AutoDiscover: monotonic send-timestamp floor (#89)
-// Wadamesh's own provider rather than the core's MicroNMEALocationProvider:
+// Comet's own provider rather than the core's MicroNMEALocationProvider:
 // identical behaviour, plus the RMC speed/course the core keeps private (see
 // src/helpers/WadaNmeaLocationProvider.h for why it is a copy, not a subclass).
 // With the UART probe: M9 receivers ship at 115200 or 9600 depending on the

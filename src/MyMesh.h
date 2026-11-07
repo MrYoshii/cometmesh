@@ -148,7 +148,7 @@ public:
   void begin(bool has_display);
   void startInterface(BaseSerialInterface &serial);
 
-  // Keep WadaMesh's queued text packets intact around the pinned core's
+  // Keep Comet's queued text packets intact around the pinned core's
   // sendMessage/sendCommandData implementations.  That core currently drops
   // every queued TXT before enqueueing a new one; these wrappers restore FIFO
   // behavior and let MyMesh replace only the same logical private message.

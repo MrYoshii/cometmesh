@@ -13,7 +13,7 @@
 #   web/scripts/prefs-slot.sh [out-dir]      (build first: web/build.sh host)
 set -euo pipefail
 WEB="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$WEB/build-host/wadamesh-host"
+BIN="$WEB/build-host/comet-host"
 OUT="${1:-$(mktemp -d)}"
 mkdir -p "$OUT"
 DATA="$OUT/data"; rm -rf "$DATA"

@@ -1,6 +1,6 @@
 # Elecrow CrowPanel P4 10.1: standalone 16 MB partition table (same layout as the T-Display P4).
 # NOT an AppFS/launcher app (that's the Tanmatsu): this flashes bootloader+app directly.
-# Dual OTA app slots (4 MB each; the P4 wadamesh image is ~2.5-3 MB) + a big FAT for
+# Dual OTA app slots (4 MB each; the P4 comet image is ~2.5-3 MB) + a big FAT for
 # identity/prefs/contacts/chat history + map tiles.
 # Name,     Type, SubType,  Offset,   Size,   Flags
 nvs,        data, nvs,      0x9000,   24K,

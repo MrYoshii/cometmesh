@@ -1,7 +1,7 @@
 # wada.ui.input max_len + Enter-is-OK (d9f763a2) and wada.sys.random (882a2046)
 # in the web host build, against the real LuaAppHost.cpp. Install the test app first:
 #   mkdir -p "$WADA_DATA_DIR/spiffs/apps" && cp web/scripts/apps/inputlen.lua "$WADA_DATA_DIR/spiffs/apps/"
-#   web/build-host/wadamesh-host --headless --script web/scripts/lua-input.wada --shots <dir>
+#   web/build-host/comet-host --headless --script web/scripts/lua-input.wada --shots <dir>
 # Expect: r1 shows "caps().input_len = true" and "random OK"; r3 "max_len 300 -> 250
 # chars, ends '456789'" (typed on the host keyboard, Enter = OK); r5 "default -> 63
 # chars" (100 typed, no max_len); r6 "full range: 100/100 integers" (random over the whole

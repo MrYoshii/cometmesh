@@ -94,7 +94,7 @@ bool i18nHasFileOverlay() { return s_file_n > 0; }
 
 // The translation table used to live here, compiled into every image. It is now
 // EXPORTED DATA: deploy/apps/lang/<code>.lang in the repo (canonical, translators
-// PR those files) and served from firmware.wadamesh.com/apps/lang/. The device
+// PR those files) and served from firmware.cometmesh.org/apps/lang/. The device
 // downloads the active language via the Lua Store's Languages tab and loads it at
 // boot (uiLangFileBootLoad in UITask.cpp) — TR() below consults only that overlay.
 // scripts/build/i18n-audit.py checks the files cover every TR() key in source.

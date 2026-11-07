@@ -1,4 +1,4 @@
-# Host harness for Wadamesh Lua apps
+# Host harness for Comet Lua apps
 
 Runs a Store app on your desktop, against a mock of the `wada.*` host, before
 it ever touches a device. Not part of the firmware build.

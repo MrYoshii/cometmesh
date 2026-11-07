@@ -13,7 +13,7 @@
 #include <helpers/ui/ST7789LCDDisplay.h>
 #endif
 #include "helpers/sensors/EnvironmentSensorManager.h"
-// Wadamesh-owned NMEA provider (the core one plus speed/course for wada.sys.gps)
+// Comet-owned NMEA provider (the core one plus speed/course for wada.sys.gps)
 #include "../../src/helpers/WadaNmeaLocationProvider.h"
 #if defined(HAS_M9_KEYBOARD)
 #include "M9Keyboard.h"

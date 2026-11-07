@@ -92,13 +92,13 @@ async function runScript(page, lines, { prefix, touch, shots = true }) {
 async function bootPage(page) {
   const t0 = Date.now();
   await page.goto(URL_, { waitUntil: 'load' });
-  await page.waitForFunction(() => window.wadamesh && window.wadamesh.running(), null, { timeout: 60000 });
+  await page.waitForFunction(() => window.comet && window.comet.running(), null, { timeout: 60000 });
   return Date.now() - t0;
 }
 
 async function scrollFps(page) {
   // Contacts list: drag up and down for ~3 s, count animation frames and presented frames.
-  const s0 = await page.evaluate(() => ({ ...window.wadamesh.stats, now: performance.now() }));
+  const s0 = await page.evaluate(() => ({ ...window.comet.stats, now: performance.now() }));
   const [x, yTop] = await canvasPoint(page, 400, 140);
   const [, yBot] = await canvasPoint(page, 400, 400);
   for (let k = 0; k < 4; k++) {
@@ -109,7 +109,7 @@ async function scrollFps(page) {
     for (let i = 1; i <= 20; i++) { await page.mouse.move(x, yTop + (yBot - yTop) * i / 20); await sleep(16); }
     await page.mouse.up(); await sleep(200);
   }
-  const s1 = await page.evaluate(() => ({ ...window.wadamesh.stats, now: performance.now() }));
+  const s1 = await page.evaluate(() => ({ ...window.comet.stats, now: performance.now() }));
   const sec = (s1.now - s0.now) / 1000;
   return { seconds: +sec.toFixed(2), rafFps: +((s1.frames - s0.frames) / sec).toFixed(1),
            presentsPerSec: +((s1.presents - s0.presents) / sec).toFixed(1),
@@ -117,7 +117,7 @@ async function scrollFps(page) {
 }
 
 async function historyHas(page, needle) {
-  const hits = await page.evaluate((needle) => window.wadamesh.findInStorage(needle), needle);
+  const hits = await page.evaluate((needle) => window.comet.findInStorage(needle), needle);
   return hits.length ? hits : false;
 }
 
@@ -156,7 +156,7 @@ async function geoAndTiles(browser, r, shots) {
   const tiles = [];
   page.on('request', (q) => { const m = q.url().match(/\/tiles\/(\d+)\/(\d+)\/(\d+)\.jpg/); if (m) tiles.push(m.slice(1).map(Number)); });
   await bootPage(page);
-  const geoAtBoot = await page.evaluate(() => window.wadamesh.geo());
+  const geoAtBoot = await page.evaluate(() => window.comet.geo());
   const secure = await page.evaluate(() => window.isSecureContext);   // http (not localhost): no location
   const net = await page.evaluate(() => fetch('tiles/3/4/2.jpg').then((x) => x.status, () => 0));
   await runScript(page, [
@@ -177,7 +177,7 @@ async function geoAndTiles(browser, r, shots) {
   const [cx, cy] = tileOf(GHENT.latitude, GHENT.longitude, z);
   r.geo = {
     promptedAtBoot: geoAtBoot.watching,    // must be false: nothing asks on page load
-    watching: (await page.evaluate(() => window.wadamesh.geo())).watching,
+    watching: (await page.evaluate(() => window.comet.geo())).watching,
     tileServer: net,
     tilesRequested: tiles.length,
     centredOnGhent: secure ? tiles.some((t) => t[0] === z && Math.abs(t[1] - cx) <= 1 && Math.abs(t[2] - cy) <= 1)
@@ -220,8 +220,8 @@ async function storeAndBackups(browser, r, shots) {
     if (net === 200) {
       await runScript(page, ['tap 695 360', 'wait 1500', 'tap 60 150', 'wait 5000', 'shot 16-store',
                              'tap 740 463', 'wait 6000', 'shot 17-store-installed', 'key esc', 'wait 1000'], { prefix: 'web-', shots });
-      await page.evaluate(() => window.wadamesh.flush());
-      st.installed = (await page.evaluate(() => window.wadamesh.findInStorage('wada'))).some((h) => /\/spiffs\/apps\/2048\.lua$/.test(h));
+      await page.evaluate(() => window.comet.flush());
+      st.installed = (await page.evaluate(() => window.comet.findInStorage('wada'))).some((h) => /\/spiffs\/apps\/2048\.lua$/.test(h));
       await bootPage(page);   // reload
       await sleep(4000);
       log.length = 0;
@@ -252,8 +252,8 @@ async function storeAndBackups(browser, r, shots) {
     await sleep(1500);
     if (shots) await canvasPng(page, path.join(SHOTS, 'web-20-import-confirm.png'));
     await runScript(page, ['tap 550 391', 'wait 500'], { shots: false });   // the confirm's Import
-    await page.waitForFunction(() => !window.wadamesh.running(), null, { timeout: 20000 }).catch(() => {});
-    await page.waitForFunction(() => window.wadamesh && window.wadamesh.running(), null, { timeout: 60000 });
+    await page.waitForFunction(() => !window.comet.running(), null, { timeout: 20000 }).catch(() => {});
+    await page.waitForFunction(() => window.comet && window.comet.running(), null, { timeout: 60000 });
     await sleep(4000);
     const b2 = await exportBackup(page);
     st.importCarriesSettings = /"gps_fuzz_m": 1000/.test(b2.text);
@@ -266,9 +266,9 @@ async function storeAndBackups(browser, r, shots) {
     const [chooser2] = await Promise.all([page.waitForEvent('filechooser', { timeout: 20000 }), page.click('#btn-restore')]);
     await chooser2.setFiles(tarPath);
     await page.waitForEvent('load', { timeout: 30000 });
-    await page.waitForFunction(() => window.wadamesh && window.wadamesh.running(), null, { timeout: 60000 });
+    await page.waitForFunction(() => window.comet && window.comet.running(), null, { timeout: 60000 });
     await sleep(3000);
-    const hits = await page.evaluate(() => window.wadamesh.findInStorage('wada'));
+    const hits = await page.evaluate(() => window.comet.findInStorage('wada'));
     if (net === 200) st.restoreBringsTheApp = hits.some((h) => /\/spiffs\/apps\/2048\.lua$/.test(h));
     st.restoreKeepsSettings = (await exportBackup(page)).text.includes('"gps_fuzz_m": 1000');
     await ctx.close();
@@ -300,14 +300,14 @@ for (const name of BROWSERS) {
     }
     r.firstLoadMs = await bootPage(page);
     r.coi = await page.evaluate(() => crossOriginIsolated);
-    r.bootMs = await page.evaluate(() => window.wadamesh.stats.bootMs);
+    r.bootMs = await page.evaluate(() => window.comet.stats.bootMs);
     const prefix = name === 'chromium' ? 'web-' : `web-${name}-`;
     if (name === 'chromium') await page.screenshot({ path: path.join(SHOTS, 'web-page.png') });
     const shots = name === 'chromium' || ALL_SHOTS;
     await runScript(page, QUICK ? tour.slice(0, 8) : tour, { prefix, shots });
 
     // persistence: the tour sent "Hello from the browser!" (06-sent); flush, reload, look again
-    await page.evaluate(() => window.wadamesh.flush());
+    await page.evaluate(() => window.comet.flush());
     await sleep(1500);
     r.savedBeforeReload = await historyHas(page, 'Hello from the browser');
     r.reloadMs = await bootPage(page);
@@ -333,19 +333,19 @@ for (const name of BROWSERS) {
       await sleep(4000);
       // The phone gets its own portrait canvas (its CSS width; web/build.sh mobiletest covers
       // phones in depth), so tap by label and by the canvas's own size here.
-      const [pw2, ph2] = await p2.evaluate(() => window.wadamesh.size());
+      const [pw2, ph2] = await p2.evaluate(() => window.comet.size());
       r.phoneCanvas = `${pw2}x${ph2}`;
       const ptap = async (x, y) => {
         const b = await p2.locator('#screen').boundingBox();
         await p2.touchscreen.tap(b.x + (x + 0.5) * b.width / pw2, b.y + (y + 0.5) * b.height / ph2);
       };
-      const skip = await p2.evaluate(() => window.wadamesh.findText('Skip'));
+      const skip = await p2.evaluate(() => window.comet.findText('Skip'));
       if (skip) await ptap(skip[0], skip[1]);
       await sleep(2500);
       await ptap(pw2 * 0.1, ph2 - 16);   // Chats, the first tab
       await sleep(1500);
       if (shots) await p2.screenshot({ path: path.join(SHOTS, `${prefix}phone.png`) });
-      r.phoneTapWorked = ph2 > pw2 && !!(await p2.evaluate(() => window.wadamesh.findText('Public')));
+      r.phoneTapWorked = ph2 > pw2 && !!(await p2.evaluate(() => window.comet.findText('Public')));
       await phone.close();
     }
   } catch (e) {

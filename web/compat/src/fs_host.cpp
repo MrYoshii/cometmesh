@@ -13,7 +13,7 @@
 #include <atomic>
 
 #ifndef WADA_DEFAULT_DATA_DIR
-#define WADA_DEFAULT_DATA_DIR "wadamesh-data"
+#define WADA_DEFAULT_DATA_DIR "comet-data"
 #endif
 
 namespace { std::atomic<unsigned> g_fs_gen{0}; }

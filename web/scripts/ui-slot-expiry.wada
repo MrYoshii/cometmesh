@@ -1,5 +1,5 @@
 # UI request slot expiry (cec1431c), web host build, demo backend.
-# Run: WADA_DEMO_SILENT_TELEMETRY=1 WADA_DATA_DIR=<fresh dir> web/build-host/wadamesh-host \
+# Run: WADA_DEMO_SILENT_TELEMETRY=1 WADA_DATA_DIR=<fresh dir> web/build-host/comet-host \
 #        --headless --script web/scripts/ui-slot-expiry.wada --shots <dir>
 # The contact sheet's Telemetry (no SD on this build, so no telemetry window and no
 # deadline of its own) takes the single-flight UI request slot for Hilltop Repeater

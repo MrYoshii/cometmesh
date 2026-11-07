@@ -12,5 +12,5 @@ dependencies:
   badgeteam/badge-bsp: "^0.9.9"          # display (MIPI), input/keyboard, power, led, device
   nicolaielectronics/tanmatsu-wifi: "^1.1.2"   # WiFi/BLE hosted on the C6 coprocessor
   nicolaielectronics/tanmatsu-lora: "^0.3.0"   # SX1262/1268 LoRa (remote, on the coprocessor)
-  # NOTE: pax-gfx is intentionally omitted — wadamesh renders with LVGL, flushed to the
+  # NOTE: pax-gfx is intentionally omitted — comet renders with LVGL, flushed to the
   # BSP display, not PAX.

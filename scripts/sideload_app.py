@@ -4,7 +4,7 @@ serial console.
 
 Boards whose storage is soldered on (the ThinkNode M9) cannot take the
 "drop it on the SD card" route from the SDK page, and the firmware's Store can
-only download from firmware.wadamesh.com. This pushes the files through the
+only download from firmware.cometmesh.org. This pushes the files through the
 serial CLI instead, using three commands the firmware offers for exactly this:
 
     fput /apps/<name>                 open (truncate) the file

@@ -15,7 +15,7 @@ idf_component_register(
 		meshcore
 		lvgl
 		RadioLib           # target.h (included by main.cpp) pulls <RadioLib.h>
-		wadamesh_app
+		comet_app
 		c6_at              # AT-over-SDIO Wi-Fi/BLE driver for the on-board ESP32-C6 (P4-only)
 	INCLUDE_DIRS
 		"."
@@ -44,21 +44,21 @@ idf_build_set_property(COMPILE_OPTIONS "${_co}")
 # Pins from LilyGo's components/private_library/t_display_p4_config.h (see [[tdisplay-p4-port]]).
 if(DEFINED ENV{WADA_P4_LEGACY_AT})
   set(P4_C6_BACKEND_DEF TDP4_C6_HOSTED=0)
-  message(STATUS "wadamesh: P4 C6 backend = legacy ESP-AT")
+  message(STATUS "comet: P4 C6 backend = legacy ESP-AT")
 else()
   set(P4_C6_BACKEND_DEF TDP4_C6_HOSTED=1)
-  message(STATUS "wadamesh: P4 C6 backend = esp-hosted")
+  message(STATUS "comet: P4 C6 backend = esp-hosted")
 endif()
 if(DEFINED ENV{WADA_P4_LR2021})
   set(P4_RADIO_DEFS
     USE_LR2021 RADIO_CLASS=CustomLR2021 WRAPPER_CLASS=TDisplayP4LR2021Wrapper
     LR2021_IRQ_DIO=11 LR2021_TCXO_VOLTAGE=3.3f LR2021_RX_BOOSTED_GAIN=1)
-  message(STATUS "wadamesh: P4 radio = LR2021")
+  message(STATUS "comet: P4 radio = LR2021")
 else()
   set(P4_RADIO_DEFS
     USE_SX1262 RADIO_CLASS=CustomSX1262 WRAPPER_CLASS=CustomSX1262Wrapper
     SX126X_RX_BOOSTED_GAIN=1 SX126X_CURRENT_LIMIT=140)
-  message(STATUS "wadamesh: P4 radio = SX1262")
+  message(STATUS "comet: P4 radio = SX1262")
 endif()
 set(WADA_DEFS
   HAS_TDISPLAY_P4=1 ESP32_PLATFORM MC_VENDORED_TOUCH_APP UI_LVGL=1 HAS_TOUCH_UI=1
@@ -137,10 +137,10 @@ endforeach()
 # (compiles HI8561Display + the HI8561 integrated-touch path in Hi8561Touch.cpp). ---
 if(DEFINED ENV{WADA_P4_LCD})
   set(P4_DISPLAY_DEFS DISPLAY_CLASS=HI8561Display SCREEN_WIDTH=540 SCREEN_HEIGHT=1168 HAS_TDP4_LCD=1)
-  message(STATUS "wadamesh: T-Display P4 panel = HI8561 TFT-LCD (540x1168)")
+  message(STATUS "comet: T-Display P4 panel = HI8561 TFT-LCD (540x1168)")
 else()
   set(P4_DISPLAY_DEFS DISPLAY_CLASS=RM69A10Display SCREEN_WIDTH=568 SCREEN_HEIGHT=1232)
-  message(STATUS "wadamesh: T-Display P4 panel = RM69A10 AMOLED (568x1232)")
+  message(STATUS "comet: T-Display P4 panel = RM69A10 AMOLED (568x1232)")
 endif()
 foreach(_d ${P4_DISPLAY_DEFS})
   idf_build_set_property(COMPILE_OPTIONS "-D${_d}" APPEND)
@@ -160,32 +160,32 @@ if(DEFINED ENV{WADA_DOC})
   if("$ENV{WADA_DOC}" STREQUAL "music")
     idf_build_set_property(COMPILE_OPTIONS "-DDOC_MUSIC_AUDIT" APPEND)
   endif()
-  message(STATUS "wadamesh: DOC capture build ($ENV{WADA_DOC})")
+  message(STATUS "comet: DOC capture build ($ENV{WADA_DOC})")
 endif()
 if(DEFINED ENV{WADA_OTA_SELFTEST})
   idf_build_set_property(COMPILE_OPTIONS "-DWADA_OTA_SELFTEST=1" APPEND)
-  message(STATUS "wadamesh: OTA self-test build (installs the latest beta unattended)")
+  message(STATUS "comet: OTA self-test build (installs the latest beta unattended)")
 endif()
 if(DEFINED ENV{WADA_SD_KHZ})
   idf_build_set_property(COMPILE_OPTIONS "-DTDP4_SD_KHZ=$ENV{WADA_SD_KHZ}" APPEND)
-  message(STATUS "wadamesh: SD primary rung clock = $ENV{WADA_SD_KHZ} kHz")
+  message(STATUS "comet: SD primary rung clock = $ENV{WADA_SD_KHZ} kHz")
 endif()
 if(DEFINED ENV{WADA_SD_1BIT})
   idf_build_set_property(COMPILE_OPTIONS "-DTDP4_SD_1BIT=true" APPEND)
-  message(STATUS "wadamesh: SD primary rung = 1-bit bus")
+  message(STATUS "comet: SD primary rung = 1-bit bus")
 endif()
 
 # #167: WADA_DSI_MBPS=<n> overrides the RM69A10 DSI lane bit rate (default 750 -- see the
 # RM_BITRATE note in RM69A10Display.cpp; 1000 = the LilyGo/Meck value with the thin eye).
 if(DEFINED ENV{WADA_DSI_MBPS})
   idf_build_set_property(COMPILE_OPTIONS "-DRM_BITRATE_MBPS=$ENV{WADA_DSI_MBPS}" APPEND)
-  message(STATUS "wadamesh: DSI lane rate = $ENV{WADA_DSI_MBPS} Mbps")
+  message(STATUS "comet: DSI lane rate = $ENV{WADA_DSI_MBPS} Mbps")
 endif()
 
 # #167: WADA_SD_STORE_TEST=1 puts the store back on the SD card (writes hop to core 0).
 if(DEFINED ENV{WADA_SD_STORE_TEST})
   idf_build_set_property(COMPILE_OPTIONS "-DTDP4_SD_STORE_TEST=1" APPEND)
-  message(STATUS "wadamesh: SD-STORE-ON-CORE-0 experiment build")
+  message(STATUS "comet: SD-STORE-ON-CORE-0 experiment build")
 endif()
 
 # Companion diagnostic (#167): `WADA_P4_POKE_TRACE=1 ./build.sh build` logs every runtime poke at
@@ -193,7 +193,7 @@ endif()
 # visible flashes can be correlated against them on the console.
 if(DEFINED ENV{WADA_P4_POKE_TRACE})
   idf_build_set_property(COMPILE_OPTIONS "-DTDP4_POKE_TRACE=1" APPEND)
-  message(STATUS "wadamesh: POKE TRACE enabled (diagnostic build, do not ship)")
+  message(STATUS "comet: POKE TRACE enabled (diagnostic build, do not ship)")
 endif()
 
 # Diagnostic build for the whole-screen colour flash (#167): `WADA_P4_FLUSH_TRACE=1 ./build.sh build`
@@ -201,12 +201,12 @@ endif()
 # screen flashes and nothing logs, the cause is below LVGL and the UI is the wrong place to look.
 if(DEFINED ENV{WADA_P4_FLUSH_TRACE})
   idf_build_set_property(COMPILE_OPTIONS "-DTDP4_FLUSH_TRACE=1" APPEND)
-  message(STATUS "wadamesh: FLUSH TRACE enabled (diagnostic build, do not ship)")
+  message(STATUS "comet: FLUSH TRACE enabled (diagnostic build, do not ship)")
 endif()
 
 if(DEFINED ENV{C6_FLASH_HELPER})
   idf_build_set_property(COMPILE_OPTIONS "-DTDP4_C6_FLASH_HELPER=1" APPEND)
-  message(STATUS "wadamesh: BUILDING C6-FLASH HELPER (P4 leaves the C6 free)")
+  message(STATUS "comet: BUILDING C6-FLASH HELPER (P4 leaves the C6 free)")
 endif()
 
 # Firmware version/tag (build.sh passes WADA_FW_TAG/-DATE from git describe + date).
@@ -218,7 +218,7 @@ if(NOT WADA_FW_DATE)
 endif()
 idf_build_set_property(COMPILE_OPTIONS "-DFIRMWARE_RELEASE_TAG=\"${WADA_FW_TAG}\"" APPEND)
 idf_build_set_property(COMPILE_OPTIONS "-DFIRMWARE_BUILD_DATE=\"${WADA_FW_DATE}\"" APPEND)
-idf_build_set_property(COMPILE_OPTIONS "-DFIRMWARE_VERSION=\"wadamesh ${WADA_FW_TAG}\"" APPEND)
+idf_build_set_property(COMPILE_OPTIONS "-DFIRMWARE_VERSION=\"comet ${WADA_FW_TAG}\"" APPEND)
 
 # On-device OTA / update-channel UI (the "Get test builds (beta)" toggle + the Install-update button
 # in UITask.cpp) is gated on a NON-EMPTY FIRMWARE_OTA_ENV. The 8 S3 boards set this per-env in

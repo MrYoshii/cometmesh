@@ -1,4 +1,4 @@
--- Breakout — wadamesh Lua app
+-- Breakout — comet Lua app
 -- Swipe left/right to move paddle  |  Swipe up to launch
 -- Keyboard: arrows to move, Enter / Space to launch
 -- Contributed by samuelcoustet

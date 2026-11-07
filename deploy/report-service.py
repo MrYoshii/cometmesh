@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-wadamesh beta report service.
+comet beta report service.
 
 Why this exists
 ---------------
@@ -22,7 +22,7 @@ Two reasons, both hard:
     write credential has to live somewhere the public cannot read, which is
     here.
 
-So: device POSTs plain HTTP to firmware.wadamesh.com/report/..., this service
+So: device POSTs plain HTTP to firmware.cometmesh.org/report/..., this service
 holds the token, and GitHub sees a well-formed matrix instead of raw traffic.
 
 SQLite is the database; GitHub is a view
@@ -52,17 +52,17 @@ Run
 
 Environment
 -----------
-    WADA_REPORTS_DB    sqlite path         (default /opt/wadamesh-reports/reports.db)
-    WADA_FW_ROOT       firmware tree       (default /srv/wadamesh/firmware)
+    WADA_REPORTS_DB    sqlite path         (default /opt/comet-reports/reports.db)
+    WADA_FW_ROOT       firmware tree       (default /srv/comet/firmware)
     WADA_GH_TOKEN      GitHub token with issues:write on the repo. Absent = the
                        service runs normally and simply never publishes.
                        DELIBERATELY UNSET (Kaj's call, 2026-09-23): the matrix
-                       lives on wadamesh.com/beta only, so no write credential
+                       lives on cometmesh.org/beta only, so no write credential
                        exists for this anywhere. /report/health reporting
                        publishes:false is the expected state, not a fault. The
                        publishing code below stays in place because turning it
-                       on later is then one line in /etc/wadamesh-reports.env.
-    WADA_GH_REPO       owner/name          (default ALLFATHER-BV/wadamesh)
+                       on later is then one line in /etc/comet-reports.env.
+    WADA_GH_REPO       owner/name          (default MrYoshii/cometmesh)
     WADA_REPORTS_PORT  listen port         (default 5006)
 """
 
@@ -81,10 +81,10 @@ try:
 except ImportError:                                    # publishing is optional
     requests = None
 
-DB_PATH   = os.environ.get("WADA_REPORTS_DB", "/opt/wadamesh-reports/reports.db")
-FW_ROOT   = os.environ.get("WADA_FW_ROOT", "/srv/wadamesh/firmware")
+DB_PATH   = os.environ.get("WADA_REPORTS_DB", "/opt/comet-reports/reports.db")
+FW_ROOT   = os.environ.get("WADA_FW_ROOT", "/srv/comet/firmware")
 GH_TOKEN  = os.environ.get("WADA_GH_TOKEN", "").strip()
-GH_REPO   = os.environ.get("WADA_GH_REPO", "ALLFATHER-BV/wadamesh")
+GH_REPO   = os.environ.get("WADA_GH_REPO", "MrYoshii/cometmesh")
 PORT      = int(os.environ.get("WADA_REPORTS_PORT", "5006"))
 
 # What a tester can say they exercised. Keep these stable: they are stored raw
@@ -201,7 +201,7 @@ def release_boards(tag):
         if os.path.isdir(d):
             out = set()
             for fn in os.listdir(d):
-                m = re.match(r"^wadamesh-(.+)-merged\.bin$", fn)
+                m = re.match(r"^comet-(.+)-merged\.bin$", fn)
                 if m:
                     out.add(m.group(1))
             if out:
@@ -218,7 +218,7 @@ def board_name(board, tag=None):
         try:
             with open(p) as f:
                 n = json.load(f).get("name", "")
-            n = n.replace("wadamesh - ", "").replace(" (beta)", "").strip()
+            n = n.replace("comet - ", "").replace(" (beta)", "").strip()
             if n:
                 return n
         except (OSError, ValueError):
@@ -269,7 +269,7 @@ def post_test():
         return bad("not json")
 
     tag   = str(body.get("tag", ""))
-    board = str(body.get("board", "")).replace("wadamesh-", "")
+    board = str(body.get("board", "")).replace("comet-", "")
     rid   = str(body.get("rid", "")).lower()
     status = str(body.get("status", ""))
     ran    = str(body.get("ran", "boot"))
@@ -316,7 +316,7 @@ def post_test():
         )
         conn.commit()
     mark_dirty(tag)
-    return jsonify({"ok": True, "matrix": "https://wadamesh.com/beta.html"})
+    return jsonify({"ok": True, "matrix": "https://cometmesh.org/beta.html"})
 
 
 @app.post("/report/ping")
@@ -329,7 +329,7 @@ def post_ping():
     except Exception:
         return bad("not json")
     tag   = str(body.get("tag", ""))
-    board = str(body.get("board", "")).replace("wadamesh-", "")
+    board = str(body.get("board", "")).replace("comet-", "")
     rid   = str(body.get("rid", "")).lower()
     if not RE_TAG.match(tag) or not RE_BOARD.match(board) or not RE_RID.match(rid):
         return bad("bad ping")
@@ -618,7 +618,7 @@ def gh(method, path, payload=None):
         headers={"Authorization": "Bearer " + GH_TOKEN,
                  "Accept": "application/vnd.github+json",
                  "X-GitHub-Api-Version": "2022-11-28",
-                 "User-Agent": "wadamesh-reports"},
+                 "User-Agent": "comet-reports"},
         json=payload, timeout=20)
     r.raise_for_status()
     return r.json()

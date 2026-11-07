@@ -1,13 +1,13 @@
 # Region discovery and channel scopes
 
-WadaMesh can query nearby MeshCore repeaters for the public regions they allow
+Comet can query nearby MeshCore repeaters for the public regions they allow
 and use those names as per-channel flood scopes.
 
 ## Discover nearby regions
 
 1. Open **Settings > Radio & Mesh > Known regions**.
 2. Select **Scan**.
-3. WadaMesh broadcasts one zero-hop node-discovery request, waits for nearby
+3. Comet broadcasts one zero-hop node-discovery request, waits for nearby
    repeater replies, then queries each repeater directly for its allowed public
    regions.
 4. New names appear under **Discovered**. Select **Add** beside each region you
@@ -18,7 +18,7 @@ supports anonymous region requests. It is bounded by the radio duty-cycle budget
 and stops after two minutes if requests cannot be completed.
 
 Region traffic does not expose a reusable region identifier: its transport code
-is a payload-dependent HMAC. WadaMesh therefore cannot infer a name by passively
+is a payload-dependent HMAC. Comet therefore cannot infer a name by passively
 listening. The active scan asks repeaters to provide their configured names.
 Private `$region` names are not imported because their keys are not included in
 the response and cannot be derived from the name.

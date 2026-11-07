@@ -1,4 +1,4 @@
-# wadamesh language file
+# comet language file
 # canonical source - translators: edit this file and PR it
 # code: uk
 # ver: 8
@@ -309,7 +309,7 @@ Factory reset?\n\nErases identity, contacts,\nchannels, messages, Wi-Fi\nand eve
 Failed to save channel.	Не вдалося зберегти канал.
 Favorites full (max %d)	Обране заповнене (макс %d)
 Favorites unsupported	Обране не підтримується
-Fetching the app list from firmware.wadamesh.com	Завантаження списку застосунків з firmware.wadamesh.com
+Fetching the app list from firmware.cometmesh.org	Завантаження списку застосунків з firmware.cometmesh.org
 Files	Файли
 Find	Знайти
 Finish	Готово
@@ -888,19 +888,19 @@ Up
 Update	Оновити
 Update bin saved to SD	Файл оновлення збережено на SD
 Update complete.\nRebooting...	Оновлення завершено.\nПерезавантаження...
-Update manually at flasher.wadamesh.com\n(Wi-Fi update is paused for now)	Оновіть вручну на flasher.wadamesh.com\n(оновлення через Wi-Fi поки призупинено)
+Update manually at flasher.cometmesh.org\n(Wi-Fi update is paused for now)	Оновіть вручну на flasher.cometmesh.org\n(оновлення через Wi-Fi поки призупинено)
 Update via the Launcher	Оновлення через Launcher
-Update via the Launcher / flasher.wadamesh.com	Оновлення через Launcher / flasher.wadamesh.com
-Update via the Launcher / flasher.wadamesh.com.	Оновлення через Launcher / flasher.wadamesh.com.
+Update via the Launcher / flasher.cometmesh.org	Оновлення через Launcher / flasher.cometmesh.org
+Update via the Launcher / flasher.cometmesh.org.	Оновлення через Launcher / flasher.cometmesh.org.
 Updated - rebooting…	Оновлено - перезавантаження…
 Use	Обрати
 Username (optional)	Ім'я користувача (необов'язково)
 Volume	Гучність
 W up  ·  A left  ·  D right  ·  Z down  ·  S select  ·  Q back	W вгору  ·  A вліво  ·  D вправо  ·  Z вниз  ·  S вибір  ·  Q назад
 WADA#15B6A6 MESH#	WADA#15B6A6 MESH#
-WADAMESH	WADAMESH
+COMET	COMET
 Waiting for Wi-Fi...	Очікування Wi-Fi...
-Welcome to WADAMESH	Ласкаво просимо до WADAMESH
+Welcome to COMET	Ласкаво просимо до COMET
 While this is on, anyone on your Wi-Fi can view and control this device. Uses plain HTTP (local network only).	Поки це увімкнено, будь-хто у вашій мережі Wi-Fi може бачити пристрій і керувати ним. Звичайний HTTP (лише локальна мережа).
 Wi-Fi	Wi-Fi
 Wi-Fi & Bluetooth	Wi-Fi і Bluetooth

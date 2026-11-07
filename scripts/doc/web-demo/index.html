@@ -1,6 +1,6 @@
 <!DOCTYPE html><html><head><meta charset=utf-8>
 <meta name=viewport content='width=device-width,initial-scale=1,maximum-scale=1'>
-<title>wadamesh</title>
+<title>comet</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;height:100%;background:#0b0b0c;color:#d7dbdd;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;font-size:14px;-webkit-text-size-adjust:100%}
 #w{display:flex;flex-direction:column;height:100%}
@@ -73,7 +73,7 @@
 #toast span{font-size:12px;color:#cfeee9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
 </style></head><body>
 <div id=w>
-<div id=hd><div id=hdl><span id=dot>&bull;</span><b>WADAMESH</b><span id=hnm></span></div>
+<div id=hd><div id=hdl><span id=dot>&bull;</span><b>COMET</b><span id=hnm></span></div>
  <div id=hdr><span id=hsig></span><span id=hwifi></span><span id=hble></span><span id=hbatt></span><span id=hclk></span></div><button id=gear title=Settings>&#9881;</button></div>
 <div id=tabs><button data-t=chats class=on>Chats</button><button data-t=contacts>Contacts</button><button data-t=term>Terminal</button></div>
 <div id=pchats class=pane>
@@ -280,6 +280,6 @@ E('i').addEventListener('keydown',function(e){if(e.key=='Enter'){tsend();e.preve
  else if(e.key=='ArrowDown'){if(hi<hist.length-1){hi++;E('i').value=hist[hi]}else{hi=hist.length;E('i').value=''}e.preventDefault()}
  else if(e.key=='Tab'){var q=E('i').value.toLowerCase(),m=CMDS.filter(function(c){return c.indexOf(q)==0});
   if(m.length==1)E('i').value=m[0];else if(m.length>1)tadd('\n'+m.join('  ').trim()+'\n','e');e.preventDefault()}});
-tadd('wadamesh terminal - node config + messaging. help = all commands.\n\n','e');
+tadd('comet terminal - node config + messaging. help = all commands.\n\n','e');
 conn();showTab('chats');
 </script></body></html>

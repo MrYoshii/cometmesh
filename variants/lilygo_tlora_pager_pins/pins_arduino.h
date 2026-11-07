@@ -19,7 +19,7 @@
 #define USB_VID 0x303A
 #define USB_PID 0x82D4
 #define USB_MANUFACTURER "LilyGo"
-#define USB_PRODUCT "wadamesh T-LoRa Pager"
+#define USB_PRODUCT "comet T-LoRa Pager"
 
 static const uint8_t LED_BUILTIN = 255; // no onboard status LED
 #define BUILTIN_LED  LED_BUILTIN

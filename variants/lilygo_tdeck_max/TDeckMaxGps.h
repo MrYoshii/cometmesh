@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// T-Deck Max location provider: the wadamesh NMEA provider with the GPS
+// T-Deck Max location provider: the comet NMEA provider with the GPS
 // power rail routed through the XL9555 expander instead of a GPIO.
 //
 // On the Pro the provider owns the rail directly (PIN_GPS_EN = GPIO 39): off

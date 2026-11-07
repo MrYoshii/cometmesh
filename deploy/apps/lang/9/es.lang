@@ -1,4 +1,4 @@
-# wadamesh language file
+# comet language file
 # canonical source - translators: edit this file and PR it
 # code: es
 # ver: 8
@@ -309,7 +309,7 @@ Factory reset?\n\nErases identity, contacts,\nchannels, messages, Wi-Fi\nand eve
 Failed to save channel.	Error al guardar el canal.
 Favorites full (max %d)	Favoritos llenos (máx %d)
 Favorites unsupported	Favoritos no compatibles
-Fetching the app list from firmware.wadamesh.com	Obteniendo la lista de apps de firmware.wadamesh.com
+Fetching the app list from firmware.cometmesh.org	Obteniendo la lista de apps de firmware.cometmesh.org
 Files	Archivos
 Find	Buscar
 Finish	Finalizar
@@ -888,19 +888,19 @@ Up
 Update	Actualizar
 Update bin saved to SD	Bin de actualización guardado en SD
 Update complete.\nRebooting...	Actualización completa.\nReiniciando...
-Update manually at flasher.wadamesh.com\n(Wi-Fi update is paused for now)	Actualiza en flasher.wadamesh.com\n(la actualización Wi-Fi está en pausa)
+Update manually at flasher.cometmesh.org\n(Wi-Fi update is paused for now)	Actualiza en flasher.cometmesh.org\n(la actualización Wi-Fi está en pausa)
 Update via the Launcher	Actualiza vía el Launcher
-Update via the Launcher / flasher.wadamesh.com	Actualiza vía el Launcher / flasher.wadamesh.com
-Update via the Launcher / flasher.wadamesh.com.	Actualiza vía el Launcher / flasher.wadamesh.com.
+Update via the Launcher / flasher.cometmesh.org	Actualiza vía el Launcher / flasher.cometmesh.org
+Update via the Launcher / flasher.cometmesh.org.	Actualiza vía el Launcher / flasher.cometmesh.org.
 Updated - rebooting…	Actualizado - reiniciando…
 Use	Usar
 Username (optional)	Nombre de usuario (opcional)
 Volume	Volumen
 W up  ·  A left  ·  D right  ·  Z down  ·  S select  ·  Q back	W arriba  ·  A izq.  ·  D der.  ·  Z abajo  ·  S elegir  ·  Q atrás
 WADA#15B6A6 MESH#	WADA#15B6A6 MESH#
-WADAMESH	WADAMESH
+COMET	COMET
 Waiting for Wi-Fi...	Esperando Wi-Fi...
-Welcome to WADAMESH	Bienvenido a WADAMESH
+Welcome to COMET	Bienvenido a COMET
 While this is on, anyone on your Wi-Fi can view and control this device. Uses plain HTTP (local network only).	Mientras esté activo, cualquiera en tu Wi-Fi puede ver y controlar este dispositivo. Usa HTTP plano (solo red local).
 Wi-Fi	Wi-Fi
 Wi-Fi & Bluetooth	Wi-Fi y Bluetooth

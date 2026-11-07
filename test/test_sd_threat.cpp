@@ -63,7 +63,7 @@ int main() {
   assert(byName("desktop.scf") == Shortcut);
 
   // Everything a real card holds must stay untouched: Elecrow's own content,
-  // wadamesh's data, the tile trees, and the "vaccine" folder some tools create.
+  // comet's data, the tile trees, and the "vaccine" folder some tools create.
   const char* keep[] = {
     "copyright.png", "test file.txt", "tiles", "maps", "15", "8.png", "123.jpg",
     "contacts3", "ui_threads_v1.bin", "identity", "prefs.kv", "wallpaper.jpg",
@@ -108,7 +108,7 @@ int main() {
   assert(!mzHeader(pe, 10));
   assert(!mzHeader(nullptr, 64));
 
-  // Media and wadamesh data do not start with MZ.
+  // Media and comet data do not start with MZ.
   const uint8_t png[64] = { 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A };
   assert(!mzHeader(png, sizeof png));
 

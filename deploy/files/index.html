@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>WADAMESH Files</title>
-<meta name="description" content="Browse, upload and download the files on your wadamesh device over a USB cable.">
-<link rel="icon" href="https://wadamesh.com/wadamesh-badge.svg">
+<title>COMET Files</title>
+<meta name="description" content="Browse, upload and download the files on your comet device over a USB cable.">
+<link rel="icon" href="https://cometmesh.org/comet-badge.svg">
 <meta name="theme-color" content="#ffffff">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -112,7 +112,7 @@
     <g fill="#19d6c2"><circle cx="10" cy="60" r="9"/><circle cx="50" cy="12" r="9"/><circle cx="50" cy="108" r="9"/>
       <circle cx="90" cy="60" r="9"/><circle cx="130" cy="12" r="9"/><circle cx="130" cy="108" r="9"/><circle cx="170" cy="60" r="9"/></g>
   </svg>
-  <h1>WADAMESH <span>FILES</span></h1>
+  <h1>COMET <span>FILES</span></h1>
   <p class="tag">The SD card and internal storage of your device, over a USB cable.</p>
 </header>
 
@@ -127,7 +127,7 @@
       <li>Connect it to this computer with a USB cable.</li>
       <li>Click <b>Connect</b> and choose the device.</li>
     </ol>
-    <p class="boards">Works on devices whose USB socket is the ESP32-S3's own: LilyGo T-Deck and T-Deck Plus, Heltec V4 and V4-R8, T-LoRa Pager, RAK WisMesh Tap V2 and Wio Tracker L2 (wadamesh beta_99 or later for all but the T-Deck and Heltec V4), and the T-Deck Pro and Max (beta_101 or later). Not yet on devices with a separate USB-serial chip (ThinkNode M9, CrowPanel, SenseCAP Indicator, Attaky) or on the T-Display P4 and Tanmatsu; on most of those the Transfer app does the same over Wi-Fi.</p>
+    <p class="boards">Works on devices whose USB socket is the ESP32-S3's own: LilyGo T-Deck and T-Deck Plus, Heltec V4 and V4-R8, T-LoRa Pager, RAK WisMesh Tap V2 and Wio Tracker L2 (comet beta_99 or later for all but the T-Deck and Heltec V4), and the T-Deck Pro and Max (beta_101 or later). Not yet on devices with a separate USB-serial chip (ThinkNode M9, CrowPanel, SenseCAP Indicator, Attaky) or on the T-Display P4 and Tanmatsu; on most of those the Transfer app does the same over Wi-Fi.</p>
     <button id="connect" class="primary">Connect</button>
     <button id="connect-any" class="linkish" style="margin-left:12px">My device is not in the list</button>
     <p id="start-status" class="status"></p>
@@ -160,7 +160,7 @@
   </section>
 </main>
 
-<footer>Open source (GPL-3.0) · <a href="https://github.com/ALLFATHER-BV/wadamesh">github.com/ALLFATHER-BV/wadamesh</a> · <a href="https://wadamesh.com">wadamesh.com</a></footer>
+<footer>Open source (GPL-3.0) · <a href="https://github.com/MrYoshii/cometmesh">github.com/MrYoshii/cometmesh</a> · <a href="https://cometmesh.org">cometmesh.org</a></footer>
 <input type="file" id="pick-files" multiple hidden>
 <input type="file" id="pick-folder" webkitdirectory multiple hidden>
 <div class="toast" id="toast"></div>
@@ -386,7 +386,7 @@ async function startSession(beacon) {
     info = await link.hello();
   } catch (e) { setStart('The device did not answer: ' + errText(e), true); link.helloing = false; return; }
   link.helloing = false;
-  $('dev-name').textContent = info.name || 'wadamesh';
+  $('dev-name').textContent = info.name || 'comet';
   $('dev-meta').textContent = [info.board, info.fw].filter(Boolean).join(' · ');
   const box = $('roots'); box.textContent = '';
   for (const r of info.roots) {

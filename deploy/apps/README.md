@@ -1,7 +1,7 @@
-# Submitting an app to the WADAMESH store
+# Submitting an app to the COMET store
 
 Apps are small Lua programs that appear in the device's **Apps** drawer and are
-downloaded over Wi-Fi from `firmware.wadamesh.com/apps/`. Snake, RF Monitor and
+downloaded over Wi-Fi from `firmware.cometmesh.org/apps/`. Snake, RF Monitor and
 Airtime all ship this way — they are ordinary submissions, not special cases, so
 reading their source is the fastest way to see what an app looks like.
 
@@ -22,7 +22,7 @@ is available through `wada.sd`, which can also find and delete Windows malware o
 card (the firmware decides what counts, so it cannot delete anything else), and
 direct card playback uses an explicit `sd:/...` path. There is no general-purpose filesystem or network access; the API
 is the whole surface, which is what makes reviewing tractable. It is documented at
-[wadamesh.com/sdk.html](https://wadamesh.com/sdk.html).
+[cometmesh.org/sdk.html](https://cometmesh.org/sdk.html).
 
 Two numbers worth knowing before you start: every callback runs under a
 **100,000 Lua instruction** budget, and Lua here is built with **32-bit numbers**,
@@ -64,7 +64,7 @@ some users silently run different code from others under the same version number
 
 ## Submitting
 
-1. Fork `ALLFATHER-BV/wadamesh` and branch off `main`.
+1. Fork `MrYoshii/cometmesh` and branch off `main`.
 2. Add your `deploy/apps/<id>/<ver>/` directory with the two files.
 3. Add or update your app's row in `deploy/apps/apps.json` (the store catalog).
    Add `"seed": false` to that row if your app should be downloadable but not
@@ -74,7 +74,7 @@ some users silently run different code from others under the same version number
    those boards do not have, is better left to the Store.
    Add `"radio": "own"` if the app only makes sense with the device's OWN LoRa
    radio (it reads the noise floor, airtime, or runs discovery scans, like RF
-   Monitor, Airtime and Wardrive). wadamesh in the browser drives a node over a
+   Monitor, Airtime and Wardrive). comet in the browser drives a node over a
    link and has no radio of its own, so it leaves such apps out. Apps that work
    from contacts, messages and a position (Nearby, Ping) do not need it.
 4. Open a pull request. In the description, say what the app does, which boards

@@ -21,7 +21,7 @@ async function tap(x, y) {
   await page.mouse.move(r.x + (x + 0.5) * r.width / W, r.y + (y + 0.5) * r.height / H);
   await page.mouse.down(); await sleep(80); await page.mouse.up(); await sleep(150);
 }
-const booted = () => page.waitForFunction(() => window.wadamesh && window.wadamesh.running(), null, { timeout: 60000 });
+const booted = () => page.waitForFunction(() => window.comet && window.comet.running(), null, { timeout: 60000 });
 await page.goto(URL_ + (NT ? '?nt' : ''), { waitUntil: 'load' });
 await booted(); await sleep(4000);
 await tap(60, 283); await sleep(2000);
@@ -29,14 +29,14 @@ await page.click('#btn-connect');
 await page.fill('#ws-host', WS);
 await page.click('#connect-dlg [data-kind="ws"]');
 await page.waitForLoadState('load'); await booted(); await sleep(6000);
-console.log('badge:', await page.locator('#mode').textContent(), 'bundle nt:', await page.evaluate(() => [...document.scripts].some((s) => /nt\/wadamesh/.test(s.src))));
+console.log('badge:', await page.locator('#mode').textContent(), 'bundle nt:', await page.evaluate(() => [...document.scripts].some((s) => /nt\/comet/.test(s.src))));
 await tap(695, 360); await sleep(1500); await tap(60, 150); await sleep(5000);
 const TRACE_CPU = process.argv.includes('--cpu');
 if (TRACE_CPU) await browser.startTracing(page, { categories: ['disabled-by-default-v8.cpu_profiler', 'v8'] });
 const APP = arg('--app', '');
 if (APP) {
   for (let i = 0; i < 12; i++) {   // scroll the list until the app's row shows
-    const p = await page.evaluate((t) => window.wadamesh.findText(t), APP);
+    const p = await page.evaluate((t) => window.comet.findText(t), APP);
     if (p && p[1] > 90 && p[1] < 440) { console.log('row', APP, p); await tap(740, p[1] + 10); break; }
     const r = await page.locator('#screen').boundingBox();
     await page.mouse.move(r.x + 400 * r.width / W, r.y + 400 * r.height / H); await page.mouse.down();
@@ -47,7 +47,7 @@ if (APP) {
 if (process.argv.includes('--watch')) {
   for (let k = 0; k < 12; k++) {
     await sleep(2000);
-    const r = await Promise.race([page.evaluate(() => JSON.stringify({ f: window.wadamesh.stats.frames, p: window.wadamesh.stats.presents })), sleep(1500).then(() => 'JS BLOCKED')]);
+    const r = await Promise.race([page.evaluate(() => JSON.stringify({ f: window.comet.stats.frames, p: window.comet.stats.presents })), sleep(1500).then(() => 'JS BLOCKED')]);
     console.log('t+' + (2 * (k + 1)) + 's', r);
     if (r === 'JS BLOCKED') {
       await sleep(4000);
@@ -104,9 +104,9 @@ if (process.argv.includes('--pause')) {
 await page.screenshot({ path: '/tmp/store-before.png' });
 await sleep(15000);
 await page.screenshot({ path: '/tmp/store-after.png' });
-await page.evaluate(() => window.wadamesh.flush());
-const sizes = await page.evaluate(() => { const M = window.wadamesh; try { return JSON.stringify(M.fileSizes ? M.fileSizes() : null); } catch (e) { return String(e); } });
-const hits = await page.evaluate(() => window.wadamesh.findInStorage('wada'));
+await page.evaluate(() => window.comet.flush());
+const sizes = await page.evaluate(() => { const M = window.comet; try { return JSON.stringify(M.fileSizes ? M.fileSizes() : null); } catch (e) { return String(e); } });
+const hits = await page.evaluate(() => window.comet.findInStorage('wada'));
 console.log('installed:', hits.filter((h) => /apps\//.test(h)));
 console.log(log.filter((l) => /STORE|LUA|companion|error|PAGEERROR|freertos|abort/i.test(l)).slice(-40).join('\n'));
 await browser.close();

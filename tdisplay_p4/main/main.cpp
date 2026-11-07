@@ -1,4 +1,4 @@
-// wadamesh on the LilyGo T-Display P4 — the app entry point.
+// comet on the LilyGo T-Display P4 — the app entry point.
 //
 // Standalone ESP-IDF app (NOT an AppFS/launcher app like the Tanmatsu): it owns the USB console,
 // drives the XL9535 expander to power the board, brings up the RM69A10 AMOLED + the C6 (esp-hosted)
@@ -176,10 +176,10 @@ static void sdSlotPowerCycle() {
   printf("[storage] SD slot power-cycled (#708)\n");
 }
 
-static void wadameshSetup() {
+static void cometSetup() {
   Serial.begin(115200);
   delay(150);
-  printf("[BOOT] wadamesh / T-Display P4\n");
+  printf("[BOOT] comet / T-Display P4\n");
 
   // 1. XL9535 expander FIRST — it powers the rails and enables the C6, SD, screen + touch.
   if (!xl9535.begin(7, 8)) printf("[BOOT] XL9535 init FAILED (board will not power up)\n");
@@ -480,10 +480,10 @@ static void wadameshSetup() {
   // a later start from the toggles, and without them every toggle failed at once and was
   // reported as a memory shortage (#612). Storing them does not touch the C6.
   char* nm = the_mesh.getNodePrefs()->node_name;
-  serial_interface.prepareBle("wadamesh-", nm, the_mesh.getBLEPin());
+  serial_interface.prepareBle("comet-", nm, the_mesh.getBLEPin());
   if (wifiConfigGetBleEnabled()) {
     if (hostedInitBLE()) {
-      serial_interface.beginBle("wadamesh-", nm, the_mesh.getBLEPin());
+      serial_interface.beginBle("comet-", nm, the_mesh.getBLEPin());
     } else {
       printf("[BOOT] hostedInitBLE FAILED\n");
     }
@@ -521,9 +521,9 @@ static uint32_t httpDateProbe(void) {
 #else
   C6Client c;
 #endif
-  if (!c.connect("firmware.wadamesh.com", 80, 8000)) return 0;
+  if (!c.connect("firmware.cometmesh.org", 80, 8000)) return 0;
   static const char req[] =
-      "HEAD / HTTP/1.1\r\nHost: firmware.wadamesh.com\r\nConnection: close\r\n\r\n";
+      "HEAD / HTTP/1.1\r\nHost: firmware.cometmesh.org\r\nConnection: close\r\n\r\n";
   if (c.write((const uint8_t*)req, sizeof(req) - 1) != sizeof(req) - 1) { c.stop(); return 0; }
   char buf[600];
   size_t got = 0;
@@ -559,7 +559,7 @@ extern "C" void app_main(void) {
   // reset or the panel comes back dark (see target.cpp).
   tdisplayP4InstallFullRestart();
   initArduino();
-  wadameshSetup();
+  cometSetup();
 
   // WiFi state machine + SNTP + TCP/WS companion server — ported from src/main.cpp's loop()
   // (excluded from this build), identical to the Tanmatsu.

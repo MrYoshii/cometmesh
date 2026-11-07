@@ -4,7 +4,7 @@
 class WebBoard : public mesh::MainBoard {
 public:
   uint16_t getBattMilliVolts() override { return 0; }      // CAP_BATTERY 0: never shown
-  const char* getManufacturerName() const override { return "wadamesh web"; }
+  const char* getManufacturerName() const override { return "comet web"; }
   void reboot() override;                                   // web/platform/host_main.cpp
   void powerOff() override;
   uint8_t getStartupReason() const override { return BD_STARTUP_NORMAL; }

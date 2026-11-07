@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Put books and documents on a wadamesh SD card for the on-device Reader.
+"""Put books and documents on a comet SD card for the on-device Reader.
 
 The Reader opens sd:/home.htm when it starts, follows links between pages on the
 card without Wi-Fi, and pages through large .txt / .md files on its own. This
