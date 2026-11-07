@@ -6,7 +6,6 @@
 #   scripts/release.sh beta_2                  build all boards, publish to the beta channel
 #   scripts/release.sh beta_2 --no-push        build and stage only
 #   scripts/release.sh beta_2 --promote        copy the tested beta_2 images to stable
-#   COMET_BOARDS="tdeck-max" scripts/release.sh beta_2    only these boards (ids)
 #
 # Needs, per board kind: ESP-IDF 5.5 exported (IDF_PATH) for "idf" boards, PlatformIO
 # (pio, or $PIO) for "pio" boards; esptool for the merged images; COMET_VPS=user@host
@@ -43,14 +42,13 @@ PIO="${PIO:-pio}"
 PUSH=1; [ "$MODE" = "--no-push" ] && PUSH=0
 [ -n "$DEST" ] || PUSH=0
 
-# "id kind target chip" per board, from boards.json (optionally only $COMET_BOARDS).
+# "id kind target chip" per board, from boards.json. Always every board: a release is
+# one source state for all of them, so no board is left behind on an older one.
+[ -z "${COMET_BOARDS:-}" ] || { echo "release.sh builds every board; COMET_BOARDS is no longer supported"; exit 1; }
 boards() {
-  python3 - "$BOARDS_JSON" "${COMET_BOARDS:-}" <<'PY'
+  python3 - "$BOARDS_JSON" <<'PY'
 import json, sys
-only = set(sys.argv[2].split())
 for b in json.load(open(sys.argv[1]))["boards"]:
-    if only and b["id"] not in only:
-        continue
     (kind, target), = b["build"].items()
     print(b["id"], kind, target, b.get("chip", "ESP32-S3"))
 PY
@@ -157,7 +155,18 @@ if [ "$MODE" = "--promote" ]; then
   index_channel TOUCH "$OUT/latest"
   CHAN=stable
 else
-  # 2b. Beta: build each board.
+  # 2b. Beta: build each board. Check first that this machine can build all of them,
+  #     so a release never stops half way with some boards built and others not.
+  [ -z "$(git -C "$ROOT" status --porcelain -- src variants idf lib platformio.ini 2>/dev/null)" ] ||
+    { echo "uncommitted changes in the firmware sources: commit them, so every board gets the same state"; exit 1; }
+  while read -r id kind _ _; do
+    case "$kind" in
+      idf) [ -n "${IDF_PATH:-}" ] || { echo "$id needs ESP-IDF 5.5 (source esp-idf/export.sh); nothing built"; exit 1; } ;;
+      pio) command -v "$PIO" >/dev/null || { echo "$id needs PlatformIO ($PIO); nothing built"; exit 1; } ;;
+    esac
+  done < <(boards)
+  [ -d "$OUT/releases/BETA/$TAG" ] && [ -n "$(ls "$OUT/releases/BETA/$TAG" 2>/dev/null)" ] &&
+    { echo "$TAG is already released; take the next number"; exit 1; }
   ARCH="$OUT/releases/BETA/$TAG"
   mkdir -p "$ARCH"
   STAGED="$(mktemp -d)"; trap 'rm -rf "$STAGED"' EXIT

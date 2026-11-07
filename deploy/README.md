@@ -84,7 +84,9 @@ curl -sI http://cometmesh.org | head -3                       # 301 -> https
 
 ## 3. Publishing a release
 
-Every board Comet is released for is one entry in `deploy/site/boards.json` (id =
+A release always builds every board from one committed source state (the script
+refuses uncommitted firmware changes, an existing tag, or a machine that cannot build
+all boards). Every board Comet is released for is one entry in `deploy/site/boards.json` (id =
 the firmware's `WADA_BOARD_ID`, build = an `idf/boards` dir or a PlatformIO env).
 The release script, the site's board table and installer, and the update check all
 go by it.
@@ -92,7 +94,7 @@ go by it.
 ```bash
 COMET_VPS=comet01-deploy scripts/release.sh beta_2             # build all boards, beta channel
 COMET_VPS=comet01-deploy scripts/release.sh beta_2 --promote   # the same images to stable
-COMET_BOARDS="tdeck-max" scripts/release.sh beta_2 --no-push   # some boards, stage only
+scripts/release.sh beta_2 --no-push                            # build + stage only
 ```
 
 It writes, per channel (`releases/BETA`, stable `releases/TOUCH`):
