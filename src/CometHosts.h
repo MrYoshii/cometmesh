@@ -3,28 +3,23 @@
 
 // Every server the firmware talks to on its own, in one place.
 //
-// Comet has no servers of its own yet. Until it has, the map tiles, the Lua app
-// catalogue, the language packs and the USB Files page still come from the
-// wadamesh hosts these defaulted to; those are compatible and only read.
+// All on Comet's own hosts (deploy/README.md), reachable over plain HTTP because the
+// device has no TLS to spare for them:
+//   firmware.cometmesh.org  updates (releases/), app store and language packs (apps/)
+//   tiles.cometmesh.org     map tiles (an nginx cache in front of OSM / OpenTopoMap)
+//   files.cometmesh.org     the USB Files web page
 //
-// Comet's own domain is cometmesh.org; once its server runs, these become
-// firmware.cometmesh.org (updates, app catalogue, language packs, reports),
-// tiles.cometmesh.org and files.cometmesh.org, all reachable over plain HTTP (the
-// device has no TLS to spare for them).
-//
-// What must NOT reach the wadamesh servers from a Comet build is switched off:
-// the update check and the on-device update (they would offer and install
-// wadamesh's own firmware), and the anonymous reports. Set COMET_HAS_UPDATE_SERVER
-// and COMET_HAS_REPORT_SERVER to 1 once Comet's firmware host serves those.
+// The anonymous test reports stay off until the report service runs on the firmware
+// host (deploy/report-service.py); set COMET_HAS_REPORT_SERVER to 1 then.
 
 #ifndef COMET_FIRMWARE_HOST
-#define COMET_FIRMWARE_HOST "firmware.wadamesh.com"   // app catalogue, language packs (and later: updates)
+#define COMET_FIRMWARE_HOST "firmware.cometmesh.org"
 #endif
 #ifndef COMET_TILE_SERVER
-#define COMET_TILE_SERVER   "http://tiles.wadamesh.com"
+#define COMET_TILE_SERVER   "http://tiles.cometmesh.org"
 #endif
 #ifndef COMET_FILES_HOST
-#define COMET_FILES_HOST    "files.wadamesh.com"      // the USB Files web page
+#define COMET_FILES_HOST    "files.cometmesh.org"     // the USB Files web page
 #endif
 #ifndef COMET_WEB_URL
 #define COMET_WEB_URL       "https://github.com/MrYoshii/cometmesh"
@@ -33,7 +28,7 @@
 #define COMET_ISSUES_URL    "https://github.com/MrYoshii/cometmesh/issues"
 #endif
 #ifndef COMET_HAS_UPDATE_SERVER
-#define COMET_HAS_UPDATE_SERVER 0
+#define COMET_HAS_UPDATE_SERVER 1
 #endif
 #ifndef COMET_HAS_REPORT_SERVER
 #define COMET_HAS_REPORT_SERVER 0

@@ -684,6 +684,9 @@ int touchPrefsGetTileServer(char* out, int out_cap) {
   out[0] = '\0';
   if (!s_begun) touchPrefsBegin();
   String v = prefsGetStr(KEY_TILE_SRV, String(DEFAULT_TILE_SERVER));
+  // A server saved by a build from before Comet had its own: the old wadamesh default
+  // follows the new default instead of staying pinned to the wadamesh host.
+  if (v == "http://tiles.wadamesh.com" || v == "http://tiles.wadamesh.com/") v = DEFAULT_TILE_SERVER;
   int n = (int)v.length();
   if (n > out_cap - 1) n = out_cap - 1;
   if (n > TOUCH_TILE_SERVER_MAXLEN - 1) n = TOUCH_TILE_SERVER_MAXLEN - 1;

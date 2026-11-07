@@ -468,7 +468,8 @@ bool SdNvsPrefs::begin(const char* ns, bool readOnly) {
     if (!ns || snprintf(_path, sizeof(_path), "%s/%s.kv", s_file_dir, ns) >= (int)sizeof(_path))
       return false;
     const bool loaded = sdLoad();
-    if (nvsHasLegacyData()) _nvs_open = _nvs.begin(ns, true);   // RO migration source
+    if (nvsHasLegacyData() && !nvsNamespaceAbsent(ns))   // RO migration source, if it has one
+      _nvs_open = _nvs.begin(ns, true);
     return loaded;
   }
 

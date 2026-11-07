@@ -27,9 +27,10 @@ OUT="$ROOT/out/firmware"                        # local mirror of the VPS firmwa
 DEST="${COMET_VPS:-}"; DEST_PATH="${COMET_VPS_PATH:-/srv/comet/firmware}"
 
 # env:binname pairs — plain string form (works on macOS's bash 3.2; no associative arrays).
-# All S3/PIO boards. The T-Display P4 is an ESP32-P4 IDF build (tdisplay_p4/) handled OUT of band
+# All S3/PIO boards. The T-Deck Max is built with ESP-IDF and released by
+# scripts/release-idf.sh, so it is not in this list. The T-Display P4 is an ESP32-P4 IDF build (tdisplay_p4/) handled OUT of band
 # — see the release skill / the P4 build+merge step — because this loop is PlatformIO-only.
-ENVS="heltec_v4_tft_companion_radio_usb_tcp_touch:comet-heltec-v4-tft LilyGo_TDeck_companion_radio_touch:comet-tdeck ThinkNode_M9_companion_radio_touch:comet-thinknode-m9 rak_tap_v2_companion_radio_touch:comet-rak-tap-v2 heltec_v4_r8_tft_companion_radio_usb_tcp_touch:comet-heltec-v4-r8-tft tlora_pager_lr1121_companion_radio_touch:comet-tlora-pager-lr1121 tlora_pager_sx1262_companion_radio_touch:comet-tlora-pager-sx1262 attaky_mesh_series_companion_radio_touch:comet-attaky wio_tracker_l2_companion_radio_touch:comet-wio-tracker-l2 crowpanel_35_companion_radio_touch:comet-crowpanel-35 crowpanel_50_companion_radio_touch:comet-crowpanel-50 LilyGo_TDeck_Pro_v1_0_companion_radio_touch:comet-tdeck-pro-v1-0 LilyGo_TDeck_Pro_v1_1_companion_radio_touch:comet-tdeck-pro-v1-1 LilyGo_TDeck_Max_companion_radio_touch:comet-tdeck-max sensecap_indicator_companion_radio_touch:comet-sensecap-indicator"
+ENVS="heltec_v4_tft_companion_radio_usb_tcp_touch:comet-heltec-v4-tft LilyGo_TDeck_companion_radio_touch:comet-tdeck ThinkNode_M9_companion_radio_touch:comet-thinknode-m9 rak_tap_v2_companion_radio_touch:comet-rak-tap-v2 heltec_v4_r8_tft_companion_radio_usb_tcp_touch:comet-heltec-v4-r8-tft tlora_pager_lr1121_companion_radio_touch:comet-tlora-pager-lr1121 tlora_pager_sx1262_companion_radio_touch:comet-tlora-pager-sx1262 attaky_mesh_series_companion_radio_touch:comet-attaky wio_tracker_l2_companion_radio_touch:comet-wio-tracker-l2 crowpanel_35_companion_radio_touch:comet-crowpanel-35 crowpanel_50_companion_radio_touch:comet-crowpanel-50 LilyGo_TDeck_Pro_v1_0_companion_radio_touch:comet-tdeck-pro-v1-0 LilyGo_TDeck_Pro_v1_1_companion_radio_touch:comet-tdeck-pro-v1-1 sensecap_indicator_companion_radio_touch:comet-sensecap-indicator"
 
 # Per-channel destination paths.
 if [ "$MODE" = "stable" ]; then

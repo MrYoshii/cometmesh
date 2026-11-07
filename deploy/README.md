@@ -5,6 +5,7 @@ Distribution stack for comet: a **VPS nginx origin behind Cloudflare**.
 ```
 tiles.cometmesh.org     →CF (HTTP, edge-cached) →  nginx → OpenStreetMap / OpenTopoMap
 firmware.cometmesh.org  →CF (cache bins)        →  nginx → /srv/comet/firmware
+files.cometmesh.org     →CF (HTTP)              →  nginx → the USB Files page
 flasher.cometmesh.org   →CF (HTTPS)             →  301 → cometmesh.org
 cometmesh.org           →CF (HTTPS)             →  nginx → /srv/comet/site (home page + roadmap)
 ```
@@ -44,7 +45,7 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ## 2. Cloudflare
 
-- **DNS:** `A`/`AAAA` records for `tiles`, `firmware`, `flasher`, `@` → the VPS IP,
+- **DNS:** `A`/`AAAA` records for `tiles`, `firmware`, `files`, `flasher`, `@` → the VPS IP,
   all **Proxied** (orange cloud).
 - **SSL/TLS:** mode **Flexible** (CF↔origin HTTP) is enough since the origin is
   HTTP-only. **Do NOT enable "Always Use HTTPS"** on `tiles.` or `firmware.` — the
@@ -63,9 +64,25 @@ From a comet checkout (builds both boards, refreshes the listing, rsyncs up):
 COMET_VPS=user@your-vps scripts/release.sh beta_2
 ```
 
-The on-device check GETs `http://firmware.cometmesh.org/releases/TOUCH`, finds the
-highest `beta_<N>`, and (once OTA-over-Wi-Fi is re-enabled) pulls
-`…/releases/TOUCH/beta_<N>/<board>.bin`.
+The boards built with ESP-IDF (today the T-Deck Max) are released separately, and
+release.sh leaves them out:
+
+```bash
+COMET_VPS=user@your-vps scripts/release-idf.sh beta_1             # beta channel
+COMET_VPS=user@your-vps scripts/release-idf.sh beta_1 --promote   # same bins to stable
+scripts/release-idf.sh beta_1 --no-push                            # build + stage in out/firmware only
+```
+
+The on-device check GETs `http://firmware.cometmesh.org/releases/TOUCH` (or `BETA`
+with *About → Get test builds*), finds the highest `beta_<N>` above its own tag, and
+installs `…/releases/<TOUCH|BETA>/beta_<N>/comet-<board>.bin`. Comet's tags start
+again at `beta_1`; a dev build (`dev-<sha>`) is below every release.
+
+What the device needs from these hosts, all served by the configs above: the update
+listings and bins, `apps/` (store and languages, `scripts/deploy-apps.sh`), map tiles
+(`tiles.`, with `comet-tile-transcode.service`) and the USB Files page (`files.`,
+`scripts/deploy-files.sh`). Reports stay off in the firmware until
+`comet-reports.service` runs.
 
 ## Done
 
