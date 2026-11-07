@@ -39,6 +39,15 @@ static SntpClockPush s_sntp_push;
 #include "comet_mark_rgb.h"               // anti-aliased mesh-mark (RGB565) for the pre-LVGL boot screen
 #include "ui-touch/TouchSleep.h"             // idle light-sleep controller (loopEnd called at end of loop())
 #include "ui-touch/device_caps.h"            // CAP_BLE_KEYBOARD: keyboard mode keeps the phone link paused from boot
+
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3 && defined(CONFIG_BT_ENABLED)
+// Arduino 3 frees the Bluetooth controller's memory in initArduino() unless a library
+// reports BLE in use, and only Arduino's own BLE library does. Comet uses NimBLE
+// directly, so without this the controller RAM went back to the heap at boot and
+// turning Bluetooth on later started the controller on overwritten memory (crash in
+// btdm_controller_init). Bluetooth can be switched on at any time, so keep it.
+extern "C" bool bleInUse(void) { return true; }
+#endif
 #endif
 
 #if defined(WADA_LVGL_O2)
