@@ -930,15 +930,15 @@ void setup() {
     // This cannot depend on the mode preference: file-backed prefs are reloaded
     // only after storage mounts, well after this first frame is committed.
     display.startFrame((ColorVal)0xFFFF);
-    // The mesh mark, still: the white-on-black artwork inverted a row at a time,
-    // centred where the LVGL splash draws its mark, the word under it.
+    // The mark, still: its 1-bit ink version (the LVGL splash's paper frame), a row at
+    // a time, centred where the splash draws it, the word under it.
     {
       const int mx = (display.width()  - COMET_MARK_W) / 2;
       const int my = (display.height() - COMET_MARK_H) / 2;
       uint16_t row[COMET_MARK_W];
       for (int y = 0; y < COMET_MARK_H; ++y) {
-        const uint16_t* src = &COMET_MARK_RGB565[(size_t)y * COMET_MARK_W];
-        for (int x = 0; x < COMET_MARK_W; ++x) row[x] = (uint16_t)~src[x];
+        const uint8_t* src = &COMET_MARK_INK1[(size_t)y * COMET_MARK_INK_STRIDE];
+        for (int x = 0; x < COMET_MARK_W; ++x) row[x] = (src[x >> 3] & (0x80 >> (x & 7))) ? 0x0000 : 0xFFFF;
         display.writePixelsRGB565(mx, my + y, COMET_MARK_W, 1, row);
       }
     }

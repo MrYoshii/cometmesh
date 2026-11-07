@@ -1,6 +1,7 @@
 #include "UITask.h"
 #include <helpers/esp32/LedcCompat.h>
 #include <helpers/esp32/WdtFeed.h>
+#include "CometMark.h"   // the Comet mark: boot splash, lock screen
 #include "TouchSleep.h"
 #include "ChatHashtag.h"
 #include <climits>         // INT_MAX (glibc does not pull it in transitively, macOS/ESP-IDF do)
@@ -51952,106 +51953,16 @@ static void lockscreenUpdateClock() {
 }
 
 // ---- The comet mark ----------------------------------------------------------
-// Two zigzags crossing on a centre line, seven nodes, from its 180 x 120 drawing
-// (nodes inside x 3..177, y 5..115), scaled to the object's height. While the
-// screen is lit, light runs along both lines and each node sends out a ring
-// (s_lock_anim redraws it).
-static const int16_t kMarkZig[2][5][2] = {
-  { { 10, 60 }, { 50, 108 }, { 90, 60 }, { 130, 108 }, { 170, 60 } },
-  { { 10, 60 }, { 50, 12 },  { 90, 60 }, { 130, 12 },  { 170, 60 } },
-};
-static const int16_t kMarkNode[7][3] = {   // x, y, ring delay (ms)
-  { 10, 60, 0 }, { 90, 60, 600 }, { 170, 60, 1200 }, { 50, 12, 300 },
-  { 130, 12, 900 }, { 50, 108, 300 }, { 130, 108, 900 },
-};
-
+// The same mark as the boot splash (CometMark.cpp), in the lock screen's ink. While
+// the screen is lit it idles: the waves pulse, and now and then a message runs in
+// through the tail (s_lock_anim redraws it).
 static void lockMarkDrawCb(lv_event_t* e) {
-  lv_draw_ctx_t* dc = lv_event_get_draw_ctx(e);
-  if (!dc) return;
   lv_area_t a;
   lv_obj_get_coords(lv_event_get_target(e), &a);
-  const int32_t s = (int32_t)lv_area_get_height(&a) * 256 / 110;   // drawing units to px, 8.8 fixed
-  auto px = [&](int32_t x16, int32_t y16) {   // drawing units x16
-    lv_point_t p = { (lv_coord_t)(a.x1 + ((x16 - 48) * s + 2048) / 4096),
-                     (lv_coord_t)(a.y1 + ((y16 - 80) * s + 2048) / 4096) };
-    return p;
-  };
   const LockInk& k = s_lock_ink;
   const bool live = !k.paper && s_lock_anim;
-  const uint32_t now = millis();
-
-  lv_draw_line_dsc_t ld;
-  lv_draw_line_dsc_init(&ld);
-  ld.width = (lv_coord_t)LV_MAX(2, (5 * s + 128) / 256);
-  ld.round_start = ld.round_end = 1;
-  ld.color = lv_color_hex(k.dot);
-  ld.opa = k.paper ? LV_OPA_COVER : (lv_opa_t)51;   // the lines at 20 %
-  for (int z = 0; z < 2; ++z) {
-    for (int i = 0; i < 4; ++i) {
-      const lv_point_t p1 = px(kMarkZig[z][i][0] * 16, kMarkZig[z][i][1] * 16);
-      const lv_point_t p2 = px(kMarkZig[z][i + 1][0] * 16, kMarkZig[z][i + 1][1] * 16);
-      lv_draw_line(dc, &ld, &p1, &p2);
-    }
-  }
-
-  lv_draw_rect_dsc_t rd;
-  lv_draw_rect_dsc_init(&rd);
-  rd.radius = LV_RADIUS_CIRCLE;
-  rd.bg_opa = LV_OPA_COVER;
-  const lv_coord_t r0 = (lv_coord_t)LV_MAX(2, (7 * s + 128) / 256);
-  if (live) {
-    // Light: five short streaks per line, a fifth of it apart, moving a fifth
-    // every 0.8 s; the top line half a step behind.
-    auto along = [&](int z, uint32_t u) {   // u: 1/16 path units, 0..1599 (4 segments of 400)
-      const int seg = (int)(u / 400u);
-      const int32_t t = (int32_t)(u % 400u);
-      const int32_t x = kMarkZig[z][seg][0] * 16 + (kMarkZig[z][seg + 1][0] - kMarkZig[z][seg][0]) * 16 * t / 400;
-      const int32_t y = kMarkZig[z][seg][1] * 16 + (kMarkZig[z][seg + 1][1] - kMarkZig[z][seg][1]) * 16 * t / 400;
-      return px(x, y);
-    };
-    lv_draw_line_dsc_t sd;
-    lv_draw_line_dsc_init(&sd);
-    sd.width = ld.width;
-    sd.round_start = sd.round_end = 1;
-    sd.color = lv_color_hex(k.line);
-    for (int z = 0; z < 2; ++z) {
-      const uint32_t shift = (now % 800u) * 320u / 800u + (z ? 160u : 0u);
-      for (int d = 0; d < 5; ++d) {
-        const uint32_t u = (d * 320u + shift) % 1600u;
-        // Keep each streak on one segment, so it never cuts a corner.
-        const uint32_t s0 = u / 400u * 400u;
-        const uint32_t ua = u > s0 + 16u ? u - 16u : s0, ub = u + 16u < s0 + 400u ? u + 16u : s0 + 399u;
-        const lv_point_t p1 = along(z, ua), p2 = along(z, ub);
-        if (s_look_rainbow) sd.color = lv_color_hex(lookRainbow((int)u, 1600));   // the light changes hue as it runs
-        lv_draw_line(dc, &sd, &p1, &p2);
-      }
-    }
-    // Rings: every 2.4 s each node's ring grows to 2.4x and fades over 70 % of it.
-    lv_draw_rect_dsc_t rr;
-    lv_draw_rect_dsc_init(&rr);
-    rr.radius = LV_RADIUS_CIRCLE;
-    rr.bg_opa = LV_OPA_TRANSP;
-    rr.border_color = lv_color_hex(k.line);
-    rr.border_width = 1;
-    for (int n = 0; n < 7; ++n) {
-      const uint32_t ph = (now + 2400u - (uint32_t)kMarkNode[n][2]) % 2400u;
-      if (ph >= 1680u) continue;
-      const int32_t q = (int32_t)ph * 256 / 1680;
-      const lv_coord_t rad = (lv_coord_t)(r0 + r0 * 14 * q / 2560);
-      rr.border_opa = (lv_opa_t)(140 * (256 - q) / 256);
-      if (s_look_rainbow) rr.border_color = lv_color_hex(lookRainbow(n, 7));
-      const lv_point_t c = px(kMarkNode[n][0] * 16, kMarkNode[n][1] * 16);
-      const lv_area_t ra = { (lv_coord_t)(c.x - rad), (lv_coord_t)(c.y - rad), (lv_coord_t)(c.x + rad), (lv_coord_t)(c.y + rad) };
-      lv_draw_rect(dc, &rr, &ra);
-    }
-  }
-  rd.bg_color = lv_color_hex(k.dot);
-  for (int n = 0; n < 7; ++n) {
-    const lv_point_t c = px(kMarkNode[n][0] * 16, kMarkNode[n][1] * 16);
-    const lv_area_t na = { (lv_coord_t)(c.x - r0), (lv_coord_t)(c.y - r0), (lv_coord_t)(c.x + r0 - 1), (lv_coord_t)(c.y + r0 - 1) };
-    if (s_look_rainbow && !k.paper) rd.bg_color = lv_color_hex(lookRainbow(n, 7));   // each node its own hue
-    lv_draw_rect(dc, &rd, &na);
-  }
+  const CometMarkPaint paint = { lv_color_hex(k.dot), lv_color_hex(k.line), k.paper, LV_OPA_COVER };
+  cometMarkDraw(lv_event_get_draw_ctx(e), a, paint, live ? CometMarkScene::Idle : CometMarkScene::Still, millis());
 }
 
 // ---- Activity line -----------------------------------------------------------------
@@ -52137,8 +52048,9 @@ static void lockSparkDrawCb(lv_event_t* e) {
   lv_draw_rect(dc, &dd, &da);
 }
 
-static void lockExtDrawCb(lv_event_t* e) {   // room for the rings and the glow outside the box
-  lv_event_set_ext_draw_size(e, 12);
+static void lockExtDrawCb(lv_event_t* e) {   // room for the head's glow outside the box
+  lv_obj_t* o = lv_event_get_target(e);
+  lv_event_set_ext_draw_size(e, cometMarkExtDraw(lv_obj_get_height(o), CometMarkScene::Idle));
 }
 
 static void lockscreenUpdateActivity() {
@@ -52591,8 +52503,8 @@ static void lockscreenShow() {
   // the bottom. The block keeps its place whether or not cards show, and sits a
   // little above the middle of the room it has.
   const lv_font_t* fclk = lockClockFont();
-  const lv_coord_t mark_h  = SC(30);
-  const lv_coord_t mark_w  = (lv_coord_t)(mark_h * 174 / 110);
+  const lv_coord_t mark_h  = SC(40);
+  const lv_coord_t mark_w  = (lv_coord_t)(mark_h * kCometMarkW / kCometMarkH);
   const lv_coord_t clk_h   = lv_font_get_line_height(fclk);
 #if !CAP_DATE_WRAP
   const bool date_wrap = false;   // the longest date fits on one line (device_caps.h)
@@ -68551,18 +68463,16 @@ static lv_timer_t* s_splash_timer = nullptr;   // the frame clock
 static uint32_t    s_splash_clock = 0;         // animation time, ms
 static uint32_t    s_splash_last  = 0;         // millis() at the last frame
 static uint32_t    s_splash_born  = 0;         // millis() when built: a boot that never settles still ends it
-static constexpr uint32_t kSplashHoldMs = 2400;   // the fade-out starts here
+static constexpr uint32_t kSplashHoldMs = 2900;   // the fade-out starts here (the mark's message arrives at 1.5 s)
 static constexpr uint32_t kSplashFadeMs = 350;
 static UnderHidden s_splash_under;               // the UI, hidden while the splash animates over it
 
 // Brand colours, not the theme's: the splash continues the pre-LVGL screen,
 // which looks the same whatever theme or accent the user picked.
 static constexpr uint32_t kSplashGreen = 0x2BFF88;   // Comet's accent
-static constexpr uint32_t kSplashDeep  = 0x0E8A4C;
 
-// The comet's strands (tails) and head, the same geometry the pre-LVGL bitmap was
-// rendered from (scripts/gen_comet_mark.py), in the bitmap's box.
-#include "CometMarkGeom.h"
+// The mark itself is drawn by CometMark.cpp, from the same geometry the pre-LVGL
+// bitmap was rendered from (scripts/gen_comet_mark.py).
 
 static void splashRemove() {
   if (s_splash_timer) { lv_timer_del(s_splash_timer); s_splash_timer = nullptr; }
@@ -68590,116 +68500,23 @@ static void splashTapDismissCb(lv_event_t* e) {
 
 static float splashClamp01(float v) { return v < 0.0f ? 0.0f : v > 1.0f ? 1.0f : v; }
 
-static void splashDisc(lv_draw_ctx_t* dc, lv_draw_rect_dsc_t* d, lv_coord_t cx, lv_coord_t cy, lv_coord_t r) {
-  const lv_area_t da = { (lv_coord_t)(cx - r), (lv_coord_t)(cy - r), (lv_coord_t)(cx + r), (lv_coord_t)(cy + r) };
-  lv_draw_rect(dc, d, &da);
-}
-
-// A point on a strand's quadratic curve, t in 0..1000.
-static lv_point_t cometAt(const CometStrand& st, lv_coord_t ox, lv_coord_t oy, int32_t t) {
-  const int32_t u = 1000 - t;
-  const int32_t x = (u * u * st.x0 + 2 * u * t * st.cx + t * t * st.x1) / 1000000;
-  const int32_t y = (u * u * st.y0 + 2 * u * t * st.cy + t * t * st.y1) / 1000000;
-  return lv_point_t{ (lv_coord_t)(ox + x), (lv_coord_t)(oy + y) };
-}
-
 static void splashMarkDrawCb(lv_event_t* e) {
-  lv_draw_ctx_t* dc = lv_event_get_draw_ctx(e);
   lv_obj_t* obj = lv_event_get_target(e);
-  if (!dc) return;
   lv_area_t a;
   lv_obj_get_coords(obj, &a);
-  const lv_coord_t ox = a.x1, oy = a.y1;   // the bitmap's box
-  const lv_coord_t hx = ox + kCometHeadX, hy = oy + kCometHeadY;
-  lv_draw_line_dsc_t ld;
-  lv_draw_line_dsc_init(&ld);
-  ld.round_start = ld.round_end = 0;   // butt ends: round caps overlap and bead the fading tail
-  lv_draw_rect_dsc_t rd;
-  lv_draw_rect_dsc_init(&rd);
-  rd.radius = LV_RADIUS_CIRCLE;
-  const int kSeg = 10;   // segments per strand: width and light fall off along it
-
+  CometMarkPaint paint;
 #if defined(HAS_TDECK_PRO)
-  // E-paper: one still frame in ink. The tails as tapering lines (the panel has no
-  // grey, so the fade is in the width), the head a dot with a ring of coma.
-  ld.color = lv_color_black();
-  for (const CometStrand& st : kCometStrands) {
-    for (int k = 0; k < kSeg; ++k) {
-      const int32_t t0 = k * 1000 / kSeg, t1 = (k + 1) * 1000 / kSeg;
-      const int32_t keep = st.kind ? 1000 : 700;   // the dust fades out sooner
-      if (t0 > keep) break;
-      ld.width = (lv_coord_t)LV_MAX(1, (st.width_x10 * (1000 - t0 * 8 / 10)) / 10000);
-      const lv_point_t p0 = cometAt(st, ox, oy, t0), p1 = cometAt(st, ox, oy, t1);
-      lv_draw_line(dc, &ld, &p0, &p1);
-    }
-  }
-  rd.bg_color = lv_color_black();
-  splashDisc(dc, &rd, hx, hy, 6);
-  lv_draw_rect_dsc_t rr;
-  lv_draw_rect_dsc_init(&rr);
-  rr.radius = LV_RADIUS_CIRCLE;
-  rr.bg_opa = LV_OPA_TRANSP;
-  rr.border_width = 1;
-  rr.border_color = lv_color_black();
-  splashDisc(dc, &rr, hx, hy, 11);
+  paint = { lv_color_black(), lv_color_black(), true, LV_OPA_COVER };   // e-paper: one still frame in ink
 #else
-  const uint32_t t = s_splash_clock;
   const float fade = (float)lv_obj_get_style_opa_recursive(obj, LV_PART_MAIN) / 255.0f;   // the fade-out
-  auto opa = [&](float v) { return (lv_opa_t)LV_MIN(255.0f, v * fade); };
-  const lv_color_t white = lv_color_white();
-  const lv_color_t green = lv_color_hex(kSplashGreen), deep = lv_color_hex(kSplashDeep);
-  // White as the boot screen left it, then the ion tail and the coma turn green.
-  const float settle = splashClamp01(((float)t - 150.0f) / 650.0f);
-  // The tail breathes: a slow wave of light running out from the head.
-  for (size_t n = 0; n < sizeof kCometStrands / sizeof kCometStrands[0]; ++n) {
-    const CometStrand& st = kCometStrands[n];
-    const lv_color_t base = st.kind ? lv_color_mix(green, white, (uint8_t)(255.0f * settle))
-                                    : lv_color_mix(lv_color_hex(0xDFFFEB), white, (uint8_t)(160.0f * settle));
-    for (int k = 0; k < kSeg; ++k) {
-      const int32_t t0 = k * 1000 / kSeg, t1 = (k + 1) * 1000 / kSeg;
-      const float tm = (float)(t0 + t1) / 2000.0f;
-      const float wave = 0.80f + 0.20f * sinf(6.2832f * (tm * 1.6f - (float)t / 1600.0f) + (float)n);
-      const float fall = powf(1.0f - tm, 1.4f);
-      ld.color = base;
-      ld.width = (lv_coord_t)LV_MAX(1.0f, (float)st.width_x10 / 10.0f * (1.0f - 0.75f * tm));
-      ld.opa = opa((float)st.alpha * fall * wave);
-      const lv_point_t p0 = cometAt(st, ox, oy, t0), p1 = cometAt(st, ox, oy, t1);
-      lv_draw_line(dc, &ld, &p0, &p1);
-    }
-  }
-  // Grains streaming back along the ion tail.
-  if (settle > 0.0f) {
-    for (int g = 0; g < 7; ++g) {
-      const CometStrand& st = kCometStrands[(g * 3) % (sizeof kCometStrands / sizeof kCometStrands[0])];
-      const int32_t along = (int32_t)(((t + (uint32_t)g * 230u) % 1400u) * 1000u / 1400u);
-      const lv_point_t p = cometAt(st, ox, oy, along);
-      rd.bg_color = st.kind ? green : white;
-      rd.bg_opa = opa(200.0f * settle * (1.0f - (float)along / 1000.0f));
-      splashDisc(dc, &rd, p.x, p.y, 1);
-    }
-  }
-  // The head: the coma as a soft glow (a blurred shadow, no rings), breathing a
-  // little, then the bright core.
-  const float pulse = 1.0f + 0.10f * sinf(6.2832f * (float)t / 1200.0f);
-  const lv_color_t coma = lv_color_mix(green, white, (uint8_t)(255.0f * settle));
-  lv_draw_rect_dsc_t gd;
-  lv_draw_rect_dsc_init(&gd);
-  gd.radius = LV_RADIUS_CIRCLE;
-  gd.bg_color = lv_color_mix(lv_color_hex(0xE6FFF0), white, (uint8_t)(255.0f * settle));
-  gd.bg_opa = opa(255.0f);
-  gd.shadow_color = coma;
-  gd.shadow_width = (lv_coord_t)lroundf(40.0f * pulse);
-  gd.shadow_spread = 4;
-  gd.shadow_opa = opa(200.0f);
-  splashDisc(dc, &gd, hx, hy, 6);
-  (void)deep;
-  rd.bg_color = white;
-  rd.bg_opa = opa(255.0f);
-  splashDisc(dc, &rd, hx, hy, 3);
+  paint = { lv_color_white(), lv_color_hex(kSplashGreen), false, (uint8_t)lroundf(255.0f * fade) };
 #endif
+  cometMarkDraw(lv_event_get_draw_ctx(e), a, paint, CometMarkScene::Boot, s_splash_clock);
 }
 
-static void splashMarkExtCb(lv_event_t* e) { lv_event_set_ext_draw_size(e, 48); }   // the coma glow reaches past the box
+static void splashMarkExtCb(lv_event_t* e) {   // the arrival's wave reaches past the box
+  lv_event_set_ext_draw_size(e, cometMarkExtDraw(COMET_MARK_H, CometMarkScene::Boot));
+}
 
 // A label's entrance: it fades in over 450 ms and rises 8 px into place.
 static void splashLabelAt(lv_obj_t* l, uint32_t t, uint32_t from) {
@@ -68735,9 +68552,9 @@ static void splashTickCb(lv_timer_t*) {
 #if defined(HAS_TDECK_PRO)
   (void)t;   // e-paper: one still frame, then gone in one refresh
 #else
-  if (t <= 1400) {   // the entrances (until 800 + 500 ms) still running
-    splashLabelAt(s_splash_wm, t, 550);
-    splashLabelAt(s_splash_sub, t, 800);
+  if (t <= kCometBootArriveMs + 1000) {   // the words come in with the head's wave
+    splashLabelAt(s_splash_wm, t, kCometBootArriveMs + 60);
+    splashLabelAt(s_splash_sub, t, kCometBootArriveMs + 360);
   }
   if (t >= kSplashHoldMs) {
     const float f = splashClamp01((float)(t - kSplashHoldMs) / (float)kSplashFadeMs);
@@ -68808,8 +68625,8 @@ static void buildBootSplash() {
 #if !defined(HAS_TDECK_PRO)
   // Both rise into place as they fade in, the channel line a beat later, on the
   // splash's own clock (splashTickCb).
-  splashLabelAt(wm, 0, 550);
-  splashLabelAt(sub, 0, 800);
+  splashLabelAt(wm, 0, kCometBootArriveMs + 60);
+  splashLabelAt(sub, 0, kCometBootArriveMs + 360);
 #endif
 }
 
@@ -85740,9 +85557,9 @@ static void docSizeAudit() {
   splashRemove();
   buildBootSplash();
   if (s_splash_timer) lv_timer_pause(s_splash_timer);
-  s_splash_clock = 1900;
-  splashLabelAt(s_splash_wm, s_splash_clock, 550);
-  splashLabelAt(s_splash_sub, s_splash_clock, 800);
+  s_splash_clock = 2300;
+  splashLabelAt(s_splash_wm, s_splash_clock, kCometBootArriveMs + 60);
+  splashLabelAt(s_splash_sub, s_splash_clock, kCometBootArriveMs + 360);
   captureScreenToSerial("sz_splash");
   splashRemove();
   docSettle(4);
@@ -87335,18 +87152,18 @@ static void docAuditFocus() {
   ssaverTeardown(true);
   docSettle(6);
 #endif
-  // The boot splash at four moments: the hand-off frame, the mesh settling,
-  // the nodes lit, the hold. The draw reads the time, so each frame is exact.
+  // The boot splash at four moments: the hand-off frame, the message hopping in,
+  // the head's wave, the hold. The draw reads the time, so each frame is exact.
   splashRemove();
   buildBootSplash();
   if (s_splash_timer) lv_timer_pause(s_splash_timer);   // the shots set the clock themselves
-  static const uint16_t kSplashAt[4] = { 0, 450, 1000, 1900 };
+  static const uint16_t kSplashAt[4] = { 0, 1100, 1650, 2300 };
   for (int i = 0; i < 4; ++i) {
     char nm[16];
     snprintf(nm, sizeof nm, "splash_%d", i);
     s_splash_clock = kSplashAt[i];
-    splashLabelAt(s_splash_wm, s_splash_clock, 550);
-    splashLabelAt(s_splash_sub, s_splash_clock, 800);
+    splashLabelAt(s_splash_wm, s_splash_clock, kCometBootArriveMs + 60);
+    splashLabelAt(s_splash_sub, s_splash_clock, kCometBootArriveMs + 360);
     captureScreenToSerial(nm);
   }
   splashRemove();

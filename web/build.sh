@@ -74,7 +74,7 @@ case "$target" in
     mkdir -p "$dist"; find "$dist" -mindepth 1 -delete   # keep the folder: a running serve keeps serving it
     cp "$bdir/comet.js" "$bdir/comet.wasm" "$dist/"
     cp "$WEB/shell/app.js" "$WEB/shell/app.css" "$dist/"
-    cp "$WEB/../deploy/site/comet-mark.svg" "$WEB/../deploy/site/favicon.ico" \
+    cp "$WEB/../assets/comet-mark.svg" "$WEB/../assets/favicon.ico" \
        "$WEB/shell/manifest.webmanifest" "$dist/"
     mkdir -p "$dist/icons"   # the home-screen icons (web/shell/icons/render.mjs)
     cp "$WEB/shell/icons/"*.png "$WEB/shell/icons/app-icon.svg" "$dist/icons/"
