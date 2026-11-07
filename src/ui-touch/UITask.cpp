@@ -9593,6 +9593,11 @@ static void versionCheckUpdateUi() {
                                     : TR(LV_SYMBOL_DOWNLOAD "  Update available: beta_%d\nYou have beta_%d. Get it at flasher.cometmesh.org."),
              s_verchk_latest_n, my_n);
     lv_obj_set_style_text_color(s_update_about_lbl, lightSurfaceTextColor(0xE2A23A), LV_PART_MAIN);
+  } else if (s_verchk_latest_n == 0) {
+    snprintf(b, sizeof b, touchPrefsGetBetaUpdates()
+                 ? TR("Firmware beta_%d\nNo test build for this board on the server yet.")
+                 : TR("Firmware beta_%d\nNo stable release yet. Turn on Get test builds for the newest."), my_n);
+    lv_obj_set_style_text_color(s_update_about_lbl, lv_color_hex(COLOR_SUB), LV_PART_MAIN);
   } else if (s_verchk_latest_n >= 0) {
     snprintf(b, sizeof b, TR(LV_SYMBOL_OK "  Up to date (beta_%d)"), my_n);
     lv_obj_set_style_text_color(s_update_about_lbl, lightSurfaceTextColor(0x6FCF6F), LV_PART_MAIN);
@@ -9712,6 +9717,10 @@ static void sdFwSaveToSdCb(lv_event_t* e) {
   if (s_verchk_latest_n < 0) {
     if (s_sdfw_status_lbl) lv_label_set_text(s_sdfw_status_lbl,
         TR("No version known yet. Wi-Fi and a completed update check are needed first."));
+    return;
+  }
+  if (s_verchk_latest_n == 0) {   // the channel has no release for this board yet
+    if (s_sdfw_status_lbl) lv_label_set_text(s_sdfw_status_lbl, TR("Nothing released on this channel yet."));
     return;
   }
   s_sdfw_msg[0] = 0; s_sdfw_pct = 0;
@@ -36449,7 +36458,9 @@ static int verchkFetchLatest(WiFiClient& client, HTTPClient& http) {
   }
   if (innum && curnum > best) best = curnum;
   http.end();
-  return best;
+  // Reached, but nothing released on this channel yet (an empty listing): 0, not the
+  // -1 that means "couldn't reach", so the About page can say which it is.
+  return best < 0 ? 0 : best;
 }
 
 #if CAP_LUA_APPS
