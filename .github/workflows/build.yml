@@ -5,7 +5,8 @@ name: build
 # `gh workflow run build.yml`), so nothing builds on a push by itself.
 # Every board's flashable images are attached as artifacts: firmware.bin (app
 # only, flash at 0x10000, keeps settings) and firmware-merged.bin (full image at
-# 0x0, erases settings).
+# 0x0, erases settings), plus bootloader.bin and partitions.bin. With a tag
+# (beta_<N>) the images carry it, like a release build of scripts/release.sh.
 
 on:
   workflow_dispatch:
@@ -15,6 +16,10 @@ on:
         type: choice
         default: all
         options: [all, max, pager]
+      tag:
+        description: 'Release tag to embed (beta_<N>); empty = dev-<sha>'
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -63,7 +68,9 @@ jobs:
       - name: Build
         run: |
           unset WIFI_SSID WIFI_PWD
-          TAG="dev-${GITHUB_SHA::7}"
+          TAG="${{ inputs.tag }}"
+          if [ -z "$TAG" ]; then TAG="dev-${GITHUB_SHA::7}"
+          elif ! [[ "$TAG" =~ ^beta_[0-9]+$ ]]; then echo "::error::tag must be beta_<N>"; exit 1; fi
           export PLATFORMIO_BUILD_FLAGS="-DFIRMWARE_RELEASE_TAG='\"${TAG}\"' -DFIRMWARE_VERSION='\"${TAG}\"'"
           pio run -t mergebin -e "${{ matrix.env }}" 2>&1 | tee build.log
           exit ${PIPESTATUS[0]}
@@ -83,6 +90,8 @@ jobs:
           path: |
             .pio/build/${{ matrix.env }}/firmware-merged.bin
             .pio/build/${{ matrix.env }}/firmware.bin
+            .pio/build/${{ matrix.env }}/bootloader.bin
+            .pio/build/${{ matrix.env }}/partitions.bin
           if-no-files-found: error
 
       - name: Upload build log
