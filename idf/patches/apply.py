@@ -97,5 +97,9 @@ sub(BC, [
    "void SerialBLEInterface::onDisconnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo, int reason) {"),
   ("void SerialBLEInterface::onWrite(NimBLECharacteristic* pCharacteristic) {",
    "void SerialBLEInterface::onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) {"),
-  ("adv->setScanResponse(true);", "adv->enableScanResponse(true);"),
+  # 2.x setName() puts the name in the scan response only if that is already enabled;
+  # otherwise into the advert, where "MeshCore-<name>" does not fit beside the 128-bit
+  # service UUID, and the phone app, which looks for the name, never lists the device.
+  ("  adv->setName(dev_name);\n  adv->setScanResponse(true);",
+   "  adv->enableScanResponse(true);   // first: 2.x routes the name by this flag\n  adv->setName(dev_name);"),
 ], "SerialBLEInterface.cpp: esp-nimble-cpp 2.x")
