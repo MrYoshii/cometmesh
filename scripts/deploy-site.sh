@@ -36,8 +36,25 @@ fi
 DRY=""
 [ "${1:-}" = "--dry-run" ] && DRY="--dry-run"
 
+# Cache busting: nginx lets browsers keep CSS/JS for an hour, so each page asks for
+# them as file?v=<hash of that file>. The source says ?v=dev; the staged copy gets the
+# hashes, and a changed file is fetched fresh on the next page load.
+STAGE="$(mktemp -d)"; trap 'rm -rf "$STAGE"' EXIT
+cp -a "$SRC". "$STAGE/"
+python3 - "$STAGE" <<'PY'
+import glob, hashlib, os, re, sys
+d = sys.argv[1]
+def ver(m):
+    f = os.path.join(d, m.group(2))
+    h = hashlib.sha1(open(f, "rb").read()).hexdigest()[:10] if os.path.exists(f) else "0"
+    return '%s="%s?v=%s"' % (m.group(1), m.group(2), h)
+for p in glob.glob(os.path.join(d, "*.html")):
+    s = open(p).read()
+    open(p, "w").write(re.sub(r'(href|src)="([A-Za-z0-9_.-]+\.(?:css|js))\?v=dev"', ver, s))
+PY
+
 ssh "$DEST" "mkdir -p '$DEST_PATH'"
-rsync -avz $DRY --delete "$SRC" "$DEST:$DEST_PATH/"
+rsync -avz --checksum $DRY --delete "$STAGE/" "$DEST:$DEST_PATH/"
 
 if [ -z "$DRY" ]; then
   echo
