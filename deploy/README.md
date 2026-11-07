@@ -84,28 +84,31 @@ curl -sI http://cometmesh.org | head -3                       # 301 -> https
 
 ## 3. Publishing a release
 
-From a comet checkout (builds both boards, refreshes the listing, rsyncs up):
+Every board Comet is released for is one entry in `deploy/site/boards.json` (id =
+the firmware's `WADA_BOARD_ID`, build = an `idf/boards` dir or a PlatformIO env).
+The release script, the site's board table and installer, and the update check all
+go by it.
 
 ```bash
-COMET_VPS=user@your-vps scripts/release.sh beta_2
+COMET_VPS=comet01-deploy scripts/release.sh beta_2             # build all boards, beta channel
+COMET_VPS=comet01-deploy scripts/release.sh beta_2 --promote   # the same images to stable
+COMET_BOARDS="tdeck-max" scripts/release.sh beta_2 --no-push   # some boards, stage only
 ```
 
-The boards built with ESP-IDF (today the T-Deck Max) are released separately, and
-release.sh leaves them out:
+It writes, per channel (`releases/BETA`, stable `releases/TOUCH`):
 
-```bash
-COMET_VPS=user@your-vps scripts/release-idf.sh beta_1             # beta channel
-COMET_VPS=user@your-vps scripts/release-idf.sh beta_1 --promote   # same bins to stable
-scripts/release-idf.sh beta_1 --no-push                            # build + stage in out/firmware only
-```
+- `<tag>/comet-<id>.bin` (+ `-bootloader`, `-partitions`, `-otadata`, `-merged`)
+- `index-<id>.json`: the tags that have an image for that board. The device's update
+  check reads its own (About → Install update; About → Get test builds for BETA), so
+  boards are released independently.
+- `latest-beta/` or `latest/manifest-<id>.json`: the browser installer on
+  cometmesh.org, pointing at the board's newest tag. It writes the four images at their
+  offsets, so an install over Comet keeps the settings.
 
-The on-device check GETs `http://firmware.cometmesh.org/releases/TOUCH` (or `BETA`
-with *About → Get test builds*), finds the highest `beta_<N>` above its own tag, and
-installs `…/releases/<TOUCH|BETA>/beta_<N>/comet-<board>.bin`. Comet's tags start
-again at `beta_1`; a dev build (`dev-<sha>`) is below every release.
+Tags are `beta_<N>`, from `beta_1`; a dev build (`dev-<sha>`) is below every release.
 
 What the device needs from these hosts, all served by the configs above: the update
-listings and bins, `apps/` (store and languages, `scripts/deploy-apps.sh`), map tiles
+listings and images, `apps/` (store and languages, `scripts/deploy-apps.sh`), map tiles
 (`tiles.`, with `comet-tile-transcode.service`) and the USB Files page (`files.`,
 `scripts/deploy-files.sh`). Reports stay off in the firmware until
 `comet-reports.service` runs.
@@ -122,9 +125,6 @@ listings and bins, `apps/` (store and languages, `scripts/deploy-apps.sh`), map 
 - **`flasher.cometmesh.org` 301-redirects to the apex** (see
   `deploy/nginx/flasher.cometmesh.org.conf`). A browser installer comes back with the
   first release.
-- **`deploy/flasher/`** is the old wadamesh-era standalone flasher page; no deploy
-  script publishes it.
-
 ## TODO before public launch
 
 - **Flip `comet` repo public** = launch.

@@ -36397,6 +36397,8 @@ static inline const char* updChannelArchive() {
 // so we never buffer the whole JSON; entries are alphabetical so the max isn't last.
 // Reuses the worker's own WiFiClient/HTTPClient (passed in) rather than putting
 // a second pair on the ~8 KB worker stack — nesting them overflowed it.
+static const char* cometBoardId();   // WADA_BOARD_ID, defined with the OTA names below
+
 static int verchkFetchLatest(WiFiClient& client, HTTPClient& http) {
   http.setReuse(false);
   http.setConnectTimeout(8000);
@@ -36406,8 +36408,12 @@ static int verchkFetchLatest(WiFiClient& client, HTTPClient& http) {
   return -1;   // no Comet update server yet: never offer comet's firmware
 #endif
   http.setUserAgent("comet-touch");
-  char listurl[72];
-  snprintf(listurl, sizeof listurl, "http://" COMET_FIRMWARE_HOST "/releases/%s", updChannelArchive());
+  // This board's own listing (scripts/release.sh writes one per board, with only the
+  // tags that have an image for it), so boards are released independently and a
+  // device is never offered a tag that has nothing for it.
+  char listurl[128];
+  snprintf(listurl, sizeof listurl, "http://" COMET_FIRMWARE_HOST "/releases/%s/index-%s.json",
+           updChannelArchive(), cometBoardId());
   if (!http.begin(client, listurl)) {
     return -1;
   }
@@ -37155,7 +37161,7 @@ static int wifiScanWatchdogSafe(uint32_t cap_ms, uint16_t per_chan_ms = 300) {
 #elif defined(WADA_WEB)
 #define WADA_BOARD_ID "web"            // never self-updates (CAP_OTA 0); names its test reports
 #else
-#error "WADA_BOARD_ID: this board has no release artifact name. Add it here AND to scripts/release.sh ENVS, or a self-update fetches another board's firmware and its test reports land under the wrong board."
+#error "WADA_BOARD_ID: this board has no release artifact name. Add it here AND to deploy/site/boards.json, or a self-update fetches another board's firmware and its test reports land under the wrong board."
 #endif
 
 
@@ -37271,6 +37277,7 @@ static bool reportPostWorker(WiFiClient& client, HTTPClient& http,
 // was published. Every board is now listed explicitly and anything else refuses to compile, so
 // forgetting this table is a build break instead of a field brick.
 static const char* const OTA_BIN_NAME = "comet-" WADA_BOARD_ID;
+static const char* cometBoardId() { return WADA_BOARD_ID; }
 // Download the latest published app-only bin over plain HTTP and flash it into the spare A/B slot
 // via the Arduino Update writer. Runs on the tile-fetcher worker (off the UI thread); reports
 // progress through s_ota_state / s_ota_pct / s_ota_msg for the UI poll timer. We fetch the

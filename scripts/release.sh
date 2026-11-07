@@ -1,232 +1,179 @@
 #!/usr/bin/env bash
-# comet release — two channels: TEST (beta, default) and STABLE (promote).
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Comet release: build every board in deploy/site/boards.json, stage the images under
+# out/firmware/ (a mirror of firmware.cometmesh.org), publish.
 #
-# Cut a TEST build (builds all PlatformIO boards and publishes the beta channel):
-#   COMET_VPS=user@host scripts/release.sh beta_21
+#   scripts/release.sh beta_2                  build all boards, publish to the beta channel
+#   scripts/release.sh beta_2 --no-push        build and stage only
+#   scripts/release.sh beta_2 --promote        copy the tested beta_2 images to stable
+#   COMET_BOARDS="tdeck-max" scripts/release.sh beta_2    only these boards (ids)
 #
-# Promote an ALREADY-BUILT beta to STABLE (no rebuild — copies the tested bins):
-#   COMET_VPS=user@host scripts/release.sh beta_21 --promote
+# Needs, per board kind: ESP-IDF 5.5 exported (IDF_PATH) for "idf" boards, PlatformIO
+# (pio, or $PIO) for "pio" boards; esptool for the merged images; COMET_VPS=user@host
+# (or an ~/.ssh/config alias) to publish, never committed. COMET_VPS_PATH overrides
+# the firmware root (/srv/comet/firmware).
 #
-# Channels on the VPS firmware root (firmware.cometmesh.org, behind Cloudflare):
-#   releases/BETA/<tag>/   immutable beta archives   <- test channel + new-firmware beta check
-#   releases/TOUCH/<tag>/  immutable stable archives <- stable feed + legacy on-device check
-#   latest-beta/           beta feed   (version.json + manifests + rolling bins)
-#   latest/                stable feed (version.json + manifests + rolling bins)
-#
-# The VPS target comes from the environment — never commit it (Cloudflare fronts
-# the origin, so the IP isn't needed in the firmware anyway).
+# On the server (deploy/nginx/firmware.cometmesh.org.conf):
+#   releases/<BETA|TOUCH>/<tag>/comet-<id>.bin          app image, what a device self-updates to
+#   releases/<BETA|TOUCH>/<tag>/comet-<id>-{bootloader,partitions,otadata}.bin
+#   releases/<BETA|TOUCH>/<tag>/comet-<id>-merged.bin   everything at 0x0 (erases settings)
+#   releases/<BETA|TOUCH>/index-<id>.json               the tags that have an image for <id>;
+#                                                       the device's update check reads this
+#   releases/<BETA|TOUCH>/index.json                    every tag
+#   latest-beta/, latest/  manifest-<id>.json           the browser installer (esp-web-tools),
+#                                                       pointing at that board's newest tag
+# Boards are released independently: a tag that leaves a board out is simply not in
+# that board's listing. Tags are beta_<N>; a dev build (dev-<sha>) is below all of them.
 set -euo pipefail
 
-TAG="${1:?usage: release.sh <tag> [--promote]   e.g. beta_21  /  beta_21 --promote}"
-MODE="beta"
-[ "${2:-}" = "--promote" ] && MODE="stable"
+TAG="${1:?usage: release.sh beta_<N> [--no-push | --promote]}"
+MODE="${2:-}"
+[[ "$TAG" =~ ^beta_[0-9]+$ ]] || { echo "tag must be beta_<N>, not $TAG"; exit 1; }
 
-PIO="${PIO:-$HOME/Library/Python/3.9/bin/pio}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-OUT="$ROOT/out/firmware"                        # local mirror of the VPS firmware root
-DEST="${COMET_VPS:-}"; DEST_PATH="${COMET_VPS_PATH:-/srv/comet/firmware}"
+BOARDS_JSON="$ROOT/deploy/site/boards.json"
+OUT="$ROOT/out/firmware"
+DEST="${COMET_VPS:-}"
+DEST_PATH="${COMET_VPS_PATH:-/srv/comet/firmware}"
+PIO="${PIO:-pio}"
+PUSH=1; [ "$MODE" = "--no-push" ] && PUSH=0
+[ -n "$DEST" ] || PUSH=0
 
-# env:binname pairs — plain string form (works on macOS's bash 3.2; no associative arrays).
-# All S3/PIO boards. The T-Deck Max is built with ESP-IDF and released by
-# scripts/release-idf.sh, so it is not in this list. The T-Display P4 is an ESP32-P4 IDF build (tdisplay_p4/) handled OUT of band
-# — see the release skill / the P4 build+merge step — because this loop is PlatformIO-only.
-ENVS="heltec_v4_tft_companion_radio_usb_tcp_touch:comet-heltec-v4-tft LilyGo_TDeck_companion_radio_touch:comet-tdeck ThinkNode_M9_companion_radio_touch:comet-thinknode-m9 rak_tap_v2_companion_radio_touch:comet-rak-tap-v2 heltec_v4_r8_tft_companion_radio_usb_tcp_touch:comet-heltec-v4-r8-tft tlora_pager_lr1121_companion_radio_touch:comet-tlora-pager-lr1121 tlora_pager_sx1262_companion_radio_touch:comet-tlora-pager-sx1262 attaky_mesh_series_companion_radio_touch:comet-attaky wio_tracker_l2_companion_radio_touch:comet-wio-tracker-l2 crowpanel_35_companion_radio_touch:comet-crowpanel-35 crowpanel_50_companion_radio_touch:comet-crowpanel-50 LilyGo_TDeck_Pro_v1_0_companion_radio_touch:comet-tdeck-pro-v1-0 LilyGo_TDeck_Pro_v1_1_companion_radio_touch:comet-tdeck-pro-v1-1 sensecap_indicator_companion_radio_touch:comet-sensecap-indicator"
-
-# Per-channel destination paths.
-if [ "$MODE" = "stable" ]; then
-  ARCH="$OUT/releases/TOUCH"; FEED="$OUT/latest"
-else
-  ARCH="$OUT/releases/BETA";  FEED="$OUT/latest-beta"
-fi
-
-# 0. Web build gate (beta only, optional): the browser build compiles the same UI
-#    against the web stand-in (web/mesh/WebMesh.*), so a UI change the stand-in lacks
-#    breaks it, and its tours have caught memory bugs the boards hide. Runs when emcc
-#    is installed and fails the release on a broken web build; skipped, with a note,
-#    without emcc. The browser tour needs Playwright (web/node_modules) and is skipped
-#    without it. Nothing here is published: web/dist is deployed separately
-#    (scripts/deploy-webclient.sh). WADA_SKIP_WEB=1 skips the whole gate.
-if [ "$MODE" = "beta" ] && [ -z "${WADA_SKIP_WEB:-}" ]; then
-  if command -v emcc >/dev/null && command -v emcmake >/dev/null; then
-    echo "web gate: web/build.sh web"
-    "$ROOT/web/build.sh" web || { echo "ERROR: the web build is broken (web/build.sh web); WADA_SKIP_WEB=1 skips this gate"; exit 1; }
-    # The native headless tour (same UI, host build): it is what caught the #629 double
-    # free as a crash, without a browser.
-    echo "web gate: web/build.sh smoke"
-    "$ROOT/web/build.sh" smoke || { echo "ERROR: the headless UI tour failed (web/build.sh smoke); WADA_SKIP_WEB=1 skips this gate"; exit 1; }
-    if [ -d "$ROOT/web/node_modules/playwright" ]; then
-      WEB_SHOTS="$(mktemp -d)"   # keep the tracked web/docs shots out of a release run
-      echo "web gate: web/build.sh webtest"
-      "$ROOT/web/build.sh" webtest --shots "$WEB_SHOTS" || { echo "ERROR: the web acceptance tour failed (web/build.sh webtest); WADA_SKIP_WEB=1 skips this gate"; exit 1; }
-      rm -rf "$WEB_SHOTS"
-    else
-      echo "note: web gate: Playwright not installed (web/node_modules), browser tour skipped"
-    fi
-  else
-    echo "note: web gate skipped: emcc not found (brew install emscripten to check the web build)"
-  fi
-fi
-
-# 1. Pull the current published tree so listings stay complete across tags.
-if [ -n "$DEST" ]; then
-  mkdir -p "$OUT"
-  # --exclude apps/: the Lua app + language store lives under the same document
-  # root but is NOT ours. It is published by scripts/deploy-apps.sh from
-  # deploy/apps/, which is the canonical copy. Pulling it into out/ makes a local
-  # mirror that the push below then sends back, overwriting a newer store with
-  # whatever was current when it was pulled. That happened on 2026-08-23: the
-  # beta_69 firmware push reverted the store to sdktest 1.2 and language v15 and
-  # deleted two apps, minutes after deploy-apps.sh had published them.
-  rsync -a --exclude 'apps/' "$DEST:$DEST_PATH/" "$OUT/" 2>/dev/null || echo "note: first publish (nothing to pull yet)"
-fi
-mkdir -p "$ARCH/$TAG" "$FEED"
-
-if [ "$MODE" = "beta" ]; then
-  # 2b. TEST build: compile all PlatformIO boards (tag + version embedded) into the beta archive + feed.
-  # Firmware data (About screen + the app's device info) is derived here, never
-  # hand-maintained: the tag, the core version actually pinned in platformio.ini,
-  # and today's build date. Every staged binary is verified to carry them below —
-  # beta_60 shipped with a stale in-tree default and About read "v1.16.0-touch".
-  CORE_VER="$(grep -oE 'meshcomod\.git#core-v[0-9.]+' platformio.ini | head -1 | sed 's/.*#core-//')"
-  [ -n "$CORE_VER" ] || { echo "ERROR: no core-v* pin found in platformio.ini"; exit 1; }
-  # The meshcomod release that core IS (core-v1.18.0 = meshcomod v1.18.0.1): its own
-  # companion version string, from the pinned core the last build pulled. About shows
-  # "on meshcomod <this>". Falls back to the pin when the core is not fetched yet.
-  MC_HDR=".pio/libdeps/LilyGo_TDeck_companion_radio_touch/MeshCore/examples/companion_radio/MyMesh.h"
-  MESHCOMOD_VER="$(grep -oE '^#define FIRMWARE_VERSION "v[0-9.]+"' "$MC_HDR" 2>/dev/null | grep -oE 'v[0-9.]+' | head -1)"
-  [ -n "$MESHCOMOD_VER" ] || MESHCOMOD_VER="$CORE_VER"
-  sed -i '' -E "s/^#define FIRMWARE_CORE_VERSION \"v[0-9.]+\"/#define FIRMWARE_CORE_VERSION \"${MESHCOMOD_VER}\"/" src/MyMesh.h
-  # Hyphens, NOT spaces: PLATFORMIO_BUILD_FLAGS is whitespace-split, so a date
-  # like "10 Aug 2026" tears the flag string apart and every -D after it is lost
-  # — including the release tag, which is how a build silently ships untagged.
-  BUILD_DATE="$(date '+%d-%b-%Y')"
-  echo "firmware data: tag=$TAG core=$CORE_VER meshcomod=$MESHCOMOD_VER date=$BUILD_DATE"
-  export PLATFORMIO_BUILD_FLAGS="-DFIRMWARE_RELEASE_TAG='\"${TAG}\"' -DFIRMWARE_VERSION='\"comet ${TAG}\"' -DFIRMWARE_BUILD_DATE='\"${BUILD_DATE}\"' -DFIRMWARE_CORE_VERSION='\"${MESHCOMOD_VER}\"'"
-  # Keep the in-tree default (what DEV flashes show) in step with the pinned core,
-  # so a bench build never reports a version the firmware no longer is.
-  sed -i '' -E "s/^#define FIRMWARE_VERSION \"v[0-9.]+-touch\"/#define FIRMWARE_VERSION \"${MESHCOMOD_VER}-touch\"/" src/MyMesh.h
-  git diff --quiet src/MyMesh.h || echo "note: refreshed the dev FIRMWARE_VERSION default in src/MyMesh.h -> ${CORE_VER}-touch (commit it)"
-  for pair in $ENVS; do
-    env="${pair%%:*}"; name="${pair##*:}"
-    "$PIO" run -t mergebin -e "$env"
-    cp ".pio/build/$env/firmware.bin"        "$ARCH/$TAG/$name.bin"
-    cp ".pio/build/$env/firmware-merged.bin" "$ARCH/$TAG/$name-merged.bin"
-    cp ".pio/build/$env/firmware-merged.bin" "$FEED/$name-merged.bin"   # rolling -> flasher (standalone)
-    cp ".pio/build/$env/firmware.bin"        "$FEED/$name.bin"          # rolling app image -> Launcher path
-    if [ "$name" = "comet-tdeck-pro-v1-1" ]; then
-      # beta_85 and earlier identify V1.1 as "tdeck-pro". Keep only the app
-      # alias in the archive so OTA works without creating a third matrix board.
-      cp ".pio/build/$env/firmware.bin"        "$ARCH/$TAG/comet-tdeck-pro.bin"
-      cp ".pio/build/$env/firmware.bin"        "$FEED/comet-tdeck-pro.bin"
-      cp ".pio/build/$env/firmware-merged.bin" "$FEED/comet-tdeck-pro-merged.bin"
-    fi
-  done
-else
-  # 2s. STABLE promotion: NO rebuild — copy the already-tested beta bins so what
-  #     ships to stable is byte-for-byte what the community tested.
-  #
-  # What the testers actually said, before promoting on their behalf. This never
-  # blocks: a board nobody owns can never go green, and some promotes are made on
-  # other evidence. It exists so the promote is a decision rather than a habit.
-  "$(dirname "$0")/build/matrix-check.sh" "$TAG" || true
-  SRC="$OUT/releases/BETA/$TAG"
-  if [ ! -d "$SRC" ] || ! ls "$SRC/"*.bin >/dev/null 2>&1; then
-    # beta_20 + any pre-channel build already lives under releases/TOUCH/<tag>/.
-    if ls "$ARCH/$TAG/"*.bin >/dev/null 2>&1; then
-      SRC="$ARCH/$TAG"; echo "note: $TAG not in releases/BETA — promoting from existing $ARCH/$TAG"
-    else
-      echo "ERROR: no built bins for $TAG (expected $OUT/releases/BETA/$TAG). Cut the beta first."; exit 1
-    fi
-  fi
-  for pair in $ENVS; do
-    name="${pair##*:}"
-    # A board added after this tag was cut has no bins to promote. Skip it
-    # instead of aborting the whole promotion (set -e), and say so.
-    if [ ! -f "$SRC/$name-merged.bin" ]; then
-      echo "note: $name has no $TAG build (board added later) — not in this stable set"
-      continue
-    fi
-    cp "$SRC/$name.bin"        "$ARCH/$TAG/$name.bin"
-    cp "$SRC/$name-merged.bin" "$ARCH/$TAG/$name-merged.bin"
-    cp "$SRC/$name-merged.bin" "$FEED/$name-merged.bin"
-    cp "$SRC/$name.bin"        "$FEED/$name.bin"
-    if [ "$name" = "comet-tdeck-pro-v1-1" ]; then
-      cp "$SRC/$name.bin"        "$ARCH/$TAG/comet-tdeck-pro.bin"
-      cp "$SRC/$name.bin"        "$FEED/comet-tdeck-pro.bin"
-      cp "$SRC/$name-merged.bin" "$FEED/comet-tdeck-pro-merged.bin"
-    fi
-  done
-  echo "promoted $TAG bins  $SRC -> $ARCH/$TAG (+ $FEED)"
-fi
-
-# 3. Regenerate this channel's update-check listing (firmware scans the body for
-#    the highest beta_<N>). JSON array of dir names — GitHub-contents shape.
-python3 - "$ARCH" > "$ARCH/index.json" <<'PY'
-import os, sys, json
-rel = sys.argv[1]
-betas = sorted(d for d in os.listdir(rel)
-               if d.startswith("beta_") and os.path.isdir(os.path.join(rel, d)))
-print(json.dumps([{"name": b, "type": "dir"} for b in betas], indent=2))
+# "id kind target chip" per board, from boards.json (optionally only $COMET_BOARDS).
+boards() {
+  python3 - "$BOARDS_JSON" "${COMET_BOARDS:-}" <<'PY'
+import json, sys
+only = set(sys.argv[2].split())
+for b in json.load(open(sys.argv[1]))["boards"]:
+    if only and b["id"] not in only:
+        continue
+    (kind, target), = b["build"].items()
+    print(b["id"], kind, target, b.get("chip", "ESP32-S3"))
 PY
-echo "listing ($MODE): $(python3 -c 'import json,sys;print(", ".join(x["name"] for x in json.load(open(sys.argv[1]))))' "$ARCH/index.json")"
+}
+board_name() { python3 -c 'import json,sys; print(next(b["name"] for b in json.load(open(sys.argv[1]))["boards"] if b["id"]==sys.argv[2]))' "$BOARDS_JSON" "$1"; }
 
-# 3a2. FIRMWARE DATA GATE — every staged app image must carry this tag, or the
-#      release ships binaries whose About screen / update check disagree with the
-#      release they are published under. Covers the out-of-band IDF boards
-#      (T-Display P4) too: they are injected into $ARCH/$TAG before this runs, so
-#      forgetting to rebuild them with WADA_FW_TAG fails here instead of shipping.
-missing=""
-for f in "$ARCH/$TAG"/*.bin; do
-  case "$f" in *-merged.bin) continue;; esac      # merged images embed the same app
-  # grep -c, not grep -q: this script runs under `set -o pipefail`, and grep -q
-  # exits at the first match, which SIGPIPEs `strings` and makes the whole
-  # pipeline "fail" — reporting every image as untagged even when it is fine.
-  n="$(strings "$f" | grep -c "$TAG" || true)"
-  [ "${n:-0}" -gt 0 ] || missing="$missing $(basename "$f")"
-  # ... and the meshcomod release About names as the core (test builds set it above).
-  if [ -n "${MESHCOMOD_VER:-}" ]; then
-    n="$(strings "$f" | grep -c "$MESHCOMOD_VER" || true)"
-    [ "${n:-0}" -gt 0 ] || missing="$missing $(basename "$f")(no meshcomod $MESHCOMOD_VER)"
-  fi
-done
-if [ -n "$missing" ]; then
-  echo "ERROR: these staged images do not embed $TAG:$missing"
-  echo "       rebuild them with the tag (S3: release.sh does it; P4: WADA_FW_TAG=$TAG ./build.sh build)"
-  exit 1
+esptool_cmd() {
+  if command -v esptool >/dev/null; then echo esptool
+  elif command -v esptool.py >/dev/null; then echo esptool.py
+  else echo "python3 -m esptool"; fi
+}
+merge() {   # <out> <bootloader> <partitions> <otadata> <app>
+  local e; e="$(esptool_cmd)"
+  $e --chip esp32s3 merge-bin -o "$1" 0x0 "$2" 0x8000 "$3" 0xe000 "$4" 0x10000 "$5" >/dev/null 2>&1 ||
+  $e --chip esp32s3 merge_bin -o "$1" 0x0 "$2" 0x8000 "$3" 0xe000 "$4" 0x10000 "$5" >/dev/null
+}
+
+# Build one board with the tag embedded; leaves the four images in $STAGED/<id>-*.
+build_board() {   # <id> <kind> <target>
+  local id="$1" kind="$2" target="$3" b
+  case "$kind" in
+    idf)
+      [ -n "${IDF_PATH:-}" ] || { echo "$id: IDF_PATH is not set (source esp-idf/export.sh)"; exit 1; }
+      b="$ROOT/build/idf-$target-release"
+      [ -n "${COMET_KEEP_BUILD:-}" ] || rm -rf "$b"
+      COMET_FW_TAG="$TAG" COMET_BUILD_SUFFIX="-release" "$ROOT/idf/build.sh" "$target" build
+      cp "$b/comet.bin"                         "$STAGED/$id.app"
+      cp "$b/bootloader/bootloader.bin"         "$STAGED/$id.bootloader"
+      cp "$b/partition_table/partition-table.bin" "$STAGED/$id.partitions"
+      cp "$b/ota_data_initial.bin"              "$STAGED/$id.otadata"
+      ;;
+    pio)
+      command -v "$PIO" >/dev/null || { echo "$id: PlatformIO ($PIO) not found"; exit 1; }
+      PLATFORMIO_BUILD_FLAGS="-DFIRMWARE_RELEASE_TAG='\"$TAG\"' -DFIRMWARE_VERSION='\"$TAG\"'" \
+        "$PIO" run -d "$ROOT" -e "$target"
+      b="$ROOT/.pio/build/$target"
+      local app0
+      app0="$(ls "$HOME"/.platformio/packages/framework-arduinoespressif32*/tools/partitions/boot_app0.bin 2>/dev/null | head -1)"
+      [ -n "$app0" ] || { echo "$id: boot_app0.bin not found in the PlatformIO framework"; exit 1; }
+      cp "$b/firmware.bin"   "$STAGED/$id.app"
+      cp "$b/bootloader.bin" "$STAGED/$id.bootloader"
+      cp "$b/partitions.bin" "$STAGED/$id.partitions"
+      cp "$app0"             "$STAGED/$id.otadata"
+      ;;
+    *) echo "$id: unknown build kind $kind"; exit 1 ;;
+  esac
+  # The image must carry the tag, or its About page and update check disagree with the
+  # release it is published under. (grep -c: -q stops early and trips pipefail.)
+  local n; n="$(strings "$STAGED/$id.app" | grep -c "$TAG" || true)"
+  [ "${n:-0}" -gt 0 ] || { echo "$id: image does not embed $TAG"; exit 1; }
+}
+
+# Per-board listings, the all-tags listing and the installer manifests of one channel.
+index_channel() {   # <TOUCH|BETA> <feed dir>
+  python3 - "$OUT/releases/$1" "$1" "$2" "$BOARDS_JSON" <<'PY'
+import json, os, sys
+arch, chan, feed, boards = sys.argv[1:]
+os.makedirs(arch, exist_ok=True); os.makedirs(feed, exist_ok=True)
+tags = sorted((d for d in os.listdir(arch) if d.startswith("beta_") and os.path.isdir(os.path.join(arch, d))),
+              key=lambda d: int(d[5:]))
+dump = lambda p, v: json.dump(v, open(p, "w"), indent=2)
+dump(os.path.join(arch, "index.json"), [{"name": t, "type": "dir"} for t in tags])
+for b in json.load(open(boards))["boards"]:
+    bid = b["id"]
+    have = [t for t in tags if os.path.exists(os.path.join(arch, t, "comet-%s.bin" % bid))]
+    dump(os.path.join(arch, "index-%s.json" % bid), [{"name": t, "type": "dir"} for t in have])
+    man = os.path.join(feed, "manifest-%s.json" % bid)
+    if not have:
+        if os.path.exists(man): os.remove(man)
+        continue
+    t = have[-1]
+    base = "https://firmware.cometmesh.org/releases/%s/%s/comet-%s" % (chan, t, bid)
+    dump(man, {
+        "name": "Comet for the %s%s" % (b["name"], " (test build)" if chan == "BETA" else ""),
+        "version": t, "new_install_prompt_erase": True,
+        "builds": [{"chipFamily": b.get("chip", "ESP32-S3"), "parts": [
+            {"path": base + "-bootloader.bin", "offset": 0x0},
+            {"path": base + "-partitions.bin", "offset": 0x8000},
+            {"path": base + "-otadata.bin",    "offset": 0xe000},
+            {"path": base + ".bin",            "offset": 0x10000}]}]})
+    print("%s %-20s %s" % (chan, bid, ", ".join(have)))
+PY
+}
+
+# 1. Start from what is published, so the listings stay complete. apps/ belongs to
+#    scripts/deploy-apps.sh.
+if [ "$PUSH" = 1 ]; then
+  mkdir -p "$OUT"
+  rsync -a --exclude 'apps/' "$DEST:$DEST_PATH/" "$OUT/" 2>/dev/null || echo "note: nothing published yet"
 fi
-echo "firmware data verified: every staged image embeds $TAG"
 
-# 3b. Web-flasher metadata for THIS channel (version.json + manifests -> the channel feed).
-python3 "$ROOT/scripts/build/gen-flasher-meta.py" "$TAG" "$FEED" "$ROOT/release-notes/$TAG.txt" "$MODE"
-
-# 3c. Mesh America Configurator provider catalog — STABLE only (it is a public
-#     flasher catalog served live from raw.githubusercontent main; test builds
-#     must not bump it). Points at the immutable releases/TOUCH/$TAG bins.
-if [ "$MODE" = "stable" ]; then
-  CATALOG="$ROOT/deploy/meshamerica-catalog.json"
-  python3 "$ROOT/deploy/gen-meshamerica-catalog.py" "$TAG" > "$CATALOG.tmp" && mv "$CATALOG.tmp" "$CATALOG"
-  mkdir -p "$OUT/meshamerica" && cp "$CATALOG" "$OUT/meshamerica/catalog.json"
-  if git -C "$ROOT" diff --quiet -- "$CATALOG"; then
-    echo "Mesh America catalog already current for $TAG"
-  elif [ "$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null)" = "main" ]; then
-    if git -C "$ROOT" commit -q -m "chore: refresh Mesh America catalog for $TAG" -- "$CATALOG" \
-         && git -C "$ROOT" push origin HEAD:main; then
-      echo "Mesh America catalog refreshed + pushed to main ($TAG)"
-    else
-      echo "WARN: Mesh America catalog commit/push failed — push deploy/meshamerica-catalog.json to main by hand"
-    fi
-  else
-    echo "NOTE: regenerated $CATALOG for $TAG but not on 'main' — commit + push it to main."
-  fi
-fi
-
-# 4. Publish to the VPS (Cloudflare caches at the edge).
-if [ -n "$DEST" ]; then
-  # Same exclusion on the way out, so a stale apps/ left in out/ by an older
-  # checkout cannot clobber the store either. The firmware release never
-  # publishes the store; deploy-apps.sh does, and only that.
-  rsync -av --exclude 'apps/' "$OUT/" "$DEST:$DEST_PATH/"
-  echo "published $TAG ($MODE) -> $DEST:$DEST_PATH"
+if [ "$MODE" = "--promote" ]; then
+  # 2s. Stable gets the very images the testers ran, no rebuild.
+  SRC="$OUT/releases/BETA/$TAG"
+  [ -d "$SRC" ] || { echo "no $SRC: release $TAG as a beta first"; exit 1; }
+  mkdir -p "$OUT/releases/TOUCH/$TAG"
+  while read -r id _ _ _; do
+    if [ -f "$SRC/comet-$id.bin" ]; then cp "$SRC/comet-$id"*.bin "$OUT/releases/TOUCH/$TAG/"
+    else echo "note: $TAG has no image for $id"; fi
+  done < <(boards)
+  index_channel TOUCH "$OUT/latest"
+  CHAN=stable
 else
-  echo "COMET_VPS not set — built + staged in $ARCH/$TAG + $FEED only (no publish)."
+  # 2b. Beta: build each board.
+  ARCH="$OUT/releases/BETA/$TAG"
+  mkdir -p "$ARCH"
+  STAGED="$(mktemp -d)"; trap 'rm -rf "$STAGED"' EXIT
+  while read -r id kind target _; do
+    echo "== $id ($kind $target)"
+    build_board "$id" "$kind" "$target"
+    cp "$STAGED/$id.app"        "$ARCH/comet-$id.bin"
+    cp "$STAGED/$id.bootloader" "$ARCH/comet-$id-bootloader.bin"
+    cp "$STAGED/$id.partitions" "$ARCH/comet-$id-partitions.bin"
+    cp "$STAGED/$id.otadata"    "$ARCH/comet-$id-otadata.bin"
+    merge "$ARCH/comet-$id-merged.bin" "$STAGED/$id.bootloader" "$STAGED/$id.partitions" \
+          "$STAGED/$id.otadata" "$STAGED/$id.app"
+    echo "$id: $(stat -c %s "$ARCH/comet-$id.bin") bytes"
+  done < <(boards)
+  index_channel BETA "$OUT/latest-beta"
+  index_channel TOUCH "$OUT/latest"   # so every board has a stable listing, empty or not
+  CHAN=beta
+fi
+
+# 3. Publish.
+if [ "$PUSH" = 1 ]; then
+  rsync -av --exclude 'apps/' "$OUT/" "$DEST:$DEST_PATH/"
+  echo "published $TAG ($CHAN) -> $DEST:$DEST_PATH"
+else
+  echo "staged in $OUT; publish with: rsync -av --exclude apps/ out/firmware/ <host>:$DEST_PATH/"
 fi
