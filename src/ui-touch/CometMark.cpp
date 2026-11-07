@@ -6,6 +6,8 @@
 #include <math.h>
 
 #include "CometMarkGeom.h"
+#include "CometMarkGlow.h"
+#include "../comet_mark_rgb.h"   // COMET_MARK_INK1: the e-paper still at its native size
 
 namespace {
 
@@ -14,6 +16,7 @@ constexpr int kDust = sizeof kCometDust / sizeof kCometDust[0];
 constexpr int kLinks = sizeof kCometLinks / sizeof kCometLinks[0];
 constexpr int kPath = sizeof kCometPath / sizeof kCometPath[0];
 constexpr int kArcs = sizeof kCometArcs / sizeof kCometArcs[0];
+constexpr int kSpine = sizeof kCometSpine / sizeof kCometSpine[0];
 
 // Boot scene timeline, ms.
 constexpr float kDimFrom = 180.0f, kDimTo = 560.0f;   // the still mark dims to its embers
@@ -48,8 +51,10 @@ void disc(const Ctx& c, lv_point_t at, float r_px, lv_color_t col, lv_opa_t opa)
   d.radius = LV_RADIUS_CIRCLE;
   d.bg_color = col;
   d.bg_opa = opa;
-  const lv_coord_t r = (lv_coord_t)LV_MAX(1, lroundf(r_px));
-  const lv_area_t a = { (lv_coord_t)(at.x - r), (lv_coord_t)(at.y - r), (lv_coord_t)(at.x + r - 1), (lv_coord_t)(at.y + r - 1) };
+  // a disc of diameter 2r centred on the pixel `at` (odd diameters stay symmetric)
+  const lv_coord_t dmt = (lv_coord_t)LV_MAX(2, lroundf(2.0f * r_px));
+  const lv_coord_t lo = (lv_coord_t)(dmt / 2), hi = (lv_coord_t)(dmt - 1 - dmt / 2);
+  const lv_area_t a = { (lv_coord_t)(at.x - lo), (lv_coord_t)(at.y - lo), (lv_coord_t)(at.x + hi), (lv_coord_t)(at.y + hi) };
   lv_draw_rect(c.dc, &d, &a);
 }
 
@@ -74,7 +79,7 @@ void line(const Ctx& c, lv_point_t a, lv_point_t b, float w_px, lv_color_t col, 
   d.color = col;
   d.opa = opa;
   d.width = (lv_coord_t)LV_MAX(1, lroundf(w_px));
-  d.round_start = d.round_end = 0;
+  d.round_start = d.round_end = d.width > 1;   // soft ends; a hairline has none to round
   lv_draw_line(c.dc, &d, &a, &b);
 }
 
@@ -134,6 +139,31 @@ void cometMarkDraw(lv_draw_ctx_t* dc, const lv_area_t& box, const CometMarkPaint
   // ---- e-paper: ink only, one still frame whatever the scene ----
   if (paint.paper) {
     const lv_color_t ink = paint.ink;
+    if (lv_area_get_width(&box) == COMET_MARK_W && lv_area_get_height(&box) == COMET_MARK_H) {
+      // At its own size: the hand-tuned 1-bit still the boot screen showed, pixel for
+      // pixel, as horizontal runs of ink.
+      lv_draw_rect_dsc_t d;
+      lv_draw_rect_dsc_init(&d);
+      d.bg_color = ink;
+      d.bg_opa = LV_OPA_COVER;
+      for (int y = 0; y < COMET_MARK_H; ++y) {
+        const uint8_t* row = &COMET_MARK_INK1[(size_t)y * COMET_MARK_INK_STRIDE];
+        int x = 0;
+        while (x < COMET_MARK_W) {
+          while (x < COMET_MARK_W && !(row[x >> 3] & (0x80 >> (x & 7)))) ++x;
+          const int x0 = x;
+          while (x < COMET_MARK_W && (row[x >> 3] & (0x80 >> (x & 7)))) ++x;
+          if (x > x0) {
+            const lv_area_t a = { (lv_coord_t)(box.x1 + x0), (lv_coord_t)(box.y1 + y), (lv_coord_t)(box.x1 + x - 1), (lv_coord_t)(box.y1 + y) };
+            lv_draw_rect(dc, &d, &a);
+          }
+        }
+      }
+      return;
+    }
+    // Any other size: the same drawing from the geometry, each dot with a hairline of
+    // paper around it so the lines never blob into it.
+    const lv_color_t paper = lv_color_white();
     for (int i = 0; i < kLinks; ++i) {
       const CometNode& a = kCometNodes[kCometLinks[i][0]];
       const CometNode& b = kCometNodes[kCometLinks[i][1]];
@@ -141,13 +171,16 @@ void cometMarkDraw(lv_draw_ctx_t* dc, const lv_area_t& box, const CometMarkPaint
     }
     for (uint8_t n : kCometHeadLinks) {
       const CometNode& a = kCometNodes[n];
-      line(c, head, c.pt(a.x, a.y), LV_MAX(1.0f, 1.4f * c.s), ink, LV_OPA_COVER);
+      line(c, head, c.pt(a.x, a.y), LV_MAX(1.0f, 1.3f * c.s), ink, LV_OPA_COVER);
     }
-    for (const CometNode& n : kCometNodes) disc(c, c.pt(n.x, n.y), LV_MAX(1.5f, n.r * c.s / 16.0f + 0.3f), ink, LV_OPA_COVER);
-    for (const CometNode& n : kCometDust) disc(c, c.pt(n.x, n.y), 1.0f, ink, LV_OPA_COVER);
+    for (const CometNode& n : kCometNodes) {
+      const float r = LV_MAX(1.5f, (n.r * 1.15f / 16.0f + 0.35f) * c.s);
+      disc(c, c.pt(n.x, n.y), r + 1.0f, paper, LV_OPA_COVER);
+      disc(c, c.pt(n.x, n.y), r, ink, LV_OPA_COVER);
+    }
     for (const CometArc& a : kCometArcs) wave(c, head, a, 1.0f, ink, LV_OPA_COVER);
-    disc(c, head, 5.2f * c.s, ink, LV_OPA_COVER);
-    ring(c, head, 8.0f * c.s, 1.0f, ink, LV_OPA_COVER);
+    disc(c, head, 7.0f * c.s, paper, LV_OPA_COVER);
+    disc(c, head, 5.4f * c.s, ink, LV_OPA_COVER);
     return;
   }
 
@@ -201,6 +234,31 @@ void cometMarkDraw(lv_draw_ctx_t* dc, const lv_area_t& box, const CometMarkPaint
     return delta > 0.0f ? clamp01(delta / 6.0f) : 0.0f;
   };
 
+  // the tail's own soft light, behind the mesh: a blurred picture of it, tinted. Only at
+  // the mark's own size (the boot splash); smaller marks (the lock screen) go without.
+  if (lv_area_get_width(&box) == kCometGlowW && lv_area_get_height(&box) == kCometGlowH) {
+    const float tail_on = scene == CometMarkScene::Still ? 0.55f
+                        : (ember * 0.55f + (arrive >= 0.0f || scene == CometMarkScene::Idle ? 0.45f : 0.0f));
+    const lv_color_t gcol = (scene == CometMarkScene::Still || (scene == CometMarkScene::Boot && arrive < 0.0f))
+                                ? paint.ink : paint.accent;
+    static lv_img_dsc_t img;
+    if (!img.data) {
+      img.header.cf = LV_IMG_CF_ALPHA_8BIT;
+      img.header.always_zero = 0;
+      img.header.w = kCometGlowW;
+      img.header.h = kCometGlowH;
+      img.data_size = sizeof kCometGlowA8;
+      img.data = kCometGlowA8;
+    }
+    lv_draw_img_dsc_t d;
+    lv_draw_img_dsc_init(&d);
+    d.recolor = gcol;
+    d.recolor_opa = LV_OPA_COVER;
+    d.opa = c.opa(0.42f * tail_on);
+    const lv_area_t ia = { box.x1, box.y1, (lv_coord_t)(box.x1 + kCometGlowW - 1), (lv_coord_t)(box.y1 + kCometGlowH - 1) };
+    if (d.opa > LV_OPA_MIN) lv_draw_img(dc, &d, &ia, &img);
+  }
+
   // links
   for (int i = 0; i < kLinks; ++i) {
     const CometNode& a = kCometNodes[kCometLinks[i][0]];
@@ -238,6 +296,7 @@ void cometMarkDraw(lv_draw_ctx_t* dc, const lv_area_t& box, const CometMarkPaint
     const lv_color_t col = flash > 0.0f ? lv_color_mix(white, paint.accent, (uint8_t)(255.0f * flash))
                                         : (lit > 0.0f ? paint.accent : paint.ink);
     const float r = n.r * c.s / 16.0f * (1.0f + 0.6f * flash);
+    if (r >= 1.4f) disc(c, c.pt(n.x, n.y), r * 1.9f + 0.5f, col, c.opa(o * 0.12f));   // a little glow round the brighter nodes
     disc(c, c.pt(n.x, n.y), LV_MAX(1.0f, r), col, c.opa(o));
     if (flash > 0.55f) ring(c, c.pt(n.x, n.y), r + (1.0f - flash) * 9.0f * c.s, 1.0f, paint.accent, c.opa((flash - 0.55f) * 1.6f));
   }

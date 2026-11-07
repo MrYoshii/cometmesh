@@ -19,7 +19,7 @@ One geometry, every output:
   JPEG: the mark and the wordmark on a dark green ground), seeded for the picture
   picker and the fallback when a chosen wallpaper cannot be read.
 
-Run:  python3 scripts/gen_comet_mark.py   (needs Pillow)
+Run:  python3 scripts/gen_comet_mark.py   (needs Pillow and SciPy)
 """
 import math
 import os
@@ -28,14 +28,18 @@ import random
 from PIL import Image, ImageDraw, ImageFilter
 
 W, H = 208, 110          # the box (drawing units = pixels at scale 1)
-HX, HY = 168, 72         # the head
-AXIS = 195.0             # tail direction, degrees (0 = right, y grows down: 195 = left, a little up)
-LENGTH = 154.0           # tail length
-BEND = -12.0             # the tail curves away (a dust tail bends), px at its end
-ROWS = [(0.11, 1), (0.22, 2), (0.35, 2), (0.50, 3), (0.66, 3), (0.83, 4), (1.00, 3)]   # (along, nodes)
-DUST = 9                 # loose motes beside the band: no links
-ARCS = [(13, 2.2, 0.95), (21, 2.0, 0.65), (29, 1.8, 0.38)]   # radio waves: radius, width, light
-ARC_HALF = 38.0          # half the opening angle of a wave, degrees
+HX, HY = 172, 74         # the head
+AXIS = 194.0             # tail direction, degrees (0 = right, y grows down: 194 = left, a little up)
+LENGTH = 176.0           # tail length
+BEND = 16.0             # the tail sweeps in a gentle curve, px at its end
+WIDTH = 30.0             # the tail's half-width at its end
+SPACING = 13.0           # rough distance between nodes (tighter near the head)
+DUST = 12                # loose motes beside the tail: no links
+# The bow wave in front of the head (comets have one; here it is also the radio):
+# radius, width, light.
+ARCS = [(11, 2.0, 0.85), (18, 1.6, 0.42)]
+ARC_HALF = 62.0          # half the opening angle of a wave, degrees
+SPINE = 18               # samples of the tail's centre line, for its glow
 SS = 6                   # supersampling for the bitmap
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -50,57 +54,107 @@ def along(s, off):
     return (HX + dx * LENGTH * s + nx * (bend + off), HY + dy * LENGTH * s + ny * (bend + off))
 
 
+def half_width(s):
+    """The tail opens from the head and keeps widening as it streams away."""
+    s = max(0.0, min(1.0, s))
+    return 1.5 + WIDTH * s ** 0.8
+
+
+# The tail's rays: where each ends across the tail (in half-widths), how far it reaches
+# (along), and where its first node sits.
+RAYS = [(-1.0, 0.80, 0.24), (-0.48, 0.95, 0.15), (0.02, 1.00, 0.08), (0.52, 0.90, 0.19), (1.0, 0.74, 0.30)]
+
+
 def geometry():
-    rnd = random.Random(7)
-    nodes = []           # (x, y, r, row, dist)
-    rows = []
-    for ri, (s, count) in enumerate(ROWS):
-        half = 3.0 + 24.0 * s ** 1.15       # the band widens away from the head
-        row = []
-        for k in range(count):
-            off = 0.0 if count == 1 else -half + 2 * half * k / (count - 1)
-            off += rnd.uniform(-0.18, 0.18) * half / max(1, count - 1) * 2
-            ss = s + rnd.uniform(-0.025, 0.025)
-            x, y = along(ss, off)
+    import heapq
+    rnd = random.Random(5)
+    nodes = []           # (x, y, r, s, dist, ray)
+    rays = []
+    for ri, (end_off, reach, first) in enumerate(RAYS):
+        ray = []
+        sv = first
+        while sv <= reach + 1e-6:
+            off = end_off * half_width(sv) * 0.95 + rnd.uniform(-0.8, 0.8)
+            x, y = along(sv + rnd.uniform(-0.01, 0.01), off)
             dist = math.hypot(x - HX, y - HY)
-            r = 0.85 + 1.9 * (1.0 - dist / 165.0)
-            row.append(len(nodes))
-            nodes.append((x, y, r, ri, dist))
-        rows.append(row)
+            r = 0.8 + 1.5 * max(0.0, 1.0 - dist / 160.0) ** 1.1
+            ray.append(len(nodes))
+            nodes.append((x, y, r, sv, dist, ri))
+            sv += 0.075 + 0.12 * sv     # the hops lengthen down the tail
+        rays.append(ray)
+    P = [(n[0], n[1]) for n in nodes]
     links = set()
-    for ri in range(1, len(rows)):
-        for n in rows[ri]:
-            prev = sorted(rows[ri - 1], key=lambda m: math.dist(nodes[n][:2], nodes[m][:2]))
-            for m in prev[:2]:
+    for ray in rays:                 # each ray: a stream of hops
+        for a_, b_ in zip(ray, ray[1:]):
+            links.add(tuple(sorted((a_, b_))))
+    # cross links between neighbouring rays: the mesh between the streams
+    for ri in range(len(rays) - 1):
+        for n in rays[ri][::2]:
+            if nodes[n][3] > 0.62:
+                continue   # the far tail streams free: rays, not a ladder
+            ahead = [j for j in rays[ri + 1] if nodes[j][3] > nodes[n][3]] or rays[ri + 1]
+            m = min(ahead, key=lambda j: math.dist(P[n], P[j]))   # diagonal: woven, not a ladder
+            if math.dist(P[n], P[m]) < SPACING * (0.8 + 0.9 * nodes[n][3]):
                 links.add(tuple(sorted((n, m))))
-        for k in range(len(rows[ri]) - 1):
-            links.add((rows[ri][k], rows[ri][k + 1]))
-    head_links = list(rows[0])
-    # A message hopping in to the head: from the middle of the last row, always to the
-    # linked node one row nearer the head that is closest to the centre line.
-    path = [rows[-1][len(rows[-1]) // 2]]
-    for ri in range(len(rows) - 2, -1, -1):
-        cur = path[-1]
-        cands = [m for m in rows[ri] if tuple(sorted((cur, m))) in links]
-        path.append(min(cands, key=lambda m: abs(nodes[m][1] - along(ROWS[ri][0], 0)[1])))
+    links = sorted(links)
+    head_links = [ray[0] for ray in rays[1:4]]   # the inner rays start at the head
+    # The message's way in: the shortest hop path from the end of the longest ray.
+    adj = {i: [] for i in range(len(nodes))}
+    for a_, b_ in links:
+        w = math.dist(P[a_], P[b_])
+        adj[a_].append((b_, w)); adj[b_].append((a_, w))
+    start = rays[2][-1]
+    best_d = {start: 0.0}; prev = {}
+    q = [(0.0, start)]
+    while q:
+        d, u = heapq.heappop(q)
+        if d > best_d.get(u, 1e9):
+            continue
+        for v, w in adj[u]:
+            c = d + w + 4.0
+            if c < best_d.get(v, 1e9):
+                best_d[v] = c; prev[v] = u
+                heapq.heappush(q, (c, v))
+    end = min(head_links, key=lambda i: best_d.get(i, 1e9))
+    path = [end]
+    while path[-1] != start:
+        path.append(prev[path[-1]])
+    path.reverse()
     dust = []
-    for _ in range(DUST):
-        s = rnd.uniform(0.3, 1.05)
-        half = 3.0 + 24.0 * s ** 1.15
-        off = rnd.choice((-1, 1)) * half * rnd.uniform(1.2, 1.7)
-        x, y = along(s, off)
-        if 2 < x < W - 2 and 2 < y < H - 2:
-            dust.append((x, y, rnd.uniform(0.5, 0.9), math.hypot(x - HX, y - HY)))
-    return nodes, sorted(links), head_links, path, dust
+    while len(dust) < DUST:
+        s_ = rnd.uniform(0.2, 1.0)
+        off = rnd.uniform(-1.25, 1.25) * half_width(s_)
+        x, y = along(s_, off)
+        if 3 < x < W - 3 and 3 < y < H - 3 and all(math.dist((x, y), p_) > 4 for p_ in P):
+            dust.append((x, y, rnd.uniform(0.55, 0.9), math.hypot(x - HX, y - HY)))
+    spine = []
+    for k in range(SPINE + 1):
+        s_ = k / SPINE
+        x, y = along(s_, 0)
+        spine.append((x, y, half_width(s_), max(0.0, 1.0 - s_) ** 1.4))
+    nodes = [n[:5] for n in nodes]
+    return nodes, links, head_links, path, dust, spine
 
 
 def light(d):
     """How bright a part of the tail is, from its distance to the head (1 near, ~0.25 far)."""
-    return 0.25 + 0.75 * max(0.0, 1.0 - d / 160.0) ** 1.3
+    return 0.18 + 0.82 * max(0.0, 1.0 - d / 165.0) ** 1.5
 
 
-def render_bitmap(nodes, links, head_links, dust):
-    img = Image.new("L", (W * SS, H * SS), 0)
+def tail_glow(spine, scale, peak):
+    """The tail's own soft light behind the mesh: a blurred, fading band."""
+    g = Image.new("L", (W * scale, H * scale), 0)
+    gd = ImageDraw.Draw(g)
+    for (x0, y0, w0, l0), (x1, y1, w1, l1) in zip(spine, spine[1:]):
+        v = int(peak * (l0 + l1) / 2)
+        gd.line([(x0 * scale, y0 * scale), (x1 * scale, y1 * scale)], fill=v, width=int((w0 + w1) * 0.85 * scale))
+        rr = w1 * 0.85 * scale
+        gd.ellipse([x1 * scale - rr, y1 * scale - rr, x1 * scale + rr, y1 * scale + rr], fill=v)
+    return g.filter(ImageFilter.GaussianBlur(scale * 9))
+
+
+def render_bitmap(nodes, links, head_links, dust, spine):
+    img = tail_glow(spine, SS, 120)
     d = ImageDraw.Draw(img)
 
     def P(x, y):
@@ -109,7 +163,7 @@ def render_bitmap(nodes, links, head_links, dust):
     for a, b in links:
         na, nb = nodes[a], nodes[b]
         v = int(255 * 0.55 * light((na[4] + nb[4]) / 2))
-        d.line([P(na[0], na[1]), P(nb[0], nb[1])], fill=v, width=int(1.1 * SS))
+        d.line([P(na[0], na[1]), P(nb[0], nb[1])], fill=v, width=int(1.1 * SS), joint="curve")
     for n in head_links:
         nn = nodes[n]
         d.line([P(HX, HY), P(nn[0], nn[1])], fill=int(255 * 0.7), width=int(1.3 * SS))
@@ -126,7 +180,7 @@ def render_bitmap(nodes, links, head_links, dust):
     # the head: glow, then the core
     glow = Image.new("L", img.size, 0)
     gd = ImageDraw.Draw(glow)
-    for r, v in ((12, 90), (8, 170), (5.5, 255)):
+    for r, v in ((16, 70), (10, 160), (6, 255)):
         gd.ellipse([P(HX - r, HY - r), P(HX + r, HY + r)], fill=v)
     glow = glow.filter(ImageFilter.GaussianBlur(SS * 2.0))
     img = Image.composite(Image.new("L", img.size, 255), img, glow)
@@ -137,26 +191,43 @@ def render_bitmap(nodes, links, head_links, dust):
 
 
 def render_ink(nodes, links, head_links, dust):
-    """The e-paper still: 1-bit ink, drawn like CometMark.cpp's paper path."""
-    img = Image.new("1", (W, H), 1)
+    """The e-paper still: 1-bit ink. Drawn large and thresholded, so every node is a
+    round dot and every line an even stroke (no stray pixels from a 1-px renderer)."""
+    S = 8
+    img = Image.new("L", (W * S, H * S), 255)
     d = ImageDraw.Draw(img)
+
+    def P(x, y):
+        return (x * S, y * S)
+
+    def dot(x, y, r):
+        d.ellipse([P(x - r, y - r), P(x + r, y + r)], fill=0)
+
     for a, b in links:
         na, nb = nodes[a], nodes[b]
-        d.line([(round(na[0]), round(na[1])), (round(nb[0]), round(nb[1]))], fill=0, width=1)
+        d.line([P(na[0], na[1]), P(nb[0], nb[1])], fill=0, width=int(1.05 * S))
     for n in head_links:
         nn = nodes[n]
-        d.line([(HX, HY), (round(nn[0]), round(nn[1]))], fill=0, width=1)
-    for x, y, r, _row, _dist in nodes:
-        rr = max(1.5, r + 0.3)
-        d.ellipse([round(x - rr), round(y - rr), round(x + rr) - 1, round(y + rr) - 1], fill=0)
-    for x, y, _r, _dist in dust:
-        d.rectangle([round(x) - 1, round(y) - 1, round(x), round(y)], fill=0)
+        d.line([P(HX, HY), P(nn[0], nn[1])], fill=0, width=int(1.3 * S))
+    def paper_dot(x, y, r):   # a dot with a hairline of paper around it, so lines never blob into it
+        d.ellipse([P(x - r - 0.9, y - r - 0.9), P(x + r + 0.9, y + r + 0.9)], fill=255)
+        dot(x, y, r)
+
+    for x, y, r, _s, _dist in nodes:
+        paper_dot(x, y, max(1.5, r * 1.15 + 0.35))
+    for x, y, r_, _dist in dust:   # only the clear motes: a speck too near a line reads as a stray pixel
+        if r_ >= 0.7 and all(math.dist((x, y), (nn[0], nn[1])) > 6 for nn in nodes):
+            dot(x, y, 1.0)
     for rad, wid, _lv in ARCS:
         rr = rad + 1
-        d.arc([HX - rr, HY - rr, HX + rr, HY + rr], -ARC_HALF, ARC_HALF, fill=0, width=2)
-    d.ellipse([HX - 5, HY - 5, HX + 5, HY + 5], fill=0)
-    d.ellipse([HX - 8, HY - 8, HX + 8, HY + 8], outline=0, width=1)
-    return img
+        d.arc([P(HX - rr, HY - rr), P(HX + rr, HY + rr)], -ARC_HALF, ARC_HALF, fill=0, width=int(2.0 * S))
+        for ang in (-ARC_HALF, ARC_HALF):   # round ends
+            ex = HX + (rr - 1.0) * math.cos(math.radians(ang)); ey = HY + (rr - 1.0) * math.sin(math.radians(ang))
+            dot(ex, ey, 1.0)
+    d.ellipse([P(HX - 7.0, HY - 7.0), P(HX + 7.0, HY + 7.0)], fill=255)
+    dot(HX, HY, 5.4)
+    small = img.resize((W, H), Image.BOX)
+    return small.point(lambda v: 0 if v < 140 else 255).convert("1")
 
 
 def write_bitmap(img, ink):
@@ -204,7 +275,25 @@ def write_bitmap(img, ink):
         f.write("};\n#endif\n")
 
 
-def write_geom(nodes, links, head_links, path, dust):
+def write_glow(spine):
+    """The tail's soft light as an 8-bit alpha image at the mark's own size, which the
+    drawing tints: LVGL cannot blur, but it can lay down a blurred picture."""
+    g = tail_glow(spine, 2, 255).resize((W, H), Image.LANCZOS)
+    mx = max(g.get_flattened_data() if hasattr(g, 'get_flattened_data') else g.getdata()) or 1
+    g = g.point(lambda v: min(255, round(v * 255 / mx)))
+    px = list(g.get_flattened_data()) if hasattr(g, 'get_flattened_data') else list(g.getdata())
+    with open(os.path.join(ROOT, "src", "ui-touch", "CometMarkGlow.h"), "w") as f:
+        f.write("// SPDX-License-Identifier: GPL-3.0-or-later\n")
+        f.write("// The Comet mark's tail glow: 8-bit alpha, %d x %d (the mark's box).\n" % (W, H))
+        f.write("// Generated by scripts/gen_comet_mark.py (edit that, not this).\n#pragma once\n#include <stdint.h>\n\n")
+        f.write("static const int16_t kCometGlowW = %d, kCometGlowH = %d;\n" % (W, H))
+        f.write("static const uint8_t kCometGlowA8[] = {\n")
+        for i in range(0, len(px), 20):
+            f.write("  " + ",".join(str(v) for v in px[i:i + 20]) + ",\n")
+        f.write("};\n")
+
+
+def write_geom(nodes, links, head_links, path, dust, spine):
     p = os.path.join(ROOT, "src", "ui-touch", "CometMarkGeom.h")
     with open(p, "w") as f:
         f.write("// SPDX-License-Identifier: GPL-3.0-or-later\n")
@@ -235,6 +324,12 @@ def write_geom(nodes, links, head_links, path, dust):
             f.write("  {%d, %d, %d},\n" % (rad * 16, round(wid * 16), round(255 * lv)))
         f.write("};\n")
         f.write("static const int16_t kCometArcHalfDeg = %d;\n" % round(ARC_HALF))
+        f.write("// The tail's centre line, head to end: position and half-width in 1/16 units, light 0..255.\n")
+        f.write("struct CometSpine { int16_t x, y, hw; uint8_t light; };\n")
+        f.write("static const CometSpine kCometSpine[] = {\n")
+        for x, y, hw, lv in spine:
+            f.write("  {%d, %d, %d, %d},\n" % (round(x * 16), round(y * 16), round(hw * 16), round(255 * lv)))
+        f.write("};\n")
 
 
 def write_svg(nodes, links, head_links, dust):
@@ -326,10 +421,11 @@ def write_placeholder(img):
 
 
 if __name__ == "__main__":
-    nodes, links, head_links, path, dust = geometry()
+    nodes, links, head_links, path, dust, spine = geometry()
     assert len(nodes) < 256
-    write_geom(nodes, links, head_links, path, dust)
-    img = render_bitmap(nodes, links, head_links, dust)
+    write_geom(nodes, links, head_links, path, dust, spine)
+    write_glow(spine)
+    img = render_bitmap(nodes, links, head_links, dust, spine)
     ink = render_ink(nodes, links, head_links, dust)
     write_bitmap(img, ink)
     ink.convert("L").resize((W * 3, H * 3), Image.NEAREST).save(os.path.join(os.environ.get("TMPDIR", "/tmp"), "comet_mark_ink.png"))
