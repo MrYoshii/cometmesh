@@ -1,5 +1,5 @@
 <p align="center">
-  <img alt="COMET: one radio, every mesh" src="assets/cometmesh-banner.svg" width="900">
+  <img alt="Comet: one radio, every mesh" src="assets/cometmesh-banner.svg" width="900">
 </p>
 
 <p align="center"><b>One radio, every mesh.</b> &middot; open source &middot; GPL-3.0</p>

@@ -8,9 +8,9 @@
   --ink:#E6EBED; --ink2:#D2D9DD; --mut:#B0BAC0; --dim:#8C979D;
   --line:#1C2428;
   --control:#161D21; --control-hi:#222C31;
-  --teal:#15B6A6; --cyan:#19D6C2;
-  --accent-fill:#15B6A6; --on-accent:#00120F;
-  --accent-soft:rgba(25,214,194,.13);
+  --teal:#16C46B; --cyan:#19E57D;
+  --accent-fill:#16C46B; --on-accent:#002010;
+  --accent-soft:rgba(25,229,125,.13);
   --bar:rgba(0,0,0,.5);
   --frame:#16191D; --frame-edge:#2A3036;
   --warn:#F2A33A; --warn-bg:rgba(242,163,58,.13); --warn-line:rgba(242,163,58,.38);
@@ -26,13 +26,13 @@ body{overscroll-behavior:none}
 body{
   min-height:100%; display:flex; flex-direction:column;
   color:var(--ink); background:
-    radial-gradient(1200px 600px at 20% -10%, rgba(25,214,194,.10), transparent 60%),
+    radial-gradient(1200px 600px at 20% -10%, rgba(25,229,125,.10), transparent 60%),
     radial-gradient(900px 500px at 90% 110%, rgba(90,169,255,.07), transparent 60%),
     var(--bg);
   font-family:'Montserrat',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; font-weight:500;
   -webkit-font-smoothing:antialiased;
 }
-::selection{background:rgba(25,214,194,.32)}
+::selection{background:rgba(25,229,125,.32)}
 
 /* ---- the bar ---- */
 .bar{
@@ -165,7 +165,7 @@ body.fill .link-help{position:fixed; z-index:25; left:max(8px, env(safe-area-ins
 /* ---- the node link ---- */
 .badge{max-width:46vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .badge.wait{background:var(--control); color:var(--mut); box-shadow:inset 0 0 0 1px var(--line)}
-.badge.up{background:var(--accent-soft); color:var(--cyan); box-shadow:inset 0 0 0 1px rgba(25,214,194,.38)}
+.badge.up{background:var(--accent-soft); color:var(--cyan); box-shadow:inset 0 0 0 1px rgba(25,229,125,.38)}
 .badge.bad{background:var(--warn-bg); color:var(--warn); box-shadow:inset 0 0 0 1px var(--warn-line)}
 .link-help{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:10px auto 0; max-width:900px;
   padding:10px 14px; border-radius:12px; background:var(--warn-bg); box-shadow:inset 0 0 0 1px var(--warn-line);

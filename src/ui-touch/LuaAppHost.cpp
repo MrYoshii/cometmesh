@@ -723,7 +723,7 @@ int uiChart(lua_State* L) {   // wada.ui.chart(w, h, points, color1 [, color2] [
   ud->gen = s_ui_gen;
   ud->obj = ch;
   ud->n_ser = 0;
-  ud->ser[0] = lv_chart_add_series(ch, lv_color_hex(argColor(L, 4, 0x15B6A6)), LV_CHART_AXIS_PRIMARY_Y);
+  ud->ser[0] = lv_chart_add_series(ch, lv_color_hex(argColor(L, 4, 0x16C46B)), LV_CHART_AXIS_PRIMARY_Y);
   ud->n_ser = 1;
   if (!lua_isnoneornil(L, 5)) {
     ud->ser[1] = lv_chart_add_series(ch, lv_color_hex(argColor(L, 5, 0x7A7F87)), LV_CHART_AXIS_PRIMARY_Y);
@@ -1013,7 +1013,7 @@ int uiScroll(lua_State* L) {
     lv_obj_add_flag(s_h->body, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_scroll_dir(s_h->body, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(s_h->body, LV_SCROLLBAR_MODE_AUTO);
-    lv_obj_set_style_bg_color(s_h->body, lv_color_hex(luaInkColor(0x15B6A6)), LV_PART_SCROLLBAR);
+    lv_obj_set_style_bg_color(s_h->body, lv_color_hex(luaInkColor(0x16C46B)), LV_PART_SCROLLBAR);
     // 60% ink over the dark night ground stayed dark; over paper-white it blends
     // up past the 1-bit threshold and disappears, so keep the e-paper bar solid.
 #if defined(HAS_TDECK_PRO)
@@ -1689,7 +1689,7 @@ int mpMarker(lua_State* L) {
   MapUd* u = checkMap(L);
   if (!u->v) return 0;
   lua_pushboolean(L, luaHostMapMarker(u->v, luaL_checknumber(L, 2), luaL_checknumber(L, 3),
-                                      (uint32_t)luaL_optinteger(L, 4, 0x15B6A6),
+                                      (uint32_t)luaL_optinteger(L, 4, 0x16C46B),
                                       (int)luaL_optinteger(L, 5, 8)));
   return 1;   // false = the point is outside the view, so nothing was drawn
 }
@@ -1698,7 +1698,7 @@ int mpLine(lua_State* L) {
   if (!u->v) return 0;
   lua_pushboolean(L, luaHostMapLine(u->v, luaL_checknumber(L, 2), luaL_checknumber(L, 3),
                                     luaL_checknumber(L, 4), luaL_checknumber(L, 5),
-                                    (uint32_t)luaL_optinteger(L, 6, 0x15B6A6),
+                                    (uint32_t)luaL_optinteger(L, 6, 0x16C46B),
                                     (int)luaL_optinteger(L, 7, 2)));
   return 1;
 }
@@ -2957,7 +2957,7 @@ void openWada(lua_State* L) {
   // `border` is the exception: it mirrors the live theme, so on e-paper it is
   // already the light day border and is inverted when an app passes it on.
   lua_createtable(L, 0, 9);
-  lua_pushinteger(L, 0x15B6A6); lua_setfield(L, -2, "accent");
+  lua_pushinteger(L, 0x16C46B); lua_setfield(L, -2, "accent");
   lua_pushinteger(L, 0xE6E9ED); lua_setfield(L, -2, "text");
   lua_pushinteger(L, 0x7A7F87); lua_setfield(L, -2, "sub");
   lua_pushinteger(L, 0x000000); lua_setfield(L, -2, "bg");      // the page ground (matches the firmware)

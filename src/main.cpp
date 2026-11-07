@@ -24,6 +24,7 @@ static SntpClockPush s_sntp_push;
 #endif
 #if defined(ESP32_PLATFORM) && defined(HAS_TOUCH_UI)
 #include <Preferences.h>
+#include <helpers/esp32/PrefsQuiet.h>
 #include <esp_system.h>
 #include <esp_ota_ops.h>     // recovery-first boot: running slot + reset the boot pointer to factory
 #include <esp_partition.h>   // find/erase otadata so the bootloader returns to the recovery
@@ -1179,7 +1180,7 @@ void setup() {
    #endif
    #endif
     bool setup_done = false;
-    { Preferences _p; if (_p.begin("touch", true)) {
+    { Preferences _p; if (prefsBeginRO(_p, "touch")) {
         setup_done = _p.getBool("setup_ok", false);  // finished first-run setup
         _p.end();
     } }

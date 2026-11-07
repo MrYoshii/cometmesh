@@ -11,6 +11,7 @@
 #include "SdNvsPrefs.h"   // NVS, or SD /meshcomod fallback when NVS is unusable (Launcher)
 
 #include <Preferences.h>
+#include "PrefsQuiet.h"
 #include <SPIFFS.h>
 #include "esp_system.h"   // esp_random()
 #include "mbedtls/md.h"   // SHA-256 for the unlock PIN
@@ -58,7 +59,7 @@ static const uint8_t  DEFAULT_KB_BL            = 2;          // auto
 static const uint8_t  DEFAULT_KB_LAYOUT        = 0;          // English
 static const uint8_t  DEFAULT_KB_SECONDARY     = 0;          // None
 static const uint32_t DEFAULT_LOCK_COLOR       = 0xE6F2FFu;  // soft white
-static const uint32_t DEFAULT_ACCENT           = 0x15B6A6u;  // brand teal
+static const uint32_t DEFAULT_ACCENT           = 0x16C46Bu;  // Comet green
 static const bool     DEFAULT_DC_SHOW          = true;
 static const uint8_t  DEFAULT_SIG_PROBE_EN     = 1;          // signal discover probe ON
 static const uint16_t DEFAULT_SIG_POLL_MIN     = 5;          // minutes between probes
@@ -1714,7 +1715,7 @@ bool touchPrefsReadUseSdAtBoot() {
 
   bool nvs_val = false;
   Preferences p;
-  if (p.begin(TOUCH_NS, true)) {
+  if (prefsBeginRO(p, TOUCH_NS)) {
     nvs_val = p.getBool(KEY_USE_SD_STORAGE, false);
     p.end();
   }
@@ -1808,7 +1809,7 @@ static void bootUiRotationMirror(uint8_t rot) {
 uint8_t touchPrefsGetBootUiRotation() {
   Preferences nvs;
   uint8_t r = 0xFF;
-  if (nvs.begin(TOUCH_NS, true)) {
+  if (prefsBeginRO(nvs, TOUCH_NS)) {
     if (nvs.isKey(KEY_BOOT_UI_ROTATION)) r = nvs.getUChar(KEY_BOOT_UI_ROTATION, 0xFF);
     nvs.end();
   }

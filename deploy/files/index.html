@@ -15,18 +15,18 @@
     location.replace(location.href.replace(/^http:/, 'https:'));
 </script>
 <style>
-  :root{--bg:#fff;--bg2:#f4f6f2;--ink:#15181e;--mut:#5d6770;--line:#e5e8e2;--teal:#15b6a6;--cyan:#19d6c2;
-    --teal-ink:#0e8d80;--warn:#b4542d;--warn-bg:#fdf1ec;--risk:#b3261e;--risk-bg:#fdecea;color-scheme:light}
+  :root{--bg:#fff;--bg2:#f4f6f2;--ink:#15181e;--mut:#5d6770;--line:#e5e8e2;--teal:#0b8f4a;--cyan:#16c46b;
+    --teal-ink:#0a7a3f;--warn:#b4542d;--warn-bg:#fdf1ec;--risk:#b3261e;--risk-bg:#fdecea;color-scheme:light}
   *{box-sizing:border-box;margin:0;padding:0}
   [hidden]{display:none!important}
   body{font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);
     min-height:100vh;display:flex;flex-direction:column;align-items:center;-webkit-font-smoothing:antialiased}
   body::before{content:"";position:fixed;inset:-25% -10% auto -10%;height:60vh;z-index:-1;
-    background:radial-gradient(44vw 36vh at 50% 0%,rgba(25,214,194,.14),transparent 62%)}
+    background:radial-gradient(44vw 36vh at 50% 0%,rgba(25,229,125,.14),transparent 62%)}
   a{color:var(--teal-ink);text-decoration:none}
   .mono{font-family:'JetBrains Mono',ui-monospace,monospace}
   header{text-align:center;padding:44px 20px 4px}
-  header svg{width:92px;height:auto}
+  header .mark{display:block;width:150px;height:auto;margin:0 auto}
   h1{font-family:'JetBrains Mono',ui-monospace,monospace;font-weight:700;letter-spacing:3px;font-size:clamp(1.5rem,5vw,2.1rem);margin-top:6px}
   h1 span{color:var(--teal)}
   .tag{color:var(--mut);margin-top:6px}
@@ -106,12 +106,7 @@
 </head>
 <body>
 <header>
-  <svg viewBox="0 0 180 120" fill="none" aria-hidden="true">
-    <path d="M10 60 L50 108 L90 60 L130 108 L170 60" stroke="#15181E" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M10 60 L50 12 L90 60 L130 12 L170 60" stroke="#15181E" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
-    <g fill="#19d6c2"><circle cx="10" cy="60" r="9"/><circle cx="50" cy="12" r="9"/><circle cx="50" cy="108" r="9"/>
-      <circle cx="90" cy="60" r="9"/><circle cx="130" cy="12" r="9"/><circle cx="130" cy="108" r="9"/><circle cx="170" cy="60" r="9"/></g>
-  </svg>
+  <img class="mark" src="comet-mark.svg" alt="" width="208" height="110">
   <h1>COMET <span>FILES</span></h1>
   <p class="tag">The SD card and internal storage of your device, over a USB cable.</p>
 </header>

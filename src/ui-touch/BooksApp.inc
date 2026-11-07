@@ -1370,6 +1370,7 @@ static void bkdTaskFn(void*) {
           if (total && pos >= total) break;
           if (kBkdRing - (s_bkd_head - s_bkd_tail) < 4096) { parked = true; break; }
           const uint32_t now = millis();
+#ifdef COMET_BOOKS_DIAG   // download statistics every 10 s, for tuning
           if (now - log_at >= 10000) {
             const uint32_t dt = now - log_at;
             Serial.printf("[bkd] net %u KB/s, card %u KB/s (slowest tick %u ms), ring %u KB, int free %u "
@@ -1382,6 +1383,7 @@ static void bkdTaskFn(void*) {
                           (unsigned)uxTaskGetStackHighWaterMark(nullptr));
             log_at = now; net_bytes = 0; s_bkd_card_bytes = 0; s_bkd_tick_max = 0;
           }
+#endif
           if (now - win_start >= 5000) {
             if (win_bytes < 16 * 1024) {
               Serial.printf("[bkd] link slow (%u B in 5 s): reconnecting\n", (unsigned)win_bytes);

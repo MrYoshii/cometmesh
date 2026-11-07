@@ -112,6 +112,11 @@ bool TDeckProDisplay::begin() {
   memset(_sent, 0xFF, MONO_BYTES);
 
   SPI.begin(PIN_TFT_SCLK, PIN_TFT_MISO, PIN_TFT_MOSI, PIN_TFT_CS);
+  // GxEPD2 presets RST and DC with digitalWrite before its pinMode(OUTPUT). On Arduino 3
+  // that write fails ("IO 9 is not set as GPIO") until the pin is claimed as a GPIO, so
+  // claim them as inputs first: no level is driven, and the preset then lands.
+  if (PIN_TFT_RST >= 0) pinMode(PIN_TFT_RST, INPUT);
+  if (PIN_TFT_DC >= 0) pinMode(PIN_TFT_DC, INPUT);
   _epd.init(115200, true, 2, false, SPI,
             SPISettings(2000000, MSBFIRST, SPI_MODE0));
   _epd.setRotation(0);

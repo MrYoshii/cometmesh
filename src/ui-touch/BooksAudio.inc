@@ -67,8 +67,6 @@ static int bkaTrackAt(double t) {
 
 // Open the track at byte `from`. On success: the client streams the body, and *total is
 // the whole file's size (from Content-Range, or Content-Length for a 200 reply).
-#include <lwip/sockets.h>   // the socket probe in bkaOpen
-
 static bool bkaOpen(HTTPClient& http, WiFiClientSecure& tls, WiFiClient& plain, const BkaTrack& tr,
                     uint32_t from, uint32_t* total, int* code_out) {
   char url[300];
@@ -95,15 +93,8 @@ static bool bkaOpen(HTTPClient& http, WiFiClientSecure& tls, WiFiClient& plain, 
     if (code < 0) {   // no HTTP answer at all: say why (connect, DNS, TLS, memory)
       char err[96] = "";
       if (https) tls.lastError(err, sizeof err);
-      // Is a socket still to be had? (lwIP has CONFIG_LWIP_MAX_SOCKETS of them.)
-      const int probe = lwip_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-      const int probe_errno = errno;
-      if (probe >= 0) lwip_close(probe);
-      Serial.printf("[books] socket probe: %s (fd %d, errno %d)\n", probe >= 0 ? "free" : "NONE LEFT", probe, probe_errno);
-      Serial.printf("[books] open %s: %s, tls=\"%s\", wifi status %d rssi %d, internal free=%u largest=%u\n", url,
-                    HTTPClient::errorToString(code).c_str(), err, (int)WiFi.status(), (int)WiFi.RSSI(),
-                    (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
-                    (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+      Serial.printf("[books] open failed: %s%s%s\n", HTTPClient::errorToString(code).c_str(),
+                    err[0] ? ", tls: " : "", err);
     }
     http.end();
     return false;
@@ -338,6 +329,7 @@ static void bkaDecoderRun() {
   s_bka_pos = s_bka_start_t;
 
   while (!s_bka_stop) {
+#ifdef COMET_BOOKS_DIAG   // playback statistics every 10 s, for tuning
     if (millis() - log_at >= 10000) {
       const uint32_t dt = millis() - log_at;
       Serial.printf("[bka] fetch %u KB/s (book %u kbit/s), ring %u KB, underruns %u, slow writes %u (max %u ms), "
@@ -353,6 +345,7 @@ static void bkaDecoderRun() {
       underruns = slow_writes = max_write_ms = max_dec_ms = 0;
       dry = max_gap_us = 0;
     }
+#endif
     if (in_count < sizeof w->input / 2) {   // top up from the ring
       if (in_start) { memmove(w->input, w->input + in_start, in_count); in_start = 0; }
       in_count += bkaRingGet(w->input + in_count, sizeof w->input - in_count);

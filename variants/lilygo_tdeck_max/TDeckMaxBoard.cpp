@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "TDeckMaxBoard.h"
 #include <Preferences.h>
+#include <helpers/esp32/PrefsQuiet.h>
 #include "PagerHaptics.h"   // DRV2605 vibration motor (variants/lilygo_tlora_pager, shared)
 #define XPOWERS_CHIP_SY6970
 #include <XPowersLib.h>   // PowersSY6970: the charger
@@ -293,7 +294,7 @@ bool TDeckMaxBoard::setBatteryCapacity(uint16_t mah) {
 
 uint16_t TDeckMaxBoard::batteryCapacitySetting() {
   Preferences p;
-  if (!p.begin("maxhw", true)) return TDMAX_GAUGE_DESIGN_MAH;
+  if (!prefsBeginRO(p, "maxhw")) return TDMAX_GAUGE_DESIGN_MAH;
   const uint16_t v = maxCapTarget(p);
   p.end();
   return v;

@@ -17,7 +17,7 @@ static constexpr uint32_t   kStepMs = 300;   // tick period (a touch slower than
 // Palette (hex literals so the module is self-contained).
 static constexpr uint32_t kColBg   = 0x0A0B0C;   // playfield background
 static constexpr uint32_t kColFood = 0xE0584C;   // food
-static constexpr uint32_t kColBody = 0x15B6A6;   // snake body (brand teal)
+static constexpr uint32_t kColBody = 0x16C46B;   // snake body (Comet green)
 static constexpr uint32_t kColText = 0xE6EAEE;
 
 SnakeGame* SnakeGame::s_active = nullptr;

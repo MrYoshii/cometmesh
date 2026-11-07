@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include "TLoraPagerBoard.h"
 #include <Preferences.h>
+#include <helpers/esp32/PrefsQuiet.h>
 #include "PagerHaptics.h"
 #define XPOWERS_CHIP_BQ25896
 #include <XPowersLib.h>   // PowersBQ25896: the charger
@@ -370,7 +371,7 @@ bool TLoraPagerBoard::setBatteryCapacity(uint16_t mah) {
 
 uint16_t TLoraPagerBoard::batteryCapacitySetting() {
   Preferences p;
-  if (!p.begin("pagerhw", true)) return PAGER_GAUGE_DESIGN_MAH;
+  if (!prefsBeginRO(p, "pagerhw")) return PAGER_GAUGE_DESIGN_MAH;
   const uint16_t v = pagerCapTarget(p);
   p.end();
   return v;

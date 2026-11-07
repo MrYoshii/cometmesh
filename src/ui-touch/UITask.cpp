@@ -628,19 +628,19 @@ struct TouchPalette {
 
 // Night is the design's home palette: true black, three text levels (E6EBED /
 // 8A969C / 5C686E), near-black surfaces lifted only a step (0B0E10 cards, 12171A
-// controls, 1C2428 borders), teal for what is live. The status hues are the
+// controls, 1C2428 borders), Comet green for what is live. The status hues are the
 // launcher's category colours, so a warning reads in the same amber as the radio
 // tools and information in the same blue as places.
 static constexpr TouchPalette kNightPalette = {
   0x000000, 0x0B0E10, 0xE6EBED, 0x8A969C,
-  0x0E3A35, 0x0F1417, 0x5AA9FF, 0x112538,
+  0x0E3A24, 0x0F1417, 0x5AA9FF, 0x112538,
   0x2F9E6A, 0x247A52, 0xF2A33A, 0xD9484D, 0xA8353A,
   0x4CC38A, 0xF2A33A, 0xF06A6E,
   0x5AA9FF,
   0x1C2428, 0x0B0E10, 0x161D21, 0x0B0E10, 0x222C31,
-  0x07211E, 0x15B6A6, 0x12171A, 0x1C2428,
+  0x072115, 0x16C46B, 0x12171A, 0x1C2428,
   0x12171A, 0x2A3338, 0x1C2428, 0x0B0E10,
-  0x5C686E, 0x12171A, 0x19D6C2,
+  0x5C686E, 0x12171A, 0x19E57D,
 };
 
 static constexpr TouchPalette kDayPalette = {
@@ -650,9 +650,9 @@ static constexpr TouchPalette kDayPalette = {
   0x276738, 0x806000, 0xA52B26,
   0xA8CDF0,
   0xC7D0D7, 0xF8FAFB, 0xE5EAEE, 0xD5DADF, 0xD4DCE2,
-  0xD9EEEC, 0x6F9E99, 0xD6DDE2, 0xAAB5BD,
+  0xDAEFE2, 0x6F9E82, 0xD6DDE2, 0xAAB5BD,
   0xFFFFFF, 0xD8E0E6, 0xD5DDE3, 0xF8FAFB,
-  0x6B7A84, 0xDCE3E8, 0x0A7F74,
+  0x6B7A84, 0xDCE3E8, 0x0A7F45,
 };
 
 static constexpr TouchPalette kDayHighContrastPalette = {
@@ -662,9 +662,9 @@ static constexpr TouchPalette kDayHighContrastPalette = {
   0x005A26, 0x5C4600, 0xA00018,
   0x005EA8,
   0x000000, 0xFFFFFF, 0xFFFFFF, 0xD6D6D6, 0xE5E5E5,
-  0xD8F3F0, 0x005A52, 0x000000, 0x202020,
+  0xD8F3E3, 0x005A2C, 0x000000, 0x202020,
   0xFFFFFF, 0xD9D9D9, 0x404040, 0xFFFFFF,
-  0x404040, 0xBFBFBF, 0x005A52,
+  0x404040, 0xBFBFBF, 0x005A2C,
 };
 
 static constexpr TouchPalette kNightHighContrastPalette = {
@@ -674,9 +674,9 @@ static constexpr TouchPalette kNightHighContrastPalette = {
   0x55FF8A, 0xFFD400, 0xFF5A70,
   0x005EA8,
   0xFFFFFF, 0x000000, 0x000000, 0x202020, 0x303030,
-  0x003B36, 0x58FFF0, 0x404040, 0xFFFFFF,
+  0x003B1E, 0x58FF9E, 0x404040, 0xFFFFFF,
   0x101010, 0x303030, 0x404040, 0x000000,
-  0xBFBFBF, 0x303030, 0x58FFF0,
+  0xBFBFBF, 0x303030, 0x58FF9E,
 };
 
 static uint8_t s_theme_mode = TOUCH_THEME_NIGHT;
@@ -693,8 +693,8 @@ static uint32_t COLOR_PANEL         = kNightPalette.panel;
 // Runtime-themeable accent (Settings -> Accent colour). NOT constexpr: the picker
 // rewrites these live and they're reloaded from the saved pref at boot. Every
 // accent site reads them through lv_color_hex(), so one write re-themes the UI.
-uint32_t COLOR_ACCENT       = 0x15B6A6;  // COMET brand teal (default; the logo dots)
-uint32_t COLOR_ACCENT_PRESS = 0x0D766B;  // darker brand teal (default)
+uint32_t COLOR_ACCENT       = 0x16C46B;  // Comet green (default; the mark's light, kept dark enough for text on it)
+uint32_t COLOR_ACCENT_PRESS = 0x0E7F45;  // darker Comet green (default)
 static uint32_t COLOR_ON_ACCENT = kNightPalette.text;
 static uint32_t COLOR_ON_STATUS_OK = kNightPalette.text;
 static uint32_t COLOR_ON_STATUS_DANGER = kNightPalette.text;
@@ -725,8 +725,8 @@ static inline uint32_t accentClampFor(uint32_t rgb, bool day, bool hc) {
 static inline uint32_t accentClampReadable(uint32_t rgb) {
   return accentClampFor(rgb, s_theme_day, s_theme_high_contrast);
 }
-// The lit tone of an accent: brighter on dark grounds (the default teal becomes the
-// mockups' #19D6C2), deeper on light ones, the accent itself in high contrast.
+// The lit tone of an accent: brighter on dark grounds (the default green becomes the
+// mark's #19E57D), deeper on light ones, the accent itself in high contrast.
 static uint32_t accentGlowFor(uint32_t accent, bool day, bool hc) {
   if (hc) return accent;
   if (day) return accentDarken(accent, 70);
@@ -738,7 +738,7 @@ static uint32_t COLOR_SUB           = kNightPalette.sub;
 static uint32_t COLOR_TERTIARY      = kNightPalette.tertiary;
 static uint32_t COLOR_HAIR          = kNightPalette.hair;
 static uint32_t COLOR_GLOW          = kNightPalette.glow;
-static uint32_t COLOR_ON_GLOW       = 0x00201C;   // text and glyphs on a glow fill (pills, primary buttons)
+static uint32_t COLOR_ON_GLOW       = 0x002010;   // text and glyphs on a glow fill (pills, primary buttons)
 // Chat-bubble palette: kept near-monochrome (military comms terminals
 // don't colour-code direction). Slight luminance + hue lean keeps L/R
 // readable but neither side gets a "fun" tint.
@@ -900,7 +900,7 @@ static inline bool bgActive() { return s_bg_kind != 0xFF; }
 #define CAP_BG_IMAGE  CAP_LOCK_SCREEN
 #define CAP_BG_MOVING 1
 #endif
-static uint32_t COLOR_HUE[6]   = { 0x19D6C2, 0x19D6C2, 0x5AA9FF, 0xF2A33A, 0xC3CBCF, 0x4CC38A };
+static uint32_t COLOR_HUE[6]   = { 0x19E57D, 0x19E57D, 0x5AA9FF, 0xF2A33A, 0xC3CBCF, 0x4CC38A };
 static uint32_t COLOR_LINK     = 0x8A969C;
 static uint8_t  s_look_tint    = 34;      // ~13 %, the redesign's tile tint
 static bool     s_chat_icons_initials = false;   // Settings > Theme > Chat icons (applies live)
@@ -3174,7 +3174,7 @@ static void initSelectionGlowStyle(lv_style_t* style, uint32_t color) {
   lv_style_set_outline_color(style, lv_color_hex(color));
 }
 // The keyboard cursor's colour: amber, which stands apart from every accent and hue
-// the themes use (teal by default) and from the aurora behind them; deep orange by
+// the themes use (green by default) and from the aurora behind them; deep orange by
 // day, where yellow washes out on the light ground. Taste the rainbow leaves it alone:
 // the one colour that always means "you are here".
 static uint32_t focusRingColor() { return s_theme_day ? 0xD97706u : 0xFFC21Au; }
@@ -5553,7 +5553,7 @@ static lv_obj_t* makeCountPill(lv_obj_t* parent, int count) {
   lv_obj_remove_style_all(bdg);
   lv_obj_clear_flag(bdg, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);   // taps pass through
   // A pending update ("!") is red, as on the bar's Settings icon and the About row;
-  // counts are the glow teal.
+  // counts are the glow green.
   const bool update = count < 0;
   lv_obj_set_style_bg_color(bdg,
       lv_color_hex(s_theme_high_contrast ? COLOR_STATUS_DANGER : update ? 0xE2403A : COLOR_GLOW), LV_PART_MAIN);
@@ -5578,7 +5578,7 @@ static lv_obj_t* makeCountPill(lv_obj_t* parent, int count) {
 
 // Button kinds of the redesign. Secondary (styleButton) is the default: the
 // control fill, no outline, soft corners. Primary is the one action a screen is
-// for: solid glow teal with dark text. Destructive keeps the secondary face with
+// for: solid glow green with dark text. Destructive keeps the secondary face with
 // red text; the solid red is kept for the confirmation of a destructive step.
 // Taste the rainbow's press dip: a pressed button or tile pulls its edges in by two
 // pixels and springs back. transform_width/height shrink only the drawn box (no layer,
@@ -48866,7 +48866,7 @@ static void refreshChatList(LvChatPanel& p) {
       if (s_look_more && !s_theme_high_contrast) {
         lv_obj_set_style_bg_color(pill, lv_color_hex(row_hue), LV_PART_MAIN);
         lv_obj_set_style_text_color(lv_obj_get_child(pill, 0),
-            lv_color_hex(accentLuma(row_hue) > 150 ? 0x00201Cu : 0xFFFFFFu), LV_PART_MAIN);
+            lv_color_hex(accentLuma(row_hue) > 150 ? 0x002010u : 0xFFFFFFu), LV_PART_MAIN);
       }
       lv_obj_update_layout(pill);
       pill_w = lv_obj_get_width(pill);
@@ -51676,7 +51676,7 @@ struct LockInk {
   uint32_t clock, text, sub, ter, line, area, dot, card, border;
   bool paper;
 };
-static LockInk s_lock_ink = { 0xE6EBED, 0xE6EBED, 0x8A969C, 0x5C686E, 0x19D6C2, 0x15B6A6, 0x15B6A6, 0x0B0E10, 0x1C2428, false };
+static LockInk s_lock_ink = { 0xE6EBED, 0xE6EBED, 0x8A969C, 0x5C686E, 0x19E57D, 0x16C46B, 0x16C46B, 0x0B0E10, 0x1C2428, false };
 
 // How long the trackball must be held to unlock, in ms.
 static const unsigned long kLockUnlockHoldMs = 1000;
@@ -52890,7 +52890,7 @@ static void rainbowDriftCb(lv_timer_t*) {
   if (s_chat_unread_badge && !lv_obj_has_flag(s_chat_unread_badge, LV_OBJ_FLAG_HIDDEN)) {
     lv_obj_set_style_bg_color(s_chat_unread_badge, lv_color_hex(c), LV_PART_MAIN);
     lv_obj_set_style_text_color(s_chat_unread_badge,
-        lv_color_hex(accentLuma(c) > 150 ? 0x00201Cu : 0xFFFFFFu), LV_PART_MAIN);
+        lv_color_hex(accentLuma(c) > 150 ? 0x002010u : 0xFFFFFFu), LV_PART_MAIN);
   }
   // (The keyboard cursor keeps its amber: see focusRingColor.)
 }
@@ -57852,7 +57852,7 @@ static void ccToggle(lv_obj_t* parent, const char* sym, const char* label,
     const bool solid_off = !active && !s_glass_tiles;
     lv_obj_set_style_bg_color(b, lv_color_hex(solid_off ? rgbMix(COLOR_PANEL, hue, s_look_tint) : hue), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(b, (active || solid_off) ? LV_OPA_COVER : s_look_tint, LV_PART_MAIN);
-    icon_col = active ? (accentLuma(hue) > 150 ? 0x00201Cu : 0xFFFFFFu) : hue;
+    icon_col = active ? (accentLuma(hue) > 150 ? 0x002010u : 0xFFFFFFu) : hue;
     if (lookNeon()) {   // the launcher's lit neon edge
       lv_obj_set_style_border_color(b, lv_color_hex(hue), LV_PART_MAIN);
       lv_obj_set_style_border_width(b, 1, LV_PART_MAIN);
@@ -61414,7 +61414,7 @@ static void openAppDrawer() {
     if (oi < 0) {   // installed Lua app (dynamic)
       const LuaInstApp& a = s_lua_inst[-oi - 1];
       addAppTile(s_appdrawer_root, x, y, tile_w, tile_h, luaAppIconGlyph(a.icon), a.name,
-                 APPACT_LUA_BASE + (-oi - 1), 0, s_look_rainbow ? rb : s_look_more ? kMsg : 0x15B6A6, big_grid);
+                 APPACT_LUA_BASE + (-oi - 1), 0, s_look_rainbow ? rb : s_look_more ? kMsg : 0x16C46B, big_grid);
       continue;
     }
     addAppTile(s_appdrawer_root, x, y, tile_w, tile_h, tiles[oi].icon, tiles[oi].label,
@@ -66237,7 +66237,7 @@ static bool hwAppInfo(const HwRec& r, HwAppInfo& out) {
 #if CAP_LUA_APPS
     const int k = hwLuaFind(hwX32(r));
     if (k < 0) return false;
-    out = { luaAppIconGlyph(s_lua_inst[k].icon), s_lua_inst[k].name, s_look_more ? COLOR_HUE[HUE_MSG] : 0x15B6A6, APPACT_LUA_BASE + k };
+    out = { luaAppIconGlyph(s_lua_inst[k].icon), s_lua_inst[k].name, s_look_more ? COLOR_HUE[HUE_MSG] : 0x16C46B, APPACT_LUA_BASE + k };
     return true;
 #else
     return false;
@@ -69261,7 +69261,7 @@ static void applyAccent(uint32_t rgb) {
     COLOR_ACCENT_PRESS = accentDarken(COLOR_ACCENT, 65);
   }
   COLOR_GLOW = accentGlowFor(COLOR_ACCENT, s_theme_day, s_theme_high_contrast);
-  COLOR_ON_GLOW = accentLuma(COLOR_GLOW) > 150 ? 0x00201Cu : 0xFFFFFFu;
+  COLOR_ON_GLOW = accentLuma(COLOR_GLOW) > 150 ? 0x002010u : 0xFFFFFFu;
   // "Go" buttons (send, save, join, connect, apply) fill with the status-OK tone.
   // The redesign makes them the primary button: the glow with dark text.
   if (!s_theme_high_contrast) {
@@ -69369,7 +69369,7 @@ static void themeTokensFor(uint8_t mode, uint32_t accent, bool more, uint8_t sty
   t.info = p.status_info; t.warn = p.status_warn; t.ok = p.status_ok_text;
   const uint32_t acc = hc ? (day ? 0x000000u : 0xFFFFFFu) : accentClampFor(accent, day, hc);
   t.glow = accentGlowFor(acc, day, hc);
-  t.on_glow = accentLuma(t.glow) > 150 ? 0x00201Cu : 0xFFFFFFu;
+  t.on_glow = accentLuma(t.glow) > 150 ? 0x002010u : 0xFFFFFFu;
   t.sent_bg = hc ? 0x003B5Cu : (day ? 0x28556Bu : p.sent_bg);
   t.recv_bg = hc ? 0x202020u : (day ? 0x3C4852u : p.recv_bg);
   t.mention_bg = hc ? 0x003F7Fu : (day ? 0x1D5F8Au : p.mention_bg);
@@ -69553,7 +69553,7 @@ static lv_theme_t s_touch_theme;   // our wrapper theme (parent = stock default)
 // Curated accent palette for the swatch grid: COMET brand teal (default,
 // the logo dots) first, then stock grey + a colour spread.
 static const uint32_t kThemeColors[] = {
-  0x15B6A6, 0x57585A, 0x3B82F6, 0x2DA8A0, 0x3FA34D, 0x8B5CF6,
+  0x16C46B, 0x57585A, 0x3B82F6, 0x2DA8A0, 0x3FA34D, 0x8B5CF6,
   0xD2569E, 0xD0524A, 0xE0823C, 0xC8A030, 0x5B6BD0, 0xA85AB0,
 };
 
@@ -69602,7 +69602,7 @@ static void themeMiniUpdate();    // the Apply bar under the title, shown once t
 static lv_obj_t* s_accent_picker  = nullptr;
 static lv_obj_t* s_accent_hex_ta  = nullptr;
 static lv_obj_t* s_accent_preview = nullptr;
-static uint32_t  s_accent_sel     = 0x15B6A6u;   // currently-selected colour (default: brand teal)
+static uint32_t  s_accent_sel     = 0x16C46Bu;   // currently-selected colour (default: Comet green)
 static bool      s_accent_syncing = false;
 
 static bool s_picker_for_bg = false;   // the colour picker is choosing the Theme's background
@@ -69677,7 +69677,7 @@ static void accentSaveCb(lv_event_t* e) {
   if (g_lv.task) g_lv.task->rebootDevice();   // saves chat history first
 }
 static void accentResetCb(lv_event_t* e) {
-  if (lv_event_get_code(e) == LV_EVENT_CLICKED) accentSetSelection(0x15B6A6u, true);
+  if (lv_event_get_code(e) == LV_EVENT_CLICKED) accentSetSelection(0x16C46Bu, true);
 }
 static void openAccentPicker() {
   // accentPickerClose() clears s_picker_for_bg, which the Theme page's background
