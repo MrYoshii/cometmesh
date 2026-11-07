@@ -1,32 +1,82 @@
 {
-  "note": "Every board Comet is released for. The site (boards table, installer), scripts/release.sh and the update check all go by this list: adding a board is one entry here plus its WADA_BOARD_ID in src/ui-touch/UITask.cpp. id = WADA_BOARD_ID (the release images are comet-<id>.bin); build = {\"idf\": <idf/boards dir>} or {\"pio\": <PlatformIO env>}; status = main, supported or testing.",
+  "note": "Every board Comet is released for, grouped by brand on cometmesh.org/boards.html. The site (boards page, installer), scripts/release.sh and the update check all go by this list: adding a board is one entry here plus its WADA_BOARD_ID in src/ui-touch/UITask.cpp. id = WADA_BOARD_ID (release images are comet-<id>.bin); build = {\"idf\": <idf/boards dir>} or {\"pio\": <PlatformIO env>}; status = main | supported | experimental; each feature is full | partial | untested | planned | none, with an optional note in feature_notes.",
+  "levels": {
+    "full": "Works",
+    "partial": "Works, with limits",
+    "untested": "Built in, not yet tested on Comet",
+    "planned": "Planned",
+    "none": "Not on this board"
+  },
+  "statuses": {
+    "main": "Main target: tested on every build",
+    "supported": "Supported: released with every build, tested less often",
+    "experimental": "Experimental: builds, expect rough edges"
+  },
+  "features": [
+    { "id": "mesh", "name": "MeshCore messaging" },
+    { "id": "companion", "name": "Phone app over Bluetooth, Wi-Fi, USB" },
+    { "id": "gps", "name": "GPS" },
+    { "id": "maps", "name": "Offline maps" },
+    { "id": "books", "name": "Books and audiobooks" },
+    { "id": "audio", "name": "Speaker and tones" },
+    { "id": "keyboard", "name": "Keyboard" },
+    { "id": "touch", "name": "Touch screen" },
+    { "id": "battery", "name": "Battery gauge and charging" },
+    { "id": "ota", "name": "Updates over Wi-Fi" },
+    { "id": "meshtastic", "name": "Meshtastic" },
+    { "id": "modem", "name": "SMS and calls" }
+  ],
+  "brands": [
+    { "name": "LilyGo", "url": "https://lilygo.cc" }
+  ],
   "boards": [
     {
       "id": "tdeck-max",
-      "name": "LilyGo T-Deck Max",
+      "brand": "LilyGo",
+      "name": "T-Deck Max",
       "chip": "ESP32-S3",
       "radio": "SX1262",
-      "about": "3.1-inch e-paper, keyboard, touch, GPS, speaker; A7682E modem (support coming)",
+      "about": "3.1-inch e-paper, keyboard, touch, GPS, speaker, A7682E modem",
       "status": "main",
-      "build": { "idf": "tdeck_max" }
+      "build": { "idf": "tdeck_max" },
+      "support": {
+        "mesh": "full", "companion": "full", "gps": "partial", "maps": "full", "books": "full",
+        "audio": "full", "keyboard": "full", "touch": "full", "battery": "full", "ota": "untested",
+        "meshtastic": "planned", "modem": "planned"
+      },
+      "feature_notes": { "gps": "The first fix after power-on is slow" }
     },
     {
       "id": "tlora-pager-sx1262",
-      "name": "LilyGo T-LoRa Pager (SX1262)",
+      "brand": "LilyGo",
+      "name": "T-LoRa Pager (SX1262)",
       "chip": "ESP32-S3",
       "radio": "SX1262",
       "about": "Colour screen, keyboard, rotary encoder, GPS, speaker",
       "status": "supported",
-      "build": { "pio": "tlora_pager_sx1262_companion_radio_touch" }
+      "build": { "pio": "tlora_pager_sx1262_companion_radio_touch" },
+      "support": {
+        "mesh": "full", "companion": "full", "gps": "full", "maps": "full", "books": "untested",
+        "audio": "full", "keyboard": "full", "touch": "none", "battery": "full", "ota": "untested",
+        "meshtastic": "planned", "modem": "none"
+      },
+      "feature_notes": {}
     },
     {
       "id": "tlora-pager-lr1121",
-      "name": "LilyGo T-LoRa Pager (LR1121)",
+      "brand": "LilyGo",
+      "name": "T-LoRa Pager (LR1121)",
       "chip": "ESP32-S3",
       "radio": "LR1121",
       "about": "Colour screen, keyboard, rotary encoder, GPS, speaker",
       "status": "supported",
-      "build": { "pio": "tlora_pager_lr1121_companion_radio_touch" }
+      "build": { "pio": "tlora_pager_lr1121_companion_radio_touch" },
+      "support": {
+        "mesh": "untested", "companion": "untested", "gps": "untested", "maps": "untested", "books": "untested",
+        "audio": "untested", "keyboard": "untested", "touch": "none", "battery": "untested", "ota": "untested",
+        "meshtastic": "planned", "modem": "none"
+      },
+      "feature_notes": {}
     }
   ]
 }

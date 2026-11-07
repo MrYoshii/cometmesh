@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Install Comet</title>
+<meta name="description" content="Install Comet on your LoRa handheld from the browser, or with esptool.">
+<meta name="theme-color" content="#08221b">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" href="comet-mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+<header class="sky page-head">
+  <nav class="top" aria-label="Site">
+    <a class="brand" href="./"><img src="comet-mark.svg" alt="" width="52" height="28">Comet</a>
+    <span class="nav-links">
+      <a href="boards.html">Boards</a>
+      <a href="roadmap.html">Roadmap</a>
+      <a href="install.html" aria-current="page">Install</a>
+      <a href="https://github.com/MrYoshii/cometmesh">GitHub</a>
+    </span>
+  </nav>
+  <div class="wrap head-copy">
+    <h1 class="page-title">Install</h1>
+    <p class="lede">The installer runs in Chrome or Edge on a computer. Comet is in testing, so the builds are test builds.</p>
+  </div>
+</header>
+
+<main class="paper">
+  <div class="wrap">
+    <ol class="steps">
+      <li><h3>Choose your board</h3>
+        <div class="board-pick" id="board-pick" role="radiogroup" aria-label="Board"></div>
+        <p class="pick-more">Not sure which one you have, or what works on it? See <a href="boards.html">Boards</a>.</p>
+      </li>
+      <li><h3>Connect it</h3><p>Plug it into your computer with a USB-C data cable. If it does not show up in the next step, hold the BOOT button while you plug it in.</p></li>
+      <li><h3>Install</h3>
+        <p>An existing install keeps its settings, contacts and chats; a new one asks whether to erase the device first.</p>
+        <div class="installer" id="installer" hidden>
+          <esp-web-install-button id="install-btn">
+            <button slot="activate" class="btn btn-ink" id="install-label">Install</button>
+            <span slot="unsupported" class="installer-note">This browser cannot talk to USB devices. Open the page in Chrome or Edge on a computer, or use esptool below.</span>
+            <span slot="not-allowed" class="installer-note">The installer needs the page over HTTPS: open https://cometmesh.org.</span>
+          </esp-web-install-button>
+        </div>
+        <p class="installer-note" id="install-none" hidden>There is no build for this board yet.</p>
+      </li>
+      <li id="esptool-step" hidden><h3>Or with esptool</h3><p>Download <a id="app-link" href="#">the app image</a> and write it over an existing install; settings, contacts and chats stay:</p>
+        <pre><code id="esptool-cmd">esptool --chip esp32s3 --port &lt;PORT&gt; --after watchdog-reset write-flash 0x10000 comet-&lt;board&gt;.bin</code></pre></li>
+    </ol>
+    <p class="aside after">Once Comet runs, it updates itself over Wi-Fi: About, then Install update. Test builds come with About, Get test builds.</p>
+  </div>
+</main>
+
+<footer class="sky foot">
+  <div class="wrap">
+    <p>Comet is free software under the GPL-3.0. Flashing replaces the firmware on your device; you can always go back by flashing the original one.</p>
+    <p><a href="https://github.com/MrYoshii/cometmesh">Source on GitHub</a> <a href="https://github.com/MrYoshii/cometmesh/issues">Report a problem</a></p>
+  </div>
+</footer>
+
+<script type="module" src="https://unpkg.com/esp-web-tools@10.0.1/dist/web/install-button.js?module"></script>
+<script src="install.js"></script>
+</body>
+</html>

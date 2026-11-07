@@ -1,0 +1,13 @@
+{
+  "note": "Written by scripts/release.sh on every publish; newest first. The roadmap page shows these.",
+  "releases": [
+    {
+      "tag": "beta_1",
+      "channel": "beta",
+      "date": "2026-11-07",
+      "boards": [
+        "tdeck-max"
+      ]
+    }
+  ]
+}

@@ -1,75 +1,159 @@
 {
   "updated": "2026-11-07",
-  "note": "Where Comet is and where it is going. Edit this file to update the roadmap on cometmesh.org; status is done, now or next.",
-  "stages": [
+  "note": "The roadmap board on cometmesh.org/roadmap.html. Move a card by changing its column. A card with \"target\": \"beta_<N>\" moves to done by itself when scripts/release.sh publishes that tag, which also stamps \"shipped\" and \"updated\" and redeploys the site. tags: firmware | ui | radio | infra | docs; boards: ids from boards.json (none = every board).",
+  "columns": [
     {
+      "id": "planned",
+      "title": "Planned"
+    },
+    {
+      "id": "next",
+      "title": "Next"
+    },
+    {
+      "id": "doing",
+      "title": "In progress"
+    },
+    {
+      "id": "testing",
+      "title": "Testing"
+    },
+    {
+      "id": "done",
+      "title": "Done"
+    }
+  ],
+  "cards": [
+    {
+      "id": "fork",
+      "column": "done",
       "title": "Comet stands on its own",
-      "items": [
-        {
-          "status": "done",
-          "title": "Forked from wadamesh, renamed throughout",
-          "text": "Own name, own repository, own logo; credits to wadamesh and MeshCore stay."
-        },
-        {
-          "status": "done",
-          "title": "Audiobooks and e-books",
-          "text": "Audiobookshelf streaming and downloads, books copied onto the SD card, an EPUB reader."
-        },
-        {
-          "status": "done",
-          "title": "The Comet mark",
-          "text": "A comet whose tail is a mesh, drawn and animated the same way on every screen, e-paper included."
-        }
+      "text": "Forked from wadamesh and renamed throughout: own name, repository and logo. Credits to wadamesh and MeshCore stay.",
+      "tags": [
+        "firmware"
       ]
     },
     {
-      "title": "A new foundation",
-      "items": [
-        {
-          "status": "now",
-          "title": "ESP-IDF 5.5 for the T-Deck Max",
-          "text": "Arduino 3.3 on a current ESP-IDF: much more free memory and downloads three to four times faster. Out as test build beta_1."
-        },
-        {
-          "status": "now",
-          "title": "A board layer",
-          "text": "Every board in one folder behind fixed interfaces, so a new device is a day of work instead of a week."
-        },
-        {
-          "status": "next",
-          "title": "T-LoRa Pager on the new base",
-          "text": "The first board to come over through the board layer."
-        },
-        {
-          "status": "now",
-          "title": "Releases and a web installer",
-          "text": "Test build beta_1 is out for the T-Deck Max: installed from the browser on cometmesh.org, updated over Wi-Fi from our own servers."
-        }
+      "id": "books",
+      "column": "done",
+      "title": "Audiobooks and e-books",
+      "text": "Audiobookshelf streaming and downloads, books on the SD card, an EPUB reader.",
+      "tags": [
+        "firmware"
       ]
     },
     {
-      "title": "The always-with-you device",
-      "items": [
-        {
-          "status": "next",
-          "title": "SMS and calls on the T-Deck Max",
-          "text": "The A7682E modem: text messages, voice calls and mobile data, for when there is no mesh."
-        },
-        {
-          "status": "next",
-          "title": "Every mesh",
-          "text": "Meshtastic next to MeshCore on the same radio, with one screen to pick the active mesh."
-        },
-        {
-          "status": "next",
-          "title": "A new interface",
-          "text": "Comet's own UI on LVGL 9, designed for small screens and e-paper first."
-        },
-        {
-          "status": "next",
-          "title": "More boards",
-          "text": "Once the board layer has proven itself on the Pager."
-        }
+      "id": "mark",
+      "column": "done",
+      "title": "The Comet mark",
+      "text": "A comet whose tail is a mesh, drawn and animated the same way on every screen, e-paper included.",
+      "tags": [
+        "ui"
+      ]
+    },
+    {
+      "id": "servers",
+      "column": "done",
+      "title": "Own servers",
+      "text": "cometmesh.org serves updates, the app store, language packs, map tiles and the USB Files page.",
+      "tags": [
+        "infra"
+      ]
+    },
+    {
+      "id": "idf-max",
+      "column": "testing",
+      "title": "ESP-IDF 5.5 base",
+      "text": "Arduino 3.3 on a current ESP-IDF: much more free memory, downloads three to four times faster. Out as test build beta_1.",
+      "tags": [
+        "firmware"
+      ],
+      "boards": [
+        "tdeck-max"
+      ],
+      "shipped": "beta_1"
+    },
+    {
+      "id": "installer",
+      "column": "testing",
+      "title": "Releases and browser installer",
+      "text": "Per-board releases from one script, installed from the browser, updated over Wi-Fi.",
+      "tags": [
+        "infra"
+      ]
+    },
+    {
+      "id": "board-layer",
+      "column": "doing",
+      "title": "Board layer",
+      "text": "Every board in one folder behind fixed interfaces, so a new device is a day of work instead of a week.",
+      "tags": [
+        "firmware"
+      ]
+    },
+    {
+      "id": "pager-idf",
+      "column": "next",
+      "title": "T-LoRa Pager on the new base",
+      "text": "The first board to come over through the board layer.",
+      "tags": [
+        "firmware"
+      ],
+      "boards": [
+        "tlora-pager-sx1262",
+        "tlora-pager-lr1121"
+      ]
+    },
+    {
+      "id": "epaper-ui",
+      "column": "next",
+      "title": "A UI made for e-paper",
+      "text": "One picture per keypress: pages instead of scrolling, no animation, keyboard first. Concept is drawn.",
+      "tags": [
+        "ui"
+      ],
+      "boards": [
+        "tdeck-max"
+      ]
+    },
+    {
+      "id": "gps-fix",
+      "column": "next",
+      "title": "Faster first GPS fix",
+      "text": "Keep position, time and satellite data across power-off, and fetch assistance data over Wi-Fi.",
+      "tags": [
+        "firmware"
+      ]
+    },
+    {
+      "id": "multimesh",
+      "column": "planned",
+      "title": "Every mesh",
+      "text": "Meshtastic next to MeshCore on the same radio, one inbox for both, one screen to pick the active mesh.",
+      "tags": [
+        "radio",
+        "ui"
+      ]
+    },
+    {
+      "id": "modem",
+      "column": "planned",
+      "title": "SMS and calls",
+      "text": "The A7682E modem: text messages, voice calls and mobile data for when there is no mesh.",
+      "tags": [
+        "firmware"
+      ],
+      "boards": [
+        "tdeck-max"
+      ]
+    },
+    {
+      "id": "more-boards",
+      "column": "planned",
+      "title": "More boards",
+      "text": "Once the board layer has proven itself on the Pager.",
+      "tags": [
+        "firmware"
       ]
     }
   ]

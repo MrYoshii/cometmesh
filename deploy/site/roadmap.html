@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comet roadmap</title>
+<meta name="description" content="What is done in Comet, what is being built and what comes next.">
+<meta name="theme-color" content="#08221b">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" href="comet-mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+<header class="sky page-head">
+  <nav class="top" aria-label="Site">
+    <a class="brand" href="./"><img src="comet-mark.svg" alt="" width="52" height="28">Comet</a>
+    <span class="nav-links">
+      <a href="boards.html">Boards</a>
+      <a href="roadmap.html" aria-current="page">Roadmap</a>
+      <a href="install.html">Install</a>
+      <a href="https://github.com/MrYoshii/cometmesh">GitHub</a>
+    </span>
+  </nav>
+  <div class="wrap head-copy">
+    <h1 class="page-title">Roadmap</h1>
+    <p class="lede" id="roadmap-updated">Where Comet is and where it is going.</p>
+    <p class="release-line" id="release-line" hidden></p>
+  </div>
+</header>
+
+<main class="paper board-page">
+  <div class="kanban-filter" id="filter" role="group" aria-label="Show cards for"></div>
+  <div class="kanban" id="kanban" tabindex="0" aria-label="Roadmap board, scrolls sideways">
+    <p class="aside wrap">The roadmap loads from roadmap.json.</p>
+  </div>
+</main>
+
+<footer class="sky foot">
+  <div class="wrap">
+    <p>The board updates itself with every release. Ideas and wishes are welcome on <a href="https://github.com/MrYoshii/cometmesh/issues">GitHub</a>.</p>
+    <p><a href="https://github.com/MrYoshii/cometmesh">Source on GitHub</a> <a href="https://github.com/MrYoshii/cometmesh/issues">Report a problem</a></p>
+  </div>
+</footer>
+
+<script src="roadmap.js"></script>
+</body>
+</html>

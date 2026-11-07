@@ -20,98 +20,53 @@
 
 <header class="sky">
   <nav class="top" aria-label="Site">
-    <a class="brand" href="#top" aria-label="Comet home"><img src="comet-mark.svg" alt="" width="52" height="28">Comet</a>
+    <a class="brand" href="./" aria-current="page"><img src="comet-mark.svg" alt="" width="52" height="28">Comet</a>
     <span class="nav-links">
-      <a href="#today">What it does</a>
-      <a href="#boards">Boards</a>
-      <a href="#roadmap">Roadmap</a>
-      <a href="#install">Install</a>
+      <a href="boards.html">Boards</a>
+      <a href="roadmap.html">Roadmap</a>
+      <a href="install.html">Install</a>
       <a href="https://github.com/MrYoshii/cometmesh">GitHub</a>
     </span>
   </nav>
 
-  <div class="hero" id="top">
+  <div class="hero">
     <canvas id="comet" aria-label="The Comet mark: a comet whose tail is a mesh. A message hops in through the tail, lighting each node, and the head sends out a wave." role="img"></canvas>
     <div class="hero-copy">
       <h1>One radio,<br>every mesh.</h1>
       <p class="lede">Comet is open-source firmware that turns a LoRa handheld into a device you can always carry: mesh messages, offline maps, books and audiobooks, and soon text messages and calls over the built-in modem.</p>
       <p class="actions">
-        <a class="btn btn-glow" href="#install">Install Comet</a>
-        <a class="btn btn-quiet" href="#roadmap">See the roadmap</a>
+        <a class="btn btn-glow" href="install.html">Install Comet</a>
+        <a class="btn btn-quiet" href="boards.html">Find your board</a>
       </p>
     </div>
   </div>
 </header>
 
 <main>
-  <section class="paper" id="today" aria-labelledby="today-h">
+  <section class="paper" aria-labelledby="today-h">
     <div class="wrap two">
       <div>
         <h2 id="today-h">What Comet does today</h2>
-        <p class="aside">Built on MeshCore, for LoRa handhelds with a screen and a keyboard. What each board has is under Boards.</p>
+        <p class="aside">Built on MeshCore, for LoRa handhelds with a screen and a keyboard. How well each device is supported is on the <a href="boards.html">boards page</a>.</p>
       </div>
       <dl class="features">
         <div><dt>Mesh messaging</dt><dd>Chats, channels and contacts on MeshCore, with the companion app over Bluetooth, Wi-Fi or USB.</dd></div>
         <div><dt>Maps</dt><dd>Offline map tiles on the SD card, your position from the GPS, the nodes you have heard.</dd></div>
         <div><dt>Books and audiobooks</dt><dd>An EPUB reader, and an Audiobookshelf client that streams, downloads for offline listening, or plays folders of MP3s from the card.</dd></div>
         <div><dt>Files over USB</dt><dd>Browse, upload and download the SD card from a browser over the cable.</dd></div>
-        <div><dt>Made for e-paper</dt><dd>Contrast and refresh tuned for the Max's e-paper, with keyboard, touch, haptics and audio.</dd></div>
+        <div><dt>Updates over Wi-Fi</dt><dd>New builds come from cometmesh.org and install on the device; test builds if you want them early.</dd></div>
       </dl>
     </div>
   </section>
 
-  <section class="paper boards" id="boards" aria-labelledby="boards-h">
+  <section class="paper" aria-labelledby="where-h">
     <div class="wrap">
-      <h2 id="boards-h">Boards</h2>
-      <p class="aside">Comet is one firmware for many boards. These are the ones it is released for; more follow.</p>
-      <table class="board-table">
-        <thead><tr><th scope="col">Device</th><th scope="col">Radio</th><th scope="col" class="col-about">What it has</th><th scope="col">Status</th></tr></thead>
-        <tbody id="board-rows">
-          <tr><td colspan="4" class="board-empty">The board list loads from boards.json.</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <section class="sky roadmap" id="roadmap" aria-labelledby="roadmap-h">
-    <div class="wrap">
-      <h2 id="roadmap-h">Roadmap</h2>
-      <p class="aside" id="roadmap-updated">Where Comet is and where it is going.</p>
-      <ol class="route" id="route">
-        <li class="route-empty">The roadmap loads from roadmap.json. If you see this, open the page from a web server.</li>
-      </ol>
-      <p class="legend" aria-hidden="true">
-        <span><i class="dot dot-done"></i>Done</span>
-        <span><i class="dot dot-now"></i>Being built</span>
-        <span><i class="dot dot-next"></i>Planned</span>
-      </p>
-    </div>
-  </section>
-
-  <section class="paper" id="install" aria-labelledby="install-h">
-    <div class="wrap">
-      <h2 id="install-h">Install</h2>
-      <p class="aside">The installer runs in Chrome or Edge on a computer. Comet is in testing, so the builds are test builds.</p>
-      <ol class="steps">
-        <li><h3>Choose your board</h3>
-          <div class="board-pick" id="board-pick" role="radiogroup" aria-label="Board"></div>
-        </li>
-        <li><h3>Connect it</h3><p>Plug it into your computer with a USB-C data cable. If it does not show up in the next step, hold the BOOT button while you plug it in.</p></li>
-        <li><h3>Install</h3>
-          <p id="install-what">An existing install keeps its settings, contacts and chats; a new one asks whether to erase the device first.</p>
-          <div class="installer" id="installer">
-            <esp-web-install-button id="install-btn">
-              <button slot="activate" class="btn btn-ink" id="install-label">Install</button>
-              <span slot="unsupported" class="installer-note">This browser cannot talk to USB devices. Open the page in Chrome or Edge on a computer, or use esptool below.</span>
-              <span slot="not-allowed" class="installer-note">The installer needs the page over HTTPS: open https://cometmesh.org.</span>
-            </esp-web-install-button>
-          </div>
-          <p class="installer-note" id="install-none" hidden>There is no build for this board yet.</p>
-        </li>
-        <li id="esptool-step"><h3>Or with esptool</h3><p>Download <a id="app-link" href="#">the app image</a> and write it over an existing install; settings, contacts and chats stay:</p>
-          <pre><code id="esptool-cmd">esptool --chip esp32s3 --port &lt;PORT&gt; --after watchdog-reset write-flash 0x10000 comet-&lt;board&gt;.bin</code></pre></li>
-      </ol>
-      <p class="aside after">Once Comet runs, it updates itself over Wi-Fi: About, then Install update. Test builds come with About, Get test builds.</p>
+      <h2 id="where-h">Where to go from here</h2>
+      <ul class="doors">
+        <li><a href="boards.html"><span class="door-title">Boards</span><span class="door-text">Every device Comet runs on, by brand, and what works on each.</span></a></li>
+        <li><a href="roadmap.html"><span class="door-title">Roadmap</span><span class="door-text">What is done, what is being built and what comes next.</span></a></li>
+        <li><a href="install.html"><span class="door-title">Install</span><span class="door-text">Put Comet on your board from the browser, or with esptool.</span></a></li>
+      </ul>
     </div>
   </section>
 </main>
@@ -123,9 +78,6 @@
   </div>
 </footer>
 
-<script type="module" src="https://unpkg.com/esp-web-tools@10.0.1/dist/web/install-button.js?module"></script>
 <script src="comet.js"></script>
-<script src="roadmap.js"></script>
-<script src="boards.js"></script>
 </body>
 </html>

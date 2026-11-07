@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comet boards</title>
+<meta name="description" content="The boards Comet runs on, by brand, and how well each one is supported.">
+<meta name="theme-color" content="#08221b">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" href="comet-mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+<header class="sky page-head">
+  <nav class="top" aria-label="Site">
+    <a class="brand" href="./"><img src="comet-mark.svg" alt="" width="52" height="28">Comet</a>
+    <span class="nav-links">
+      <a href="boards.html" aria-current="page">Boards</a>
+      <a href="roadmap.html">Roadmap</a>
+      <a href="install.html">Install</a>
+      <a href="https://github.com/MrYoshii/cometmesh">GitHub</a>
+    </span>
+  </nav>
+  <div class="wrap head-copy">
+    <h1 class="page-title">Boards</h1>
+    <p class="lede">Comet is one firmware for many boards. Here is every device it is released for, grouped by brand, with what works on each.</p>
+  </div>
+</header>
+
+<main class="paper">
+  <div class="wrap">
+    <dl class="key" id="levels" aria-label="What the marks mean"></dl>
+    <div id="brands"><p class="aside">The board list loads from boards.json.</p></div>
+  </div>
+</main>
+
+<footer class="sky foot">
+  <div class="wrap">
+    <p>Missing your board? Comet is built to make new boards quick to add. <a href="https://github.com/MrYoshii/cometmesh/issues">Ask for it on GitHub</a>.</p>
+    <p><a href="https://github.com/MrYoshii/cometmesh">Source on GitHub</a> <a href="https://github.com/MrYoshii/cometmesh/issues">Report a problem</a></p>
+  </div>
+</footer>
+
+<script src="boards.js"></script>
+</body>
+</html>

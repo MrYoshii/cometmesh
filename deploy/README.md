@@ -8,7 +8,7 @@ Encrypt where browsers come.
 tiles.cometmesh.org     HTTP   nginx (14-day disk cache) → tile-transcode → OSM / OpenTopoMap
 firmware.cometmesh.org  HTTP   nginx → /srv/comet/firmware   (updates, apps/, langs)
 files.cometmesh.org     HTTPS  nginx → /srv/comet/files      (USB Files page; WebSerial needs HTTPS)
-cometmesh.org, www.     HTTPS  nginx → /srv/comet/site       (home page + roadmap)
+cometmesh.org, www.     HTTPS  nginx → /srv/comet/site       (home, boards, roadmap, install)
 flasher.cometmesh.org   HTTPS  301 → cometmesh.org
 ```
 
@@ -115,13 +115,20 @@ listings and images, `apps/` (store and languages, `scripts/deploy-apps.sh`), ma
 
 ## Done
 
-- **Home page** ✅ — `cometmesh.org` is served from `deploy/site/`: the animated mark
-  (drawn from `comet-geom.json`, which `scripts/gen_comet_mark.py` writes with the
-  firmware's headers), what Comet does, boards, the **roadmap** and install steps.
-  Publish with `COMET_VPS=user@your-vps scripts/deploy-site.sh`.
-- **The roadmap** is `deploy/site/roadmap.json`: stages, each with items whose
-  `status` is `done`, `now` or `next`, plus an `updated` date. Edit it and run
-  `deploy-site.sh`; nothing else needs touching.
+- **The site** ✅ — `cometmesh.org` is served from `deploy/site/` (`scripts/deploy-site.sh`),
+  four pages that all read the JSON files beside them:
+  - `index.html`: the animated mark (`comet-geom.json`, written by
+    `scripts/gen_comet_mark.py`) and what Comet does.
+  - `boards.html`: every board by brand with a support matrix, from `boards.json`
+    (`levels`, `statuses`, `features`, `brands`, `boards[].support`).
+  - `roadmap.html`: a board of lanes from `roadmap.json` (`columns`, `cards` with
+    `column`, `tags`, `boards`, `target`/`shipped`) and the latest release from
+    `releases.json`.
+  - `install.html`: the browser installer; `?board=<id>` preselects a board.
+- **The roadmap keeps itself current on release**: `scripts/release.sh` adds the
+  release to `releases.json`, moves every card whose `"target"` is that tag to done,
+  stamps `updated`, and redeploys the site. Move other cards by editing `column` in
+  `roadmap.json`, then `scripts/deploy-site.sh`. Commit both files after a release.
 - **`flasher.cometmesh.org` 301-redirects to the apex** (see
   `deploy/nginx/flasher.cometmesh.org.conf`). A browser installer comes back with the
   first release.

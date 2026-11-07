@@ -170,10 +170,42 @@ else
   CHAN=beta
 fi
 
-# 3. Publish.
+# 3. The site's record of it: releases.json gets the release, roadmap.json moves the
+#    cards that were waiting for this tag ("target") to done and stamps the date.
+#    Commit the two files afterwards.
+site_record() {   # <channel beta|stable> <board ids...>
+  python3 - "$ROOT/deploy/site" "$TAG" "$@" <<'PY'
+import json, os, sys, datetime
+site, tag, chan, *ids = sys.argv[1:]
+today = datetime.date.today().isoformat()
+rp = os.path.join(site, "releases.json")
+rel = json.load(open(rp)) if os.path.exists(rp) else {"releases": []}
+rel["releases"] = [r for r in rel["releases"] if not (r["tag"] == tag and r["channel"] == chan)]
+rel["releases"].insert(0, {"tag": tag, "channel": chan, "date": today, "boards": ids})
+json.dump(rel, open(rp, "w"), indent=2, ensure_ascii=False); open(rp, "a").write("\n")
+mp = os.path.join(site, "roadmap.json")
+rm = json.load(open(mp))
+moved = []
+for c in rm.get("cards", []):
+    if c.get("target") == tag and c.get("column") != "done":
+        c["column"] = "done"; c["shipped"] = tag; c.pop("target", None); moved.append(c["title"])
+rm["updated"] = today
+json.dump(rm, open(mp, "w"), indent=2, ensure_ascii=False); open(mp, "a").write("\n")
+print("site: releases.json +%s (%s)%s" % (tag, chan, "; done: " + ", ".join(moved) if moved else ""))
+PY
+}
+if [ "$MODE" = "--promote" ]; then
+  site_record stable $(ls "$OUT/releases/TOUCH/$TAG" | sed -n 's/^comet-\(.*\)-merged\.bin$/\1/p')
+else
+  site_record beta $(boards | awk '{print $1}')
+fi
+
+# 4. Publish, then the site with the updated roadmap.
 if [ "$PUSH" = 1 ]; then
   rsync -av --exclude 'apps/' "$OUT/" "$DEST:$DEST_PATH/"
   echo "published $TAG ($CHAN) -> $DEST:$DEST_PATH"
+  COMET_VPS="$DEST" "$ROOT/scripts/deploy-site.sh"
+  echo "now commit deploy/site/releases.json and deploy/site/roadmap.json"
 else
   echo "staged in $OUT; publish with: rsync -av --exclude apps/ out/firmware/ <host>:$DEST_PATH/"
 fi

@@ -1,10 +1,9 @@
-// The boards table and the installer, both from boards.json (the same list the
-// release script and the firmware go by). Which boards have a build is asked of the
-// firmware host: the installer manifest for a board exists once it has a release.
+// boards.html: every board from boards.json, grouped by brand, with a support matrix
+// (features down, boards across). The same file drives the installer and releases.
 (function () {
   "use strict";
-  var FW = "https://firmware.cometmesh.org";
-  var STATUS = { main: "Main target", supported: "Supported", testing: "Testing" };
+  var root = document.getElementById("brands");
+  if (!root) return;
 
   function el(tag, cls, text) {
     var e = document.createElement(tag);
@@ -12,89 +11,88 @@
     if (text != null) e.textContent = text;
     return e;
   }
-
-  // The newest manifest for a board: stable first, then the test channel. null if none.
-  function findBuild(id) {
-    function get(feed, beta) {
-      return fetch(FW + "/" + feed + "/manifest-" + id + ".json", { cache: "no-cache" })
-        .then(function (r) { if (!r.ok) throw 0; return r.json(); })
-        .then(function (m) { return { url: FW + "/" + feed + "/manifest-" + id + ".json", m: m, beta: beta }; });
-    }
-    return get("latest", false).catch(function () { return get("latest-beta", true); }).catch(function () { return null; });
+  function mark(level, label) {
+    var m = el("span", "mark mark-" + level);
+    m.setAttribute("aria-hidden", "true");
+    var wrap = el("span", "mark-wrap");
+    wrap.appendChild(m);
+    wrap.appendChild(el("span", "sr", label));
+    return wrap;
   }
 
-  var builds = {};   // id -> build or null, filled as the fetches return
-  var current = null;
+  fetch("boards.json", { cache: "no-cache" }).then(function (r) { return r.json(); }).then(function (d) {
+    var levels = d.levels || {}, statuses = d.statuses || {};
+    var key = document.getElementById("levels");
+    Object.keys(levels).forEach(function (lv) {
+      var row = el("div", "key-row");
+      var dt = el("dt"); dt.appendChild(mark(lv, "")); row.appendChild(dt);
+      row.appendChild(el("dd", "", levels[lv]));
+      key.appendChild(row);
+    });
 
-  function showInstaller(b) {
-    current = b.id;
-    var info = builds[b.id];
-    var btn = document.getElementById("install-btn");
-    var none = document.getElementById("install-none");
-    var installer = document.getElementById("installer");
-    var step = document.getElementById("esptool-step");
-    if (info === undefined) {   // still asking
-      installer.hidden = true; none.hidden = true; step.hidden = true;
-      return;
-    }
-    if (!info) {
-      installer.hidden = true; step.hidden = true; none.hidden = false;
-      none.textContent = "There is no build for the " + b.name + " yet.";
-      return;
-    }
-    none.hidden = true; installer.hidden = false; step.hidden = false;
-    btn.setAttribute("manifest", info.url);
-    document.getElementById("install-label").textContent =
-      "Install " + info.m.version + (info.beta ? " (test build)" : "") + " on the " + b.name;
-    var parts = info.m.builds[0].parts;
-    var app = parts[parts.length - 1].path;
-    var link = document.getElementById("app-link");
-    link.href = app;
-    link.textContent = app.split("/").pop();
-    document.getElementById("esptool-cmd").textContent =
-      "esptool --chip esp32s3 --port <PORT> --after watchdog-reset write-flash 0x10000 " + app.split("/").pop();
-  }
+    root.textContent = "";
+    var brands = (d.brands || []).slice();
+    (d.boards || []).forEach(function (b) {   // brands named only on a board still get a section
+      if (!brands.some(function (x) { return x.name === b.brand; })) brands.push({ name: b.brand || "Other" });
+    });
+    brands.forEach(function (brand) {
+      var boards = (d.boards || []).filter(function (b) { return (b.brand || "Other") === brand.name; });
+      if (!boards.length) return;
+      var sec = el("section", "maker");
+      var id = "brand-" + brand.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      sec.setAttribute("aria-labelledby", id);
+      var h = el("h2", "brand-name"); h.id = id;
+      h.textContent = brand.name;
+      sec.appendChild(h);
+      if (brand.url) {
+        var a = el("a", "brand-link", brand.url.replace(/^https?:\/\//, "")); a.href = brand.url;
+        sec.appendChild(a);
+      }
 
-  function pickRow(b) {
-    var lbl = el("label", "pick");
-    var input = el("input");
-    input.type = "radio"; input.name = "board"; input.value = b.id;
-    input.addEventListener("change", function () { showInstaller(b); });
-    lbl.appendChild(input);
-    var t = el("span", "pick-text");
-    t.appendChild(el("span", "pick-name", b.name));
-    var state = el("span", "pick-state", "checking for a build");
-    t.appendChild(state);
-    lbl.appendChild(t);
-    return { label: lbl, input: input, state: state };
-  }
-
-  fetch("boards.json", { cache: "no-cache" }).then(function (r) { return r.json(); }).then(function (data) {
-    var list = data.boards || [];
-    var rows = document.getElementById("board-rows");
-    var pick = document.getElementById("board-pick");
-    rows.textContent = "";
-    list.forEach(function (b, i) {
-      var tr = el("tr");
-      tr.appendChild(el("td", "", b.name));
-      tr.appendChild(el("td", "", b.radio || ""));
-      tr.appendChild(el("td", "col-about", b.about || ""));
-      var st = el("td");
-      st.appendChild(el("span", "pill" + (b.status === "main" ? " pill-main" : ""), STATUS[b.status] || b.status));
-      tr.appendChild(st);
-      rows.appendChild(tr);
-
-      var p = pickRow(b);
-      pick.appendChild(p.label);
-      if (i === 0) { p.input.checked = true; showInstaller(b); }
-      findBuild(b.id).then(function (info) {
-        builds[b.id] = info;
-        p.state.textContent = info ? info.m.version + (info.beta ? ", test build" : "") : "no build yet";
-        if (current === b.id) showInstaller(b);
+      var list = el("ul", "board-list");
+      boards.forEach(function (b) {
+        var li = el("li", "board");
+        var top = el("div", "board-top");
+        top.appendChild(el("h3", "board-name", b.name));
+        top.appendChild(el("span", "pill" + (b.status === "main" ? " pill-main" : ""), (statuses[b.status] || b.status).split(":")[0]));
+        li.appendChild(top);
+        li.appendChild(el("p", "board-about", b.radio + " radio · " + b.about));
+        li.appendChild(el("p", "board-status", statuses[b.status] || ""));
+        var go = el("a", "board-install", "Install on the " + b.name);
+        go.href = "install.html?board=" + encodeURIComponent(b.id);
+        li.appendChild(go);
+        list.appendChild(li);
       });
+      sec.appendChild(list);
+
+      var box = el("div", "matrix-box");
+      var t = el("table", "matrix");
+      var cap = el("caption", "sr", "What works on each " + brand.name + " board");
+      t.appendChild(cap);
+      var thead = el("thead"), hr = el("tr");
+      hr.appendChild(el("th", "", "Feature"));
+      boards.forEach(function (b) { var th = el("th", "", b.name); th.scope = "col"; hr.appendChild(th); });
+      thead.appendChild(hr); t.appendChild(thead);
+      var tb = el("tbody");
+      (d.features || []).forEach(function (f) {
+        var tr = el("tr");
+        var th = el("th", "", f.name); th.scope = "row"; tr.appendChild(th);
+        boards.forEach(function (b) {
+          var lv = (b.support || {})[f.id] || "none";
+          var td = el("td");
+          td.appendChild(mark(lv, levels[lv] || lv));
+          var note = (b.feature_notes || {})[f.id];
+          if (note) td.appendChild(el("span", "cell-note", note));
+          tr.appendChild(td);
+        });
+        tb.appendChild(tr);
+      });
+      t.appendChild(tb);
+      box.appendChild(t);
+      sec.appendChild(box);
+      root.appendChild(sec);
     });
   }).catch(function () {
-    document.getElementById("board-rows").innerHTML =
-      '<tr><td colspan="4" class="board-empty">The board list could not be loaded.</td></tr>';
+    root.innerHTML = '<p class="aside">The board list could not be loaded.</p>';
   });
 })();
