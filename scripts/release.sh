@@ -57,10 +57,13 @@ PY
 }
 board_name() { python3 -c 'import json,sys; print(next(b["name"] for b in json.load(open(sys.argv[1]))["boards"] if b["id"]==sys.argv[2]))' "$BOARDS_JSON" "$1"; }
 
-esptool_cmd() {
+esptool_cmd() {   # an installed esptool, the one in ESP-IDF, or the one PlatformIO brings
+  local pio_esptool="$HOME/.platformio/packages/tool-esptoolpy/esptool.py"
   if command -v esptool >/dev/null; then echo esptool
   elif command -v esptool.py >/dev/null; then echo esptool.py
-  else echo "python3 -m esptool"; fi
+  elif python3 -c "import esptool" 2>/dev/null; then echo "python3 -m esptool"
+  elif [ -f "$pio_esptool" ]; then echo "python3 $pio_esptool"
+  else echo "release.sh: no esptool (pip install --user esptool)" >&2; exit 1; fi
 }
 merge() {   # <out> <bootloader> <partitions> <otadata> <app>
   local e; e="$(esptool_cmd)"
