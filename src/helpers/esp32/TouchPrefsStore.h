@@ -779,8 +779,12 @@ bool    touchPrefsGetGlassTiles();
 void    touchPrefsSetGlassTiles(bool on);
 // Settings > Theme > Background: what is behind every screen. A plain colour is kept dark
 // (by night) or light (by day) enough for the text; 0xFFFFFFFF follows the accent.
+// NIGHT (Comet's own, the default): a still night sky in the accent's hue with a faint star
+// field. The Pager offers no aurora; a saved aurora shows the night sky there.
 enum : uint8_t { TOUCH_BG_AURORA = 0, TOUCH_BG_AURORA_MOVING = 1, TOUCH_BG_COLOR = 2, TOUCH_BG_IMAGE = 3,
-                 TOUCH_BG_NONE = 4 };   // NONE: the plain theme (black by night, its light grey-white by day)
+                 TOUCH_BG_NONE = 4,     // NONE: the plain theme (black by night, its light grey-white by day)
+                 TOUCH_BG_NIGHT = 5,
+                 TOUCH_BG_COUNT = 6 };
 // Settings > GPS > Save battery: the receiver rests between position checks, this
 // often (index into 2 / 5 / 15 / 30 minutes). The battery saver implies it.
 bool    touchPrefsGetGpsSaver();

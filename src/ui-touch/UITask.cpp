@@ -36406,7 +36406,13 @@ static inline const char* updChannelArchive() {
 // so we never buffer the whole JSON; entries are alphabetical so the max isn't last.
 // Reuses the worker's own WiFiClient/HTTPClient (passed in) rather than putting
 // a second pair on the ~8 KB worker stack — nesting them overflowed it.
-static const char* cometBoardId();   // WADA_BOARD_ID, defined with the OTA names below
+// This board's id in the release files (index-<id>.json, comet-<id>.bin). Host builds
+// (web/) have no WADA_BOARD_ID: they never install an update, the listing just reads empty.
+#if defined(WADA_BOARD_ID)
+static const char* cometBoardId() { return WADA_BOARD_ID; }
+#else
+static const char* cometBoardId() { return "host"; }
+#endif
 
 static int verchkFetchLatest(WiFiClient& client, HTTPClient& http) {
   http.setReuse(false);
@@ -37288,7 +37294,6 @@ static bool reportPostWorker(WiFiClient& client, HTTPClient& http,
 // was published. Every board is now listed explicitly and anything else refuses to compile, so
 // forgetting this table is a build break instead of a field brick.
 static const char* const OTA_BIN_NAME = "comet-" WADA_BOARD_ID;
-static const char* cometBoardId() { return WADA_BOARD_ID; }
 // Download the latest published app-only bin over plain HTTP and flash it into the spare A/B slot
 // via the Arduino Update writer. Runs on the tile-fetcher worker (off the UI thread); reports
 // progress through s_ota_state / s_ota_pct / s_ota_msg for the UI poll timer. We fetch the
@@ -53116,6 +53121,95 @@ static void auroraCompute(float p) {
   }
 }
 
+// ---- Night sky: Comet's own background ----------------------------------------------
+// Settings > Theme > Night sky (the default). A still sky in the accent's hue: a soft
+// glow rising from below the bottom edge into a deep, almost black top. It uses the
+// aurora's grid and row painter, so it is drawn by the same hook; the stars are added
+// once into the cached full-screen copy (nightStars), so they cost nothing per frame.
+// By day the same shape is a pale tint of the accent, without stars.
+static void nightCompute() {
+  const int W = lv_disp_get_hor_res(nullptr), H = lv_disp_get_ver_res(nullptr);
+  if (W <= 0 || H <= 0) return;
+  if (W != s_aur_w || H != s_aur_h || !s_aur_grid) {
+    const int gw = (W >> 3) + 2, gh = (H >> 3) + 2;
+    const size_t n = (size_t)gw * gh * 3;
+    uint16_t* g = (uint16_t*)psAlloc(n * 2 * sizeof(uint16_t));
+    if (!g) return;
+    if (s_aur_grid) heap_caps_free(s_aur_grid);
+    s_aur_grid = g; s_aur_shown = g + n;
+    s_aur_w = W; s_aur_h = H; s_aur_gw = gw; s_aur_gh = gh; s_aur_bh = (H + 15) >> 4;
+  }
+  const uint32_t acc = COLOR_GLOW;
+  const int amx = LV_MAX((int)((acc >> 16) & 255), LV_MAX((int)((acc >> 8) & 255), (int)(acc & 255)));
+  const int amn = LV_MIN((int)((acc >> 16) & 255), LV_MIN((int)((acc >> 8) & 255), (int)(acc & 255)));
+  const int h = rgbHue(acc);
+  const int sat = LV_MIN(78, amx ? (amx - amn) * 100 / amx : 0);   // a grey accent, a grey sky
+  // Three stops from the glow's centre outwards (the mockups' #0d3a2c, #061712, #030d0a
+  // for Comet green); by day a pale tint fading into the page colour.
+  uint32_t stop[3];
+  if (!s_theme_day) {
+    stop[0] = hsvRgb(h, sat, 23);
+    stop[1] = hsvRgb(h, sat * 95 / 100, 9);
+    stop[2] = hsvRgb(h, sat * 90 / 100, 5);
+  } else {
+    stop[0] = rgbMix(COLOR_BG, hsvRgb(h, sat, 100), 70);
+    stop[1] = rgbMix(COLOR_BG, hsvRgb(h, sat, 100), 22);
+    stop[2] = COLOR_BG;
+  }
+  float cs[3][3];
+  for (int k = 0; k < 3; ++k) {
+    cs[k][0] = (float)((stop[k] >> 16) & 255); cs[k][1] = (float)((stop[k] >> 8) & 255); cs[k][2] = (float)(stop[k] & 255);
+  }
+  for (int gy = 0; gy < s_aur_gh; ++gy) {
+    const float v = (float)(gy << 3) / (float)H;
+    const float dy = (v - 1.25f) / 1.4f;
+    uint16_t* out = s_aur_grid + (size_t)gy * s_aur_gw * 3;
+    for (int gx = 0; gx < s_aur_gw; ++gx, out += 3) {
+      const float u = (float)(gx << 3) / (float)W;
+      const float dx = (u - 0.5f) / 1.2f;
+      float d = sqrtf(dx * dx + dy * dy);   // 0 at the glow's centre, 1 at the far corners
+      if (d > 1.f) d = 1.f;
+      const int a = d < 0.55f ? 0 : 1;
+      const float t = d < 0.55f ? d / 0.55f : (d - 0.55f) / 0.45f;
+      for (int k = 0; k < 3; ++k) {
+        const float x = cs[a][k] + (cs[a + 1][k] - cs[a][k]) * t;
+        out[k] = (uint16_t)(LV_MAX(0.f, LV_MIN(k == 1 ? 252.f : 248.f, x)) * 256.f);   // room for the dither
+      }
+    }
+  }
+}
+
+#if CAP_BG_IMAGE
+// The star field, into the cached sky: a fixed scatter (the same every boot), about one
+// star per 1000 px. Most are single dim points in the text colour, every fifth tinted
+// with the accent, every ninth a little brighter with four faint arms.
+static void nightStars(lv_color_t* sky, int W, int H) {
+  if (s_theme_day || !sky) return;
+  uint32_t r = 0xC0FFEE11u;
+  auto rnd = [&r]() { r ^= r << 13; r ^= r >> 17; r ^= r << 5; return r; };
+  const uint32_t ink = 0xE4F1EAu, mint = rgbMix(ink, COLOR_GLOW, 110);
+  auto put = [&](int x, int y, uint32_t c, uint8_t a) {
+    if (x < 0 || y < 0 || x >= W || y >= H) return;
+    lv_color_t& px = sky[(size_t)y * W + x];
+    const uint32_t m = rgbMix(lv_color_to32(px) & 0xFFFFFFu, c, a);
+    px = lv_color_make((uint8_t)(m >> 16), (uint8_t)(m >> 8), (uint8_t)m);
+  };
+  const int n = W * H / 1000;
+  for (int i = 0; i < n; ++i) {
+    const int x = (int)(rnd() % (uint32_t)W), y = (int)(rnd() % (uint32_t)H);
+    const uint32_t k = rnd();
+    const uint32_t c = (k % 5 == 0) ? mint : ink;
+    const uint8_t a = (uint8_t)(50 + (k >> 8) % 90);   // 50..139 of 255: faint
+    if (k % 9 == 0) {
+      put(x, y, c, (uint8_t)LV_MIN(220, a + 80));
+      put(x - 1, y, c, a / 3); put(x + 1, y, c, a / 3); put(x, y - 1, c, a / 3); put(x, y + 1, c, a / 3);
+    } else {
+      put(x, y, c, a);
+    }
+  }
+}
+#endif
+
 // One row of sky into out: x0..x0+n-1 at y, between the grid points, dithered with a
 // 4x4 ordered pattern so the soft gradients do not band in RGB565. Per pixel: three
 // adds to walk the cell, three to dither, the packing.
@@ -53389,7 +53483,10 @@ static void bgTheme() {
   s_bg_kind = DOC_BG;   // capture builds: a background without touching the setting
 #endif
 #if !CAP_BG_IMAGE
-  if (s_bg_kind == TOUCH_BG_IMAGE) s_bg_kind = TOUCH_BG_AURORA;
+  if (s_bg_kind == TOUCH_BG_IMAGE) s_bg_kind = TOUCH_BG_NIGHT;
+#endif
+#if defined(TLORA_PAGER)   // the Pager has Comet's night sky, no aurora
+  if (s_bg_kind == TOUCH_BG_AURORA || s_bg_kind == TOUCH_BG_AURORA_MOVING) s_bg_kind = TOUCH_BG_NIGHT;
 #endif
 #if !CAP_BG_MOVING
   if (s_bg_kind == TOUCH_BG_AURORA_MOVING) s_bg_kind = TOUCH_BG_AURORA;
@@ -53489,10 +53586,12 @@ static void auroraBoot() {
   lv_draw_ctx_t* c = d && d->driver ? d->driver->draw_ctx : nullptr;
   if (!c || !c->draw_rect) return;
 #if CAP_BG_IMAGE
-  if (s_bg_kind == TOUCH_BG_IMAGE && !bgImageLoad()) s_bg_kind = TOUCH_BG_AURORA;
+  if (s_bg_kind == TOUCH_BG_IMAGE && !bgImageLoad()) s_bg_kind = TOUCH_BG_NIGHT;
 #endif
   if (s_bg_kind != TOUCH_BG_IMAGE) {
-    auroraCompute(0.12f);
+    const bool night = s_bg_kind == TOUCH_BG_NIGHT;
+    if (night) nightCompute();
+    else auroraCompute(0.12f);
     if (!s_aur_grid) return;
     memcpy(s_aur_shown, s_aur_grid, (size_t)s_aur_gw * s_aur_gh * 3 * sizeof(uint16_t));
     s_aur_on = true;
@@ -53504,11 +53603,12 @@ static void auroraBoot() {
 #if defined(DOC_CAPTURE) && defined(BENCH_NO_SKY_CACHE)
     if (false) {   // perf benchmark builds only: the sky worked out every frame
 #else
-    if (s_bg_kind == TOUCH_BG_AURORA && heap_caps_get_total_size(MALLOC_CAP_SPIRAM) >= (4u << 20)) {
+    if ((s_bg_kind == TOUCH_BG_AURORA || night) && heap_caps_get_total_size(MALLOC_CAP_SPIRAM) >= (4u << 20)) {
 #endif
       lv_color_t* sky = (lv_color_t*)psAlloc((size_t)s_aur_w * s_aur_h * sizeof(lv_color_t));
       if (sky) {
         for (int y = 0; y < s_aur_h; ++y) auroraRow(sky + (size_t)y * s_aur_w, 0, y, s_aur_w);
+        if (night) nightStars(sky, s_aur_w, s_aur_h);
         s_bg_img = sky; s_bg_w = s_aur_w; s_bg_h = s_aur_h; s_bg_sky = true;
       }
     }
@@ -69683,7 +69783,7 @@ struct ThemePageUi {
   lv_obj_t* hc_sw;
   lv_obj_t* swatch[kThemeColorN]; lv_obj_t* custom; lv_obj_t* custom_dot; lv_obj_t* accent_note;
   lv_obj_t* more_sw; lv_obj_t* style[3]; lv_obj_t* style_dot[3][3]; lv_obj_t* rainbow_sw; lv_obj_t* colour_note;
-  lv_obj_t* bg[5]; lv_obj_t* bg_sw[5]; lv_obj_t* bg_col_btn; lv_obj_t* bg_col_dot;
+  lv_obj_t* bg[TOUCH_BG_COUNT]; lv_obj_t* bg_sw[TOUCH_BG_COUNT]; lv_obj_t* bg_col_btn; lv_obj_t* bg_col_dot;
   lv_obj_t* bg_img_btn; lv_obj_t* bg_img_lbl; lv_obj_t* bg_note; lv_obj_t* glass_sw;
   lv_obj_t* bg_dim_box; lv_obj_t* bg_dim_row;   // Picture dimming, under the picture's button
   lv_obj_t* icons[2]; lv_obj_t* icons_av[2];
@@ -70303,7 +70403,7 @@ static void themePageRepaint() {
     ThemeTokens bt;
     themeTokensFor(mode, s_theme_pend.accent, more, s_theme_pend.style, bt);
     const uint32_t col = s_theme_pend.bg_col == 0xFFFFFFFFu ? bt.glow : s_theme_pend.bg_col;
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < TOUCH_BG_COUNT; ++i) {
       if (!s_tp.bg[i]) continue;
       themeChoiceStyle(s_tp.bg[i], !hc && s_theme_pend.bg_kind == i, !hc);
       lv_obj_t* sw = s_tp.bg_sw[i];
@@ -70312,6 +70412,11 @@ static void themePageRepaint() {
         lv_obj_set_style_bg_grad_dir(sw, LV_GRAD_DIR_NONE, LV_PART_MAIN);
         lv_obj_set_style_border_width(sw, i == TOUCH_BG_NONE ? 1 : 0, LV_PART_MAIN);   // black on a dark tile still shows its edge
         lv_obj_set_style_border_color(sw, lv_color_hex(bt.border), LV_PART_MAIN);
+      } else if (i == TOUCH_BG_NIGHT) {   // a little night: the accent's glow low, dark above
+        lv_obj_set_style_bg_color(sw, lv_color_hex(day ? bt.bg : rgbMix(0x030D0Au, bt.glow, 18)), LV_PART_MAIN);
+        lv_obj_set_style_bg_grad_color(sw, lv_color_hex(rgbMix(day ? bt.bg : 0x061712u, bt.glow, day ? 90 : 55)), LV_PART_MAIN);
+        lv_obj_set_style_bg_grad_dir(sw, LV_GRAD_DIR_VER, LV_PART_MAIN);
+        lv_obj_set_style_border_width(sw, 0, LV_PART_MAIN);
       } else {   // a little sky (behind the picture's icon too)
         const uint32_t lit = s_theme_pend.rainbow ? 0xC050FFu : bt.glow;
         lv_obj_set_style_bg_color(sw, lv_color_hex(rgbMix(bt.bg, lit, day ? 90 : 130)), LV_PART_MAIN);
@@ -70689,6 +70794,10 @@ static void buildThemeSettings() {
   s_theme_saved.style   = touchPrefsGetColorStyle();
   s_theme_saved.rainbow = touchPrefsGetRainbow();
   s_theme_saved.bg_kind = touchPrefsGetBackground();
+#if defined(TLORA_PAGER)   // a saved aurora shows the night sky here (bgTheme): pick that tile
+  if (s_theme_saved.bg_kind == TOUCH_BG_AURORA || s_theme_saved.bg_kind == TOUCH_BG_AURORA_MOVING)
+    s_theme_saved.bg_kind = TOUCH_BG_NIGHT;
+#endif
   s_theme_saved.bg_col  = touchPrefsGetBackgroundColor();
   touchPrefsGetBackgroundImage(s_theme_saved.bg_img, sizeof s_theme_saved.bg_img);
   s_theme_saved.glass   = touchPrefsGetGlassTiles();
@@ -70873,7 +70982,8 @@ static void buildThemeSettings() {
     s_tp.colour_note = themeNote(c, cw, "High contrast keeps its own fixed colours.");
   }
 
-  // Background: what is behind every screen. The aurora, still (the default) or moving,
+  // Background: what is behind every screen. Comet's night sky (the default); the aurora,
+  // still or moving (not on the Pager),
   // in the accent's colours (all of them with Taste the rainbow); a colour of your own;
   // a picture; or none (the plain theme: black, or its light page by day). A colour or a
   // picture is kept dark (light by day) enough to read over.
@@ -70887,11 +70997,18 @@ static void buildThemeSettings() {
     lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW_WRAP);
     lv_obj_set_style_pad_column(row, SC(6), LV_PART_MAIN);
     lv_obj_set_style_pad_row(row, SC(6), LV_PART_MAIN);
-    static const char* const kBgNames[5] = { "Still aurora", "Moving aurora", "Colour", "Image", "None" };
-    static const char* const kBgGlyph[5] = { nullptr, UI_ICON_WAVES, nullptr, UI_ICON_IMAGE, nullptr };
+    static const char* const kBgNames[TOUCH_BG_COUNT] = { "Still aurora", "Moving aurora", "Colour", "Image", "None", "Night sky" };
+    static const char* const kBgGlyph[TOUCH_BG_COUNT] = { nullptr, UI_ICON_WAVES, nullptr, UI_ICON_IMAGE, nullptr, nullptr };
+    // Night sky first: Comet's own look and the default.
+    static const uint8_t kBgOrder[TOUCH_BG_COUNT] = { TOUCH_BG_NIGHT, TOUCH_BG_AURORA, TOUCH_BG_AURORA_MOVING,
+                                                      TOUCH_BG_COLOR, TOUCH_BG_IMAGE, TOUCH_BG_NONE };
     const lv_coord_t tw = (cw - SC(6)) / 2;
-    for (int i = 0; i < 5; ++i) {
+    for (int oi = 0; oi < TOUCH_BG_COUNT; ++oi) {
+      const int i = kBgOrder[oi];
       if ((i == TOUCH_BG_IMAGE && !CAP_BG_IMAGE) || (i == TOUCH_BG_AURORA_MOVING && !CAP_BG_MOVING)) continue;
+#if defined(TLORA_PAGER)
+      if (i == TOUCH_BG_AURORA || i == TOUCH_BG_AURORA_MOVING) continue;   // no aurora on the Pager
+#endif
       lv_obj_t* b = themeChoiceTile(row, tw, TR(kBgNames[i]), themeBgKindCb, (uintptr_t)i);
       lv_obj_t* sw = lv_obj_create(lv_obj_get_child(b, 0));
       lv_obj_remove_style_all(sw);
@@ -70909,18 +71026,6 @@ static void buildThemeSettings() {
       s_tp.bg[i] = b;
       s_tp.bg_sw[i] = sw;
     }
-#if defined(TLORA_PAGER)
-    // The battery saver keeps a moving background still (its own help says so),
-    // which looked like Moving aurora not working. Say it where it is picked.
-    if (touchSleep::enabled()) {
-      lv_obj_t* n = lv_label_create(c);
-      lv_label_set_long_mode(n, LV_LABEL_LONG_WRAP);
-      lv_obj_set_width(n, cw);
-      lv_label_set_text(n, TR("Moving aurora stays still while Battery saver is on (Settings > Battery)."));
-      lv_obj_set_style_text_font(n, &g_font_12, LV_PART_MAIN);
-      lv_obj_set_style_text_color(n, lv_color_hex(COLOR_SUB), LV_PART_MAIN);
-    }
-#endif
     // The colour's own button, and the picture's (its file name), under the tiles.
     auto chip = [&](lv_event_cb_t cb, lv_obj_t** lbl, const char* text) {
       lv_obj_t* bt = lv_btn_create(c);

@@ -2638,12 +2638,12 @@ uint8_t touchPrefsGetGpsSaverEvery() {
 void touchPrefsSetGpsSaverEvery(uint8_t idx) { if (!s_begun) touchPrefsBegin(); prefsPutUChar("gps_every", idx > 3 ? 1 : idx); }
 uint8_t touchPrefsGetBackground() {
   if (!s_begun) touchPrefsBegin();
-  const uint8_t v = s_prefs.getUChar("bg_kind", TOUCH_BG_AURORA);
-  return v > TOUCH_BG_NONE ? TOUCH_BG_AURORA : v;
+  const uint8_t v = s_prefs.getUChar("bg_kind", TOUCH_BG_NIGHT);
+  return v >= TOUCH_BG_COUNT ? TOUCH_BG_NIGHT : v;
 }
 void touchPrefsSetBackground(uint8_t kind) {
   if (!s_begun) touchPrefsBegin();
-  prefsPutUChar("bg_kind", kind > TOUCH_BG_NONE ? TOUCH_BG_AURORA : kind);
+  prefsPutUChar("bg_kind", kind >= TOUCH_BG_COUNT ? TOUCH_BG_NIGHT : kind);
 }
 uint32_t touchPrefsGetBackgroundColor() {
   if (!s_begun) touchPrefsBegin();
