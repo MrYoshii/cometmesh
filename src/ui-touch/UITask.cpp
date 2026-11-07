@@ -130,7 +130,17 @@ static void* wadaMp3Scratch() { return s_wada_mp3_scratch; }
   #include <driver/i2s.h>     // pager ES8311 codec (notification tones + WAV playback)
   #include "Es8311Codec.h"    // PIN_I2S_MCLK/BCK/WS/DOUT/SDIN come from platformio.ini build flags
 #elif defined(HAS_TDECK_MAX)
-  #include <driver/i2s.h>     // Max ES8311 codec + NS4150B amp (notification tones + WAV playback)
+  // Max ES8311 codec + NS4150B amp (notification tones, WAV, Lua audio, audiobooks).
+  // ESP-IDF 5 has the channel driver (the legacy one is deprecated there and must not
+  // be linked next to it); the PlatformIO build on IDF 4.4 keeps the legacy driver.
+  #include <esp_idf_version.h>
+  #if ESP_IDF_VERSION_MAJOR >= 5
+    #define MAX_I2S_STD 1
+    #include <driver/i2s_std.h>
+  #else
+    #define MAX_I2S_STD 0
+    #include <driver/i2s.h>
+  #endif
   #include "Es8311Codec.h"    // shared with the pager; PIN_I2S_* come from the Max env build flags
   // LilyGo T-Deck-MAX pinmap fallbacks (platformio.ini is the source of truth).
   #ifndef PIN_I2S_MCLK
@@ -2150,21 +2160,81 @@ static bool        s_max_codec_begun = false;
 // play; its 4 x 128-frame buffers hold ~2 KB.
 static bool s_max_i2s_installed = false;
 static int  s_max_i2s_rate = 0;
+// Stereo with the sample duplicated into both slots (maxI2sWriteMono). A mono
+// ONLY_LEFT stream is not stable on the S3's legacy driver: install puts it in the
+// left slot, but any later i2s_set_clk moves it to the right slot, which the ES8311
+// (reading the left slot) only picked up as faint crosstalk. 4 x 128 stereo frames
+// of DMA = 2 KB; MCLK is 256 x fs either way.
+#if MAX_I2S_STD
+static i2s_chan_handle_t s_max_tx = nullptr;
+static bool s_max_i2s_on = false;   // channel enabled (clocks running)
+static bool maxI2sInstallOnce(int rate) {
+  if (s_max_i2s_installed) return true;
+  i2s_chan_config_t cc = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
+  cc.dma_desc_num = 4;
+  cc.dma_frame_num = 128;
+  cc.auto_clear = true;   // silence, not the last buffer looping, when writes stop
+  esp_err_t e = i2s_new_channel(&cc, &s_max_tx, nullptr);
+  if (e != ESP_OK) {
+    Serial.printf("[MAXAUDIO] i2s_new_channel failed %d (largest dma blk %u)\n", (int)e,
+                  (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA));
+    s_max_tx = nullptr;
+    return false;
+  }
+  i2s_std_config_t sc = {
+    .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG((uint32_t)rate),
+    .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO),
+    .gpio_cfg = {
+      .mclk = (gpio_num_t)PIN_I2S_MCLK, .bclk = (gpio_num_t)PIN_I2S_BCK, .ws = (gpio_num_t)PIN_I2S_WS,
+      .dout = (gpio_num_t)PIN_I2S_DOUT, .din = I2S_GPIO_UNUSED,
+      .invert_flags = { .mclk_inv = false, .bclk_inv = false, .ws_inv = false },
+    },
+  };
+  e = i2s_channel_init_std_mode(s_max_tx, &sc);
+  if (e != ESP_OK) {
+    Serial.printf("[MAXAUDIO] i2s std init failed %d rate=%d\n", (int)e, rate);
+    i2s_del_channel(s_max_tx);
+    s_max_tx = nullptr;
+    return false;
+  }
+  s_max_i2s_installed = true;
+  s_max_i2s_rate = rate;
+  return true;
+}
+static bool maxI2sWriteRaw(const void* buf, size_t bytes, size_t* bw, TickType_t to) {
+  return s_max_i2s_on && i2s_channel_write(s_max_tx, buf, bytes, bw, to) == ESP_OK;
+}
+static bool maxI2sSetRate(int rate) {   // only while stopped
+  i2s_std_clk_config_t clk = I2S_STD_CLK_DEFAULT_CONFIG((uint32_t)rate);
+  return i2s_channel_reconfig_std_clock(s_max_tx, &clk) == ESP_OK;
+}
+static void maxI2sStart() {
+  if (s_max_i2s_installed && !s_max_i2s_on) s_max_i2s_on = i2s_channel_enable(s_max_tx) == ESP_OK;
+}
+static void maxI2sStop() {
+  if (s_max_i2s_on) { i2s_channel_disable(s_max_tx); s_max_i2s_on = false; }
+}
+// Flush silence through the DMA ring, as the legacy i2s_zero_dma_buffer did.
+static void maxI2sZero() {
+  if (!s_max_i2s_on) return;
+  static const int16_t silence[128 * 2] = {};
+  for (int i = 0; i < 4; ++i) {
+    size_t bw = 0;
+    if (i2s_channel_write(s_max_tx, silence, sizeof silence, &bw, pdMS_TO_TICKS(50)) != ESP_OK) break;
+  }
+}
+#else
 static bool maxI2sInstallOnce(int rate) {
   if (s_max_i2s_installed) return true;
   i2s_config_t cfg = {};
   cfg.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX);
   cfg.sample_rate = rate;
   cfg.bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT;
-  // Stereo with the sample duplicated into both slots (maxI2sWriteMono). A mono
-  // ONLY_LEFT stream is not stable on the S3's legacy driver: install puts it in the
-  // left slot, but any later i2s_set_clk moves it to the right slot, which the ES8311
-  // (reading the left slot) only picked up as faint crosstalk.
   cfg.channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT;
   cfg.communication_format = I2S_COMM_FORMAT_STAND_I2S;
   cfg.intr_alloc_flags = 0;
   cfg.dma_buf_count = 4;
-  cfg.dma_buf_len = 128;   // 4 x 128 stereo frames = 2 KB
+  cfg.dma_buf_len = 128;
   cfg.use_apll = false;
   cfg.tx_desc_auto_clear = true;
   esp_err_t e = i2s_driver_install(kI2sPort, &cfg, 0, nullptr);
@@ -2185,6 +2255,16 @@ static bool maxI2sInstallOnce(int rate) {
   s_max_i2s_rate = rate;
   return true;
 }
+static bool maxI2sWriteRaw(const void* buf, size_t bytes, size_t* bw, TickType_t to) {
+  return i2s_write(kI2sPort, buf, bytes, bw, to) == ESP_OK;
+}
+static bool maxI2sSetRate(int rate) {   // same width + channels as installed, so no DMA re-allocation
+  return i2s_set_clk(kI2sPort, (uint32_t)rate, I2S_BITS_PER_SAMPLE_16BIT, I2S_CHANNEL_STEREO) == ESP_OK;
+}
+static void maxI2sStart() { i2s_start(kI2sPort); }
+static void maxI2sStop() { i2s_stop(kI2sPort); }
+static void maxI2sZero() { i2s_zero_dma_buffer(kI2sPort); }
+#endif
 // Write mono samples as duplicated L/R frames.
 static bool maxI2sWriteMono(const int16_t* mono, size_t frames, TickType_t to) {
   int16_t st[128 * 2];
@@ -2192,7 +2272,7 @@ static bool maxI2sWriteMono(const int16_t* mono, size_t frames, TickType_t to) {
     const size_t n = frames > 128 ? 128 : frames;
     for (size_t i = 0; i < n; ++i) st[2 * i] = st[2 * i + 1] = mono[i];
     size_t bw = 0;
-    if (i2s_write(kI2sPort, st, n * 2 * sizeof(int16_t), &bw, to) != ESP_OK || bw != n * 2 * sizeof(int16_t))
+    if (!maxI2sWriteRaw(st, n * 2 * sizeof(int16_t), &bw, to) || bw != n * 2 * sizeof(int16_t))
       return false;
     mono += n; frames -= n;
   }
@@ -2201,18 +2281,18 @@ static bool maxI2sWriteMono(const int16_t* mono, size_t frames, TickType_t to) {
 
 static bool maxAudioInstallRate(int rate) {
   if (!maxI2sInstallOnce(rate)) return false;
-  if (rate != s_max_i2s_rate) {   // same width + channels as installed, so no DMA re-allocation
-    esp_err_t e = i2s_set_clk(kI2sPort, (uint32_t)rate, I2S_BITS_PER_SAMPLE_16BIT, I2S_CHANNEL_STEREO);
-    if (e != ESP_OK) { Serial.printf("[MAXAUDIO] i2s_set_clk failed %d rate=%d\n", (int)e, rate); return false; }
+  if (rate != s_max_i2s_rate) {
+    maxI2sStop();   // the channel driver takes a new clock only while stopped
+    if (!maxI2sSetRate(rate)) { Serial.printf("[MAXAUDIO] i2s rate change failed rate=%d\n", rate); return false; }
     s_max_i2s_rate = rate;
   }
-  i2s_start(kI2sPort);
+  maxI2sStart();
   if (!s_max_codec_begun) {
     s_max_codec_begun = s_max_codec.begin(Wire, 0x18);
     Serial.printf("[MAXAUDIO] codec begin %s\n", s_max_codec_begun ? "ok" : "FAILED");
-    if (!s_max_codec_begun) { i2s_stop(kI2sPort); return false; }
+    if (!s_max_codec_begun) { maxI2sStop(); return false; }
   }
-  if (!s_max_codec.start((uint32_t)rate)) { Serial.printf("[MAXAUDIO] codec start FAILED rate=%d\n", rate); i2s_stop(kI2sPort); return false; }
+  if (!s_max_codec.start((uint32_t)rate)) { Serial.printf("[MAXAUDIO] codec start FAILED rate=%d\n", rate); maxI2sStop(); return false; }
   Serial.printf("[MAXAUDIO] started rate=%d\n", rate);
   return true;
 }
@@ -2236,8 +2316,8 @@ static void maxSetVolume(int pct) {
 static void maxAudioUninstall() {
   s_max_codec.setMute(true);
   s_max_codec.suspend();
-  i2s_zero_dma_buffer(kI2sPort);
-  i2s_stop(kI2sPort);   // driver stays installed -- see maxI2sInstallOnce
+  maxI2sZero();
+  maxI2sStop();   // driver stays installed -- see maxI2sInstallOnce
 }
 
 // Render `freq` Hz for `ms` ms into the already-installed I2S as a 16-bit
@@ -2263,7 +2343,7 @@ static void maxPlayToneRaw(int freq, int ms) {
     }
     maxI2sWriteMono(buf, (size_t)n, pdMS_TO_TICKS(200));
   }
-  i2s_zero_dma_buffer(kI2sPort);
+  maxI2sZero();
 }
 #endif  // HAS_TDECK_MAX
 
@@ -2503,7 +2583,7 @@ static bool maxPlayWavFile(const char* prefpath, int volPct) {
     maxI2sWriteMono(out, (size_t)frames, pdMS_TO_TICKS(300));
     remaining -= (uint32_t)got;
   }
-  i2s_zero_dma_buffer(kI2sPort);
+  maxI2sZero();
   maxAudioUninstall();
   f.close();
   return true;
@@ -2571,7 +2651,7 @@ static bool maxNotifyKick() {
 // Boot-time setup, before the radio stacks fragment internal RAM: install the resident
 // I2S driver (left stopped) and start the notify worker (it idles until kicked).
 static void maxAudioPrewarm() {
-  if (maxI2sInstallOnce(kI2sSampleRate)) i2s_stop(kI2sPort);
+  if (maxI2sInstallOnce(kI2sSampleRate)) maxI2sStop();
   maxNotifyWorkerEnsure();
   Serial.printf("[MAXAUDIO] prewarm i2s=%d worker=%d\n", (int)s_max_i2s_installed, s_max_notify_task != nullptr);
 }
