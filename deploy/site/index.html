@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comet: one radio, every mesh</title>
+<meta name="description" content="Comet is open-source firmware that turns a LoRa handheld into an off-grid companion: mesh messages, maps, books and audiobooks, and soon SMS and calls.">
+<meta property="og:title" content="Comet: one radio, every mesh">
+<meta property="og:description" content="Open-source firmware for LoRa handhelds: mesh messaging, maps, books and audiobooks.">
+<meta property="og:image" content="https://cometmesh.org/og-image.jpg">
+<meta name="theme-color" content="#08221b">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" href="comet-mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+<header class="sky">
+  <nav class="top" aria-label="Site">
+    <a class="brand" href="#top" aria-label="Comet home"><img src="comet-mark.svg" alt="" width="52" height="28">Comet</a>
+    <span class="nav-links">
+      <a href="#today">What it does</a>
+      <a href="#roadmap">Roadmap</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/MrYoshii/cometmesh">GitHub</a>
+    </span>
+  </nav>
+
+  <div class="hero" id="top">
+    <canvas id="comet" aria-label="The Comet mark: a comet whose tail is a mesh. A message hops in through the tail, lighting each node, and the head sends out a wave." role="img"></canvas>
+    <div class="hero-copy">
+      <h1>One radio,<br>every mesh.</h1>
+      <p class="lede">Comet is open-source firmware that turns a LoRa handheld into a device you can always carry: mesh messages, offline maps, books and audiobooks, and soon text messages and calls over the built-in modem.</p>
+      <p class="actions">
+        <a class="btn btn-glow" href="#install">Install Comet</a>
+        <a class="btn btn-quiet" href="#roadmap">See the roadmap</a>
+      </p>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="paper" id="today" aria-labelledby="today-h">
+    <div class="wrap two">
+      <div>
+        <h2 id="today-h">What Comet does today</h2>
+        <p class="aside">Built on MeshCore. Everything below works on the LilyGo T-Deck Max, most of it on the T-LoRa Pager.</p>
+      </div>
+      <dl class="features">
+        <div><dt>Mesh messaging</dt><dd>Chats, channels and contacts on MeshCore, with the companion app over Bluetooth, Wi-Fi or USB.</dd></div>
+        <div><dt>Maps</dt><dd>Offline map tiles on the SD card, your position from the GPS, the nodes you have heard.</dd></div>
+        <div><dt>Books and audiobooks</dt><dd>An EPUB reader, and an Audiobookshelf client that streams, downloads for offline listening, or plays folders of MP3s from the card.</dd></div>
+        <div><dt>Files over USB</dt><dd>Browse, upload and download the SD card from a browser over the cable.</dd></div>
+        <div><dt>Made for e-paper</dt><dd>Contrast and refresh tuned for the Max's e-paper, with keyboard, touch, haptics and audio.</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="paper boards" aria-labelledby="boards-h">
+    <div class="wrap">
+      <h2 id="boards-h">Boards</h2>
+      <table class="board-table">
+        <thead><tr><th scope="col">Device</th><th scope="col">Radio</th><th scope="col">Status</th></tr></thead>
+        <tbody>
+          <tr><td>LilyGo T-Deck Max</td><td>SX1262, A7682E modem, e-paper</td><td><span class="pill pill-main">Main target</span></td></tr>
+          <tr><td>LilyGo T-LoRa Pager</td><td>SX1262 or LR1121</td><td><span class="pill">Supported</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="sky roadmap" id="roadmap" aria-labelledby="roadmap-h">
+    <div class="wrap">
+      <h2 id="roadmap-h">Roadmap</h2>
+      <p class="aside" id="roadmap-updated">Where Comet is and where it is going.</p>
+      <ol class="route" id="route">
+        <li class="route-empty">The roadmap loads from roadmap.json. If you see this, open the page from a web server.</li>
+      </ol>
+      <p class="legend" aria-hidden="true">
+        <span><i class="dot dot-done"></i>Done</span>
+        <span><i class="dot dot-now"></i>Being built</span>
+        <span><i class="dot dot-next"></i>Planned</span>
+      </p>
+    </div>
+  </section>
+
+  <section class="paper" id="install" aria-labelledby="install-h">
+    <div class="wrap">
+      <h2 id="install-h">Install</h2>
+      <p class="aside">There are no releases yet: builds come from GitHub Actions. A browser installer follows with the first release.</p>
+      <ol class="steps">
+        <li><h3>Get the firmware</h3><p>Download the <code>comet.bin</code> for your board from the latest build on <a href="https://github.com/MrYoshii/cometmesh/actions">GitHub Actions</a>.</p></li>
+        <li><h3>Connect the device</h3><p>Plug it in over USB. Install <a href="https://docs.espressif.com/projects/esptool/">esptool</a> if you do not have it.</p></li>
+        <li><h3>Flash it</h3><p>Over an existing install this keeps your settings, contacts and chats:</p>
+          <pre><code>esptool --chip esp32s3 --port &lt;PORT&gt; write-flash 0x10000 comet.bin</code></pre></li>
+      </ol>
+    </div>
+  </section>
+</main>
+
+<footer class="sky foot">
+  <div class="wrap">
+    <p>Comet is free software under the GPL-3.0. It is a fork of <a href="https://github.com/ALLFATHER-BV/wadamesh">wadamesh</a> and runs on <a href="https://github.com/meshcore-dev/MeshCore">MeshCore</a>; it is not affiliated with wadamesh, MeshCore, Meshtastic or LilyGo.</p>
+    <p><a href="https://github.com/MrYoshii/cometmesh">Source on GitHub</a> <a href="https://github.com/MrYoshii/cometmesh/issues">Report a problem</a></p>
+  </div>
+</footer>
+
+<script src="comet.js"></script>
+<script src="roadmap.js"></script>
+</body>
+</html>

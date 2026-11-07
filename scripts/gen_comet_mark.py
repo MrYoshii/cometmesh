@@ -293,6 +293,22 @@ def write_glow(spine):
         f.write("};\n")
 
 
+def write_site_geom(nodes, links, head_links, path, dust, spine):
+    """The same geometry for the website, which draws and animates the mark like the device."""
+    import json
+    g = {
+        "box": [W, H], "head": [HX, HY],
+        "nodes": [[round(x, 2), round(y, 2), round(r, 2), round(light(dist), 3)] for x, y, r, _s, dist in nodes],
+        "dust": [[round(x, 2), round(y, 2), round(r, 2), round(0.8 * light(dist), 3)] for x, y, r, dist in dust],
+        "links": [list(l) for l in links], "headLinks": head_links, "path": path,
+        "arcs": [[rad, wid, lv] for rad, wid, lv in ARCS], "arcHalf": ARC_HALF,
+        "spine": [[round(x, 2), round(y, 2), round(hw, 2), round(lv, 3)] for x, y, hw, lv in spine],
+    }
+    with open(os.path.join(ROOT, "deploy", "site", "comet-geom.json"), "w") as f:
+        json.dump(g, f, separators=(",", ":"))
+        f.write("\n")
+
+
 def write_geom(nodes, links, head_links, path, dust, spine):
     p = os.path.join(ROOT, "src", "ui-touch", "CometMarkGeom.h")
     with open(p, "w") as f:
@@ -425,6 +441,7 @@ if __name__ == "__main__":
     assert len(nodes) < 256
     write_geom(nodes, links, head_links, path, dust, spine)
     write_glow(spine)
+    write_site_geom(nodes, links, head_links, path, dust, spine)
     img = render_bitmap(nodes, links, head_links, dust, spine)
     ink = render_ink(nodes, links, head_links, dust)
     write_bitmap(img, ink)

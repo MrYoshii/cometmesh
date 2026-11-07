@@ -1,0 +1,32 @@
+{
+  "updated": "2026-11-07",
+  "note": "Where Comet is and where it is going. Edit this file to update the roadmap on cometmesh.org; status is done, now or next.",
+  "stages": [
+    {
+      "title": "Comet stands on its own",
+      "items": [
+        { "status": "done", "title": "Forked from wadamesh, renamed throughout", "text": "Own name, own repository, own logo; credits to wadamesh and MeshCore stay." },
+        { "status": "done", "title": "Audiobooks and e-books", "text": "Audiobookshelf streaming and downloads, books copied onto the SD card, an EPUB reader." },
+        { "status": "done", "title": "The Comet mark", "text": "A comet whose tail is a mesh, drawn and animated the same way on every screen, e-paper included." }
+      ]
+    },
+    {
+      "title": "A new foundation",
+      "items": [
+        { "status": "now", "title": "ESP-IDF 5.5 for the T-Deck Max", "text": "Arduino 3.3 on a current ESP-IDF: about 80 KB more free memory and downloads three to four times faster. In testing on the device." },
+        { "status": "now", "title": "A board layer", "text": "Every board in one folder behind fixed interfaces, so a new device is a day of work instead of a week." },
+        { "status": "next", "title": "T-LoRa Pager on the new base", "text": "The first board to come over through the board layer." },
+        { "status": "next", "title": "Releases and a web installer", "text": "Built by CI, installed from the browser, updated over Wi-Fi from our own servers." }
+      ]
+    },
+    {
+      "title": "The always-with-you device",
+      "items": [
+        { "status": "next", "title": "SMS and calls on the T-Deck Max", "text": "The A7682E modem: text messages, voice calls and mobile data, for when there is no mesh." },
+        { "status": "next", "title": "Every mesh", "text": "Meshtastic next to MeshCore on the same radio, with one screen to pick the active mesh." },
+        { "status": "next", "title": "A new interface", "text": "Comet's own UI on LVGL 9, designed for small screens and e-paper first." },
+        { "status": "next", "title": "More boards", "text": "Once the board layer has proven itself on the Pager." }
+      ]
+    }
+  ]
+}
