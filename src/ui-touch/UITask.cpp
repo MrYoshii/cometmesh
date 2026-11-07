@@ -69748,12 +69748,21 @@ static void touchThemeApplyCb(lv_theme_t* /*th*/, lv_obj_t* obj) {
 }
 static lv_theme_t s_touch_theme;   // our wrapper theme (parent = stock default)
 
-// Curated accent palette for the swatch grid: COMET brand teal (default,
-// the logo dots) first, then stock grey + a colour spread.
+// Curated accent palette for the swatch grid: the six Comet colours first (Comet
+// green, the default and the logo's, then the sky's others), then stock grey and a
+// spread. Every other colour comes from the hue slider or a hex value in the picker.
 static const uint32_t kThemeColors[] = {
-  0x16C46B, 0x57585A, 0x3B82F6, 0x2DA8A0, 0x3FA34D, 0x8B5CF6,
-  0xD2569E, 0xD0524A, 0xE0823C, 0xC8A030, 0x5B6BD0, 0xA85AB0,
+  0x16C46B, 0x3FA7E8, 0x8B5CF6, 0xE0B23C, 0xD0524A, 0xC3CBCF,
+  0x57585A, 0x2DA8A0, 0x3FA34D, 0xD2569E, 0xE0823C, 0x5B6BD0,
 };
+static const char* const kCometColorNames[6] = {
+  "Comet green", "Ice blue", "Nebula violet", "Sun gold", "Mars red", "Polar white",
+};
+// The Comet name of a colour, or "Custom colour" for anything else.
+static const char* cometColorName(uint32_t rgb) {
+  for (int i = 0; i < 6; ++i) if (kThemeColors[i] == (rgb & 0xFFFFFFu)) return TR(kCometColorNames[i]);
+  return TR("Custom colour");
+}
 
 // ---- Settings > Theme: what the page has picked and not yet applied ----------------
 // The mode, the accent and the colour look are read by every widget as it is built,
@@ -69823,9 +69832,17 @@ static uint32_t accentParseHex(const char* t) {
   }
   return (n == 6) ? (rgb & 0xFFFFFFu) : 0xFFFFFFFFu;
 }
-static void accentSetSelection(uint32_t rgb, bool update_hex) {
+static lv_obj_t* s_accent_name_lbl = nullptr;   // the Comet name of the chosen colour
+static lv_obj_t* s_accent_hue_sl   = nullptr;   // the hue slider (the wheel turns it on the Pager)
+static void accentSetSelection(uint32_t rgb, bool update_hex, bool update_hue = true) {
   s_accent_sel = rgb & 0xFFFFFFu;
   accentPreviewShow(s_accent_sel);
+  if (s_accent_name_lbl) lv_label_set_text(s_accent_name_lbl, cometColorName(s_accent_sel));
+  if (s_accent_hue_sl) {
+    lv_obj_set_style_bg_color(s_accent_hue_sl, lv_color_hex(s_accent_sel), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(s_accent_hue_sl, lv_color_hex(s_accent_sel), LV_PART_KNOB);
+    if (update_hue) lv_slider_set_value(s_accent_hue_sl, rgbHue(s_accent_sel), LV_ANIM_OFF);
+  }
   if (update_hex && s_accent_hex_ta) {
     s_accent_syncing = true;
     char hx[8]; snprintf(hx, sizeof hx, "%06X", (unsigned)s_accent_sel);
@@ -69837,6 +69854,18 @@ static void accentSwatchCb(lv_event_t* e) {
   if (lv_event_get_code(e) == LV_EVENT_CLICKED)
     accentSetSelection((uint32_t)(uintptr_t)lv_event_get_user_data(e), true);
 }
+// The hue slider: the same brightness and colourfulness as the colour you started
+// from, round the colour wheel (a grey start becomes a full colour).
+static void accentHueCb(lv_event_t* e) {
+  if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED || !s_accent_hue_sl) return;
+  const uint32_t c = s_accent_sel;
+  const int r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255;
+  const int mx = LV_MAX(r, LV_MAX(g, b)), mn = LV_MIN(r, LV_MIN(g, b));
+  int sat = mx ? (mx - mn) * 100 / mx : 0, val = mx * 100 / 255;
+  if (sat < 25) sat = 75;
+  if (val < 55) val = 80;
+  accentSetSelection(hsvRgb((int)lv_slider_get_value(s_accent_hue_sl), sat, val), true, false);
+}
 static void accentHexCb(lv_event_t* e) {
   if (s_accent_syncing || !s_accent_hex_ta) return;
   uint32_t rgb = accentParseHex(lv_textarea_get_text(s_accent_hex_ta));
@@ -69845,6 +69874,7 @@ static void accentHexCb(lv_event_t* e) {
 static void accentPickerClose() {
   if (s_accent_picker) { popupClose(&s_accent_picker); }
   s_accent_hex_ta = s_accent_preview = nullptr;
+  s_accent_name_lbl = s_accent_hue_sl = nullptr;
   s_picker_for_bg = false;
   settingsSubPageClose(accentPickerClose);
 }
@@ -69925,6 +69955,25 @@ static void openAccentPicker() {
     lv_obj_set_style_border_color(sb, lv_color_hex(0x202224), LV_PART_MAIN);
     lv_obj_add_event_cb(sb, accentSwatchCb, LV_EVENT_CLICKED, (void*)(uintptr_t)kThemeColors[i]);
   }
+
+  // The chosen colour's name, then the hue slider for every colour in between
+  // (touch: drag it; Pager: click, turn the wheel, click to keep).
+  s_accent_name_lbl = lv_label_create(s_accent_picker);
+  useChainedFont(s_accent_name_lbl);
+  lv_obj_set_style_text_color(s_accent_name_lbl, lv_color_hex(COLOR_TEXT), LV_PART_MAIN);
+  lv_label_set_text(s_accent_name_lbl, "");
+  lv_obj_set_style_pad_bottom(s_accent_name_lbl, SC(6), LV_PART_MAIN);   // room for the slider's knob
+  s_accent_hue_sl = lv_slider_create(s_accent_picker);
+  lv_slider_set_range(s_accent_hue_sl, 0, 359);
+  lv_obj_set_size(s_accent_hue_sl, sw - SC(60), SC(8));
+  lv_obj_set_style_pad_ver(s_accent_hue_sl, SC(6), LV_PART_MAIN);
+  lv_obj_set_style_bg_color(s_accent_hue_sl, lv_color_hex(COLOR_BORDER), LV_PART_MAIN);
+  lv_obj_set_style_bg_opa(s_accent_hue_sl, LV_OPA_COVER, LV_PART_MAIN);
+  lv_obj_add_event_cb(s_accent_hue_sl, accentHueCb, LV_EVENT_VALUE_CHANGED, nullptr);
+  lv_obj_t* hue_gap = lv_obj_create(s_accent_picker);   // and below it
+  lv_obj_remove_style_all(hue_gap);
+  lv_obj_clear_flag(hue_gap, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_size(hue_gap, 1, SC(4));
 
   lv_obj_t* hexrow = lv_obj_create(s_accent_picker);
   lv_obj_remove_style_all(hexrow);
