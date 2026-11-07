@@ -1,13 +1,15 @@
 # cometmesh.org infrastructure
 
-Distribution stack for comet: a **VPS nginx origin behind Cloudflare**.
+Distribution stack for comet: **one Debian VPS running nginx**, no CDN in front.
+Plain HTTP where the device fetches (it has no TLS to spare), HTTPS from Let's
+Encrypt where browsers come.
 
 ```
-tiles.cometmesh.org     →CF (HTTP, edge-cached) →  nginx → OpenStreetMap / OpenTopoMap
-firmware.cometmesh.org  →CF (cache bins)        →  nginx → /srv/comet/firmware
-files.cometmesh.org     →CF (HTTP)              →  nginx → the USB Files page
-flasher.cometmesh.org   →CF (HTTPS)             →  301 → cometmesh.org
-cometmesh.org           →CF (HTTPS)             →  nginx → /srv/comet/site (home page + roadmap)
+tiles.cometmesh.org     HTTP   nginx (14-day disk cache) → tile-transcode → OSM / OpenTopoMap
+firmware.cometmesh.org  HTTP   nginx → /srv/comet/firmware   (updates, apps/, langs)
+files.cometmesh.org     HTTPS  nginx → /srv/comet/files      (USB Files page; WebSerial needs HTTPS)
+cometmesh.org, www.     HTTPS  nginx → /srv/comet/site       (home page + roadmap)
+flasher.cometmesh.org   HTTPS  301 → cometmesh.org
 ```
 
 **Map tile styles.** The default `/{z}/{x}/{y}.jpg` route serves **OpenStreetMap**
@@ -21,40 +23,64 @@ map tiles are **© OpenTopoMap (CC-BY-SA)** over **© OpenStreetMap contributors
 transcode service provides). Deploying the topo routes = update
 `tiles.cometmesh.org.conf` + `tile-transcode.py`, then
 `systemctl restart comet-tile-transcode && nginx -t && systemctl reload nginx`
-and purge the Cloudflare cache for `tiles.cometmesh.org/opentopo/*`.
+and clear `/var/cache/nginx/comet-tiles` if old topo tiles should go.
 
-The firmware fetches **tiles + the update-check over plain HTTP** (on-device HTTPS
-isn't viable — mbedTLS needs ~30 KB heap, only ~5 KB is free post-Wi-Fi), so the
-tile + firmware hosts must stay reachable over HTTP. Cloudflare provides the edge
-cache, HTTPS for the flasher, and hides the origin IP (so no IP lives in this repo
-or the firmware).
+The firmware fetches **tiles, updates and the store over plain HTTP** (on-device
+HTTPS isn't viable: mbedTLS needs ~30 KB heap), so `tiles.` and `firmware.` must
+never redirect to HTTPS.
 
-## 1. VPS (origin)
+## 1. VPS
+
+Debian, as root. Deploys run as an unprivileged user `comet` (SSH key only) that
+owns `/srv/comet`.
 
 ```bash
-sudo apt install nginx
-sudo mkdir -p /srv/comet/firmware/releases/TOUCH /srv/comet/site /var/cache/nginx/comet-tiles
-sudo cp deploy/nginx/tiles.cometmesh.org.conf    /etc/nginx/sites-available/
-sudo cp deploy/nginx/firmware.cometmesh.org.conf /etc/nginx/sites-available/
-sudo cp deploy/nginx/flasher.cometmesh.org.conf  /etc/nginx/sites-available/   # cometmesh.org + flasher redirect
-sudo ln -s /etc/nginx/sites-available/tiles.cometmesh.org.conf    /etc/nginx/sites-enabled/
-sudo ln -s /etc/nginx/sites-available/firmware.cometmesh.org.conf /etc/nginx/sites-enabled/
-sudo ln -s /etc/nginx/sites-available/flasher.cometmesh.org.conf  /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl reload nginx
+apt install -y nginx rsync git python3-flask python3-pil python3-requests certbot python3-certbot-nginx
+git clone https://github.com/MrYoshii/cometmesh /opt/cometmesh
+
+adduser --disabled-password --gecos "Comet deploy" comet
+install -d -m 700 -o comet -g comet /home/comet/.ssh     # + authorized_keys (600)
+
+mkdir -p /srv/comet/{site,files,firmware/releases/TOUCH,firmware/releases/BETA,firmware/apps}
+echo '[]' > /srv/comet/firmware/releases/TOUCH/index.json
+echo '[]' > /srv/comet/firmware/releases/BETA/index.json
+chown -R comet: /srv/comet
+mkdir -p /var/cache/nginx/comet-tiles && chown www-data: /var/cache/nginx/comet-tiles
+
+cd /opt/cometmesh/deploy/nginx
+cp tiles.cometmesh.org.conf firmware.cometmesh.org.conf files.cometmesh.org.conf flasher.cometmesh.org.conf /etc/nginx/sites-available/
+for f in tiles firmware files flasher; do ln -sf /etc/nginx/sites-available/$f.cometmesh.org.conf /etc/nginx/sites-enabled/; done
+rm -f /etc/nginx/sites-enabled/default
+nginx -t && systemctl reload nginx
+
+mkdir -p /opt/comet-tiles && cp /opt/cometmesh/deploy/tile-transcode.py /opt/comet-tiles/
+cp /opt/cometmesh/deploy/comet-tile-transcode.service /etc/systemd/system/
+systemctl daemon-reload && systemctl enable --now comet-tile-transcode
 ```
 
-## 2. Cloudflare
+## 2. DNS and TLS
 
-- **DNS:** `A`/`AAAA` records for `tiles`, `firmware`, `files`, `flasher`, `@` → the VPS IP,
-  all **Proxied** (orange cloud).
-- **SSL/TLS:** mode **Flexible** (CF↔origin HTTP) is enough since the origin is
-  HTTP-only. **Do NOT enable "Always Use HTTPS"** on `tiles.` or `firmware.` — the
-  firmware needs plain HTTP there.
-- **Cache Rules:**
-  - `tiles.cometmesh.org/*` → Eligible for cache, Edge TTL ~14d.
-  - `firmware.cometmesh.org/releases/*/*.bin` → cache, Edge TTL ~1d.
-  - `firmware.cometmesh.org/releases/TOUCH` (the listing) → short TTL (~60s) or
-    Bypass, so new releases appear promptly.
+- **DNS:** `A` (and `AAAA`) for `@`, `www`, `tiles`, `firmware`, `files`, `flasher`
+  → the VPS.
+- **TLS** for the browser hosts only; `--redirect` adds the HTTPS redirect to just
+  these server blocks, `tiles.` and `firmware.` stay HTTP:
+
+```bash
+certbot --nginx --redirect -m <mail> --agree-tos \
+  -d cometmesh.org -d www.cometmesh.org -d files.cometmesh.org -d flasher.cometmesh.org
+```
+
+certbot edits the live copies in `/etc/nginx/sites-available/`. When a config in
+this repo changes, copy it over and run the same certbot command again: it
+re-adds its lines to the fresh file.
+
+Check:
+
+```bash
+curl -sI http://tiles.cometmesh.org/5/17/11.jpg | head -1     # 200, no redirect
+curl -s  http://firmware.cometmesh.org/releases/TOUCH         # the listing
+curl -sI http://cometmesh.org | head -3                       # 301 -> https
+```
 
 ## 3. Publishing a release
 
@@ -101,11 +127,9 @@ listings and bins, `apps/` (store and languages, `scripts/deploy-apps.sh`), map 
 
 ## TODO before public launch
 
-- **Re-enable OTA-over-Wi-Fi** in the firmware (currently it version-checks then
-  defers to manual flashing).
 - **Flip `comet` repo public** = launch.
 - Decide tile-proxy sharing: dedicated `tiles.cometmesh.org` (this config) vs
   reusing the meshcomod proxy.
 
-> Never commit the VPS IP, SSH keys, or `COMET_VPS`. Cloudflare fronts the
-> origin; the deploy target is supplied via the environment at publish time.
+> Never commit SSH keys or `COMET_VPS`; the deploy target comes from the
+> environment (an `~/.ssh/config` alias such as `comet01-deploy` works).

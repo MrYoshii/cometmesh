@@ -91,7 +91,6 @@ fi
 if [ -n "$DEST" ] && [ "$MODE" != "--no-push" ]; then
   rsync -av --exclude 'apps/' "$OUT/" "$DEST:$DEST_PATH/"
   echo "published $TAG ($([ "$MODE" = "--promote" ] && echo stable || echo beta)) -> $DEST:$DEST_PATH"
-  echo "note: Cloudflare caches; the listings have a 60 s TTL, the bins are immutable per tag."
 else
   echo "staged in $OUT (not published: set COMET_VPS, or rsync -av --exclude apps/ out/firmware/ host:/srv/comet/firmware/)"
 fi

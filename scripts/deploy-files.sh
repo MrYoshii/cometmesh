@@ -25,5 +25,4 @@ rsync -avz $DRY --delete "$SRC" "$DEST:$DEST_PATH/"
 if [ -z "$DRY" ]; then
   echo
   echo "deployed deploy/files/ -> $DEST:$DEST_PATH"
-  echo "note: Cloudflare edge-caches; purge files.cometmesh.org if a change does not show."
 fi

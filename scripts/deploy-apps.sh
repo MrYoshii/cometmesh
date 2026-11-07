@@ -88,7 +88,7 @@ if ! ls "$ROOT"/.pio/libdeps/*/lvgl >/dev/null 2>&1 && [ ! -d "$ROOT/idf/deps/li
       read -r repo ref <<<"$(pin "$lib")"
       [ -n "$repo" ] || { echo "no pin for $lib in idf/fetch-deps.sh"; exit 1; }
       echo "fetching $lib ($repo $ref) into $COMET_LIBDEPS"
-      git clone -q --depth 1 -b "$ref" "https://github.com/$repo" "$COMET_LIBDEPS/$lib"
+      git -c advice.detachedHead=false clone -q --depth 1 -b "$ref" "https://github.com/$repo" "$COMET_LIBDEPS/$lib"
     fi
   done
 fi
