@@ -3257,7 +3257,16 @@ static void initSelectionGlowStyle(lv_style_t* style, uint32_t color) {
 // the themes use (green by default) and from the aurora behind them; deep orange by
 // day, where yellow washes out on the light ground. Taste the rainbow leaves it alone:
 // the one colour that always means "you are here".
+#if defined(TLORA_PAGER)
+// Comet on the Pager: the cursor is the comet's own light, a bright tint of the accent
+// (a deep shade by day), so it reads as the brightest thing on screen and still stands
+// apart from the accent's plain borders on picked chips.
+static uint32_t focusRingColor() {
+  return s_theme_day ? rgbMix(COLOR_GLOW, 0x000000u, 110) : rgbMix(COLOR_GLOW, 0xFFFFFFu, 120);
+}
+#else
 static uint32_t focusRingColor() { return s_theme_day ? 0xD97706u : 0xFFC21Au; }
+#endif
 static bool colorsNear(uint32_t a, uint32_t b) {   // 0xRRGGBB or 0xAARRGGBB
   const int dr = (int)((a >> 16) & 0xFF) - (int)((b >> 16) & 0xFF);
   const int dg = (int)((a >> 8) & 0xFF) - (int)((b >> 8) & 0xFF);
