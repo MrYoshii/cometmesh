@@ -34686,6 +34686,131 @@ static lv_coord_t chatsBuildHeader(lv_obj_t* tab) {
   return h;
 }
 
+#if defined(TLORA_PAGER)
+// ---- Inbox, Pager: the list on the left, the focused chat on the right -----------------
+// Turning through the list reads along: the pane shows the focused chat's newest
+// messages, so most chats can be read without opening them. Press opens the chat as
+// before; every row keeps its long press (Hold Enter) and the header's actions.
+static lv_obj_t* s_inbox_prev = nullptr;        // the pane (null when the inbox is one column)
+static lv_obj_t* s_inbox_prev_title = nullptr;
+static lv_obj_t* s_inbox_prev_sub = nullptr;
+static lv_obj_t* s_inbox_prev_body = nullptr;
+static int       s_inbox_prev_thread = -1;
+static void formatChatRowTime(char* buf, size_t cap, uint32_t ts);   // with the chat list, below
+static inline lv_coord_t inboxListW() { return tabContentW() * 47 / 100; }
+
+static void inboxPreviewShow(int thread) {
+  if (!s_inbox_prev || !s_inbox_prev_body || !g_lv.task) return;
+  s_inbox_prev_thread = thread;
+  lv_obj_clean(s_inbox_prev_body);
+  bool ch = false; uint16_t unread = 0; uint32_t ts = 0;
+  char name[UITask::MAX_THREAD_NAME + 1];
+  if (thread < 0 || !g_lv.task->getThreadInfo(thread, ch, unread, ts, name, sizeof name)) {
+    lv_label_set_text(s_inbox_prev_title, "");
+    lv_label_set_text(s_inbox_prev_sub, "");
+    return;
+  }
+  char shown[UITask::MAX_THREAD_NAME + 8];
+  copyUtf8ReplacingMissingGlyphs(&g_font_semi_16, shown, sizeof shown, threadShownName(thread, name));
+  lv_label_set_text(s_inbox_prev_title, shown);
+  char sub[48];
+  if (unread > 0) snprintf(sub, sizeof sub, "%s · %u %s", ch ? TR("Channel") : TR("Direct chat"), (unsigned)unread, TR("new"));
+  else            snprintf(sub, sizeof sub, "%s", ch ? TR("Channel") : TR("Direct chat"));
+  lv_label_set_text(s_inbox_prev_sub, sub);
+  int idx[4];
+  const int n = g_lv.task->getThreadMessageIndexes(thread, idx, 4, true);
+  if (n <= 0) {
+    lv_obj_t* l = lv_label_create(s_inbox_prev_body);
+    lv_label_set_text(l, TR("No messages yet"));
+    lv_obj_set_style_text_font(l, &g_font_14, LV_PART_MAIN);
+    lv_obj_set_style_text_color(l, lv_color_hex(COLOR_SUB), LV_PART_MAIN);
+    return;
+  }
+  const lv_coord_t w = lv_obj_get_content_width(s_inbox_prev_body);
+  for (int k = n - 1; k >= 0; --k) {   // oldest of the few first, the newest at the bottom
+    UITask::UIMessage m;
+    if (!g_lv.task->getMessageByIndex(idx[k], m)) continue;
+    lv_obj_t* head = lv_label_create(s_inbox_prev_body);
+    char t[16]; formatChatRowTime(t, sizeof t, m.ts);
+    char who[UITask::MAX_SENDER_NAME + 24];
+    const char* sender = m.outgoing ? TR("You") : (m.sender[0] ? m.sender : shown);
+    snprintf(who, sizeof who, "%s  %s", sender, t);
+    char who_ok[sizeof who];
+    copyUtf8ReplacingMissingGlyphs(&g_font_semi_14, who_ok, sizeof who_ok, who);
+    lv_label_set_text(head, who_ok);
+    lv_label_set_long_mode(head, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(head, w);
+    lv_obj_set_style_text_font(head, &g_font_semi_14, LV_PART_MAIN);
+    lv_obj_set_style_text_color(head, lv_color_hex(m.outgoing ? COLOR_SUB : COLOR_GLOW), LV_PART_MAIN);
+    lv_obj_t* body = lv_label_create(s_inbox_prev_body);
+    lv_label_set_text(body, m.text);
+    lv_label_set_long_mode(body, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(body, w);
+    lv_obj_set_style_text_font(body, &g_font_14, LV_PART_MAIN);
+    lv_obj_set_style_text_color(body, lv_color_hex(COLOR_TEXT), LV_PART_MAIN);
+    lv_obj_set_style_pad_bottom(body, 4, LV_PART_MAIN);
+    useChainedFont(body);
+  }
+  // Keep what fits: the oldest message goes (head and text) while it would stick out
+  // above the pane's top, but the newest always stays.
+  for (int guard = 0; guard < 4 && lv_obj_get_child_cnt(s_inbox_prev_body) > 2; ++guard) {
+    lv_obj_update_layout(s_inbox_prev_body);
+    lv_obj_t* first = lv_obj_get_child(s_inbox_prev_body, 0);
+    if (!first || lv_obj_get_y(first) >= 0) break;
+    lv_obj_del(first);
+    if (lv_obj_t* t2 = lv_obj_get_child(s_inbox_prev_body, 0)) lv_obj_del(t2);
+  }
+}
+static void inboxRowFocusCb(lv_event_t* e) {
+  if (lv_event_get_code(e) != LV_EVENT_FOCUSED) return;
+  const intptr_t enc = reinterpret_cast<intptr_t>(lv_obj_get_user_data(lv_event_get_target(e)));
+  if (enc > 0 && (int)(enc - 1) != s_inbox_prev_thread) inboxPreviewShow((int)(enc - 1));
+}
+static void inboxPaneDeleteCb(lv_event_t*) {
+  s_inbox_prev = s_inbox_prev_title = s_inbox_prev_sub = s_inbox_prev_body = nullptr;
+  s_inbox_prev_thread = -1;
+}
+static void inboxPaneMake(lv_obj_t* tab, lv_coord_t x) {
+  const lv_coord_t gap = 6;
+  s_inbox_prev = lv_obj_create(tab);
+  lv_obj_remove_style_all(s_inbox_prev);
+  lv_obj_add_flag(s_inbox_prev, NAV_SKIP_FLAG);
+  lv_obj_clear_flag(s_inbox_prev, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_pos(s_inbox_prev, x + gap, 4);
+  lv_obj_set_size(s_inbox_prev, tabContentW() - x - 2 * gap, tabContentH() - 8);
+  lv_obj_set_style_radius(s_inbox_prev, 14, LV_PART_MAIN);
+  lv_obj_set_style_bg_color(s_inbox_prev, lv_color_hex(COLOR_PANEL), LV_PART_MAIN);
+  lv_obj_set_style_bg_opa(s_inbox_prev, s_theme_high_contrast ? LV_OPA_COVER : 215, LV_PART_MAIN);
+  lv_obj_set_style_border_color(s_inbox_prev, lv_color_hex(COLOR_BORDER), LV_PART_MAIN);
+  lv_obj_set_style_border_width(s_inbox_prev, s_theme_high_contrast ? 2 : 1, LV_PART_MAIN);
+  lv_obj_set_style_pad_hor(s_inbox_prev, 12, LV_PART_MAIN);
+  lv_obj_set_style_pad_ver(s_inbox_prev, 8, LV_PART_MAIN);
+  lv_obj_set_style_clip_corner(s_inbox_prev, true, LV_PART_MAIN);
+  lv_obj_set_flex_flow(s_inbox_prev, LV_FLEX_FLOW_COLUMN);
+  lv_obj_add_event_cb(s_inbox_prev, inboxPaneDeleteCb, LV_EVENT_DELETE, nullptr);
+  s_inbox_prev_title = lv_label_create(s_inbox_prev);
+  lv_label_set_long_mode(s_inbox_prev_title, LV_LABEL_LONG_DOT);
+  lv_obj_set_width(s_inbox_prev_title, lv_pct(100));
+  lv_obj_set_style_text_font(s_inbox_prev_title, &g_font_semi_16, LV_PART_MAIN);
+  lv_obj_set_style_text_color(s_inbox_prev_title, lv_color_hex(COLOR_TEXT), LV_PART_MAIN);
+  lv_label_set_text(s_inbox_prev_title, "");
+  s_inbox_prev_sub = lv_label_create(s_inbox_prev);
+  lv_obj_set_style_text_font(s_inbox_prev_sub, &g_font_12, LV_PART_MAIN);
+  lv_obj_set_style_text_color(s_inbox_prev_sub, lv_color_hex(COLOR_SUB), LV_PART_MAIN);
+  lv_obj_set_style_pad_bottom(s_inbox_prev_sub, 4, LV_PART_MAIN);
+  lv_label_set_text(s_inbox_prev_sub, "");
+  // The messages fill the rest from the bottom up: the newest is always in view.
+  s_inbox_prev_body = lv_obj_create(s_inbox_prev);
+  lv_obj_remove_style_all(s_inbox_prev_body);
+  lv_obj_clear_flag(s_inbox_prev_body, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_width(s_inbox_prev_body, lv_pct(100));
+  lv_obj_set_flex_grow(s_inbox_prev_body, 1);
+  lv_obj_set_flex_flow(s_inbox_prev_body, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(s_inbox_prev_body, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+  lv_obj_set_style_pad_row(s_inbox_prev_body, 1, LV_PART_MAIN);
+}
+#endif  // TLORA_PAGER (inbox pane)
+
 static void makeChatList(lv_obj_t* tab, LvChatPanel& p, bool channel_mode, bool inbox_combined = false) {
   p.channel_mode     = channel_mode;
   p.inbox_combined   = inbox_combined;
@@ -34722,6 +34847,12 @@ static void makeChatList(lv_obj_t* tab, LvChatPanel& p, bool channel_mode, bool 
 #endif
   p.list_cont = lv_list_create(tab);
   lv_obj_set_size(p.list_cont, tabContentW(), tabContentH() - list_y);
+#if defined(TLORA_PAGER)
+  if (inbox_combined) {   // two panes: the list, and the focused chat beside it
+    lv_obj_set_width(p.list_cont, inboxListW());
+    inboxPaneMake(tab, inboxListW());
+  }
+#endif
   lv_obj_set_pos(p.list_cont, 0, list_y);
   styleSurface(p.list_cont, COLOR_BG, 0);
   lv_obj_set_style_border_width(p.list_cont, 0, LV_PART_MAIN);
@@ -48885,11 +49016,20 @@ static void refreshChatList(LvChatPanel& p) {
 #if CAP_KEYPAD_NAV
     navResume();
 #endif
+#if defined(TLORA_PAGER)
+    if (p.inbox_combined) inboxPreviewShow(-1);
+#endif
     return;
   }
 
   // Rows sit inset in the list (rounded, see below), so they are narrower than the tab.
+#if defined(TLORA_PAGER)
+  const lv_coord_t row_w = (p.inbox_combined && s_inbox_prev ? inboxListW() : tabContentW()) - 2 * kChatListInset;
+  int first_thread = -1;
+  bool prev_listed = false;
+#else
   const lv_coord_t row_w = tabContentW() - 2 * kChatListInset;
+#endif
   int shown = 0;
   for (int i = 0; i < count; ++i) {
     bool ch = false; uint16_t unread = 0; uint32_t ts = 0;
@@ -49104,6 +49244,13 @@ static void refreshChatList(LvChatPanel& p) {
     if (nav_slot >= 0 && shown - 1 <= nav_slot) nav_slot_row = btn;
 #endif
     lv_obj_add_event_cb(btn, threadSelectCb,    LV_EVENT_CLICKED,      &p.ctx_store[i]);
+#if defined(TLORA_PAGER)
+    if (p.inbox_combined && s_inbox_prev) {
+      lv_obj_add_event_cb(btn, inboxRowFocusCb, LV_EVENT_FOCUSED, nullptr);
+      if (first_thread < 0) first_thread = idxs[i];
+      if (idxs[i] == s_inbox_prev_thread) prev_listed = true;
+    }
+#endif
 #if defined(HAS_TDECK_PRO)
     lv_obj_add_event_cb(btn, threadLongPressCb, LV_EVENT_PRESSED,      &p.ctx_store[i]);
     lv_obj_add_event_cb(btn, threadLongPressCb, LV_EVENT_PRESSING,     &p.ctx_store[i]);
@@ -49124,6 +49271,14 @@ static void refreshChatList(LvChatPanel& p) {
   lv_obj_scroll_to_y(p.list_cont, saved_scroll, LV_ANIM_OFF);
 #if CAP_KEYPAD_NAV
   navResume();
+#endif
+#if defined(TLORA_PAGER)
+  // The pane follows the focused row; after a rebuild it shows the same chat again
+  // (with what just arrived), or the first one.
+  if (p.inbox_combined && s_inbox_prev) {
+    lv_obj_update_layout(s_inbox_prev);
+    inboxPreviewShow(prev_listed ? s_inbox_prev_thread : first_thread);
+  }
 #endif
 }
 
