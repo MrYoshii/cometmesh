@@ -22,6 +22,17 @@ DEST_PATH="${COMET_SITE_PATH:-/srv/comet/site}"
 python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$ROOT/deploy/site/roadmap.json" \
   || { echo "deploy/site/roadmap.json is not valid JSON" >&2; exit 1; }
 
+# Refresh the roadmap's fallback copy from the issues (public API, no token needed).
+if command -v curl >/dev/null; then
+  T="$(mktemp)"
+  if curl -fsS "https://api.github.com/repos/MrYoshii/cometmesh/issues?labels=roadmap&state=all&per_page=100" -o "$T"; then
+    python3 "$ROOT/scripts/build/roadmap-snapshot.py" "$T" "$ROOT/deploy/site/roadmap.json" || true
+  else
+    echo "note: GitHub not reachable, roadmap.json stays as it is"
+  fi
+  rm -f "$T"
+fi
+
 DRY=""
 [ "${1:-}" = "--dry-run" ] && DRY="--dry-run"
 

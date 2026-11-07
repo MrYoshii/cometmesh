@@ -1,6 +1,10 @@
 {
   "updated": "2026-11-07",
-  "note": "The roadmap board on cometmesh.org/roadmap.html. Move a card by changing its column. A card with \"target\": \"beta_<N>\" moves to done by itself when scripts/release.sh publishes that tag, which also stamps \"shipped\" and \"updated\" and redeploys the site. tags: firmware | ui | radio | infra | docs; boards: ids from boards.json (none = every board).",
+  "note": "Fallback copy of the roadmap. The source is the GitHub issues of MrYoshii/cometmesh with the label roadmap (lane = status: label, closed = done, milestone = release); roadmap.html reads them live and uses this file only when GitHub is unreachable. scripts/deploy-site.sh refreshes it. Only issues by the authors listed here are shown.",
+  "repo": "MrYoshii/cometmesh",
+  "authors": [
+    "MrYoshii"
+  ],
   "columns": [
     {
       "id": "planned",
@@ -25,43 +29,57 @@
   ],
   "cards": [
     {
-      "id": "fork",
+      "id": "gh-1",
+      "number": 1,
+      "url": "https://github.com/MrYoshii/cometmesh/issues/1",
       "column": "done",
       "title": "Comet stands on its own",
       "text": "Forked from wadamesh and renamed throughout: own name, repository and logo. Credits to wadamesh and MeshCore stay.",
       "tags": [
         "firmware"
-      ]
+      ],
+      "boards": []
     },
     {
-      "id": "books",
+      "id": "gh-2",
+      "number": 2,
+      "url": "https://github.com/MrYoshii/cometmesh/issues/2",
       "column": "done",
       "title": "Audiobooks and e-books",
       "text": "Audiobookshelf streaming and downloads, books on the SD card, an EPUB reader.",
       "tags": [
         "firmware"
-      ]
+      ],
+      "boards": []
     },
     {
-      "id": "mark",
+      "id": "gh-3",
+      "number": 3,
+      "url": "https://github.com/MrYoshii/cometmesh/issues/3",
       "column": "done",
       "title": "The Comet mark",
       "text": "A comet whose tail is a mesh, drawn and animated the same way on every screen, e-paper included.",
       "tags": [
         "ui"
-      ]
+      ],
+      "boards": []
     },
     {
-      "id": "servers",
+      "id": "gh-4",
+      "number": 4,
+      "url": "https://github.com/MrYoshii/cometmesh/issues/4",
       "column": "done",
       "title": "Own servers",
       "text": "cometmesh.org serves updates, the app store, language packs, map tiles and the USB Files page.",
       "tags": [
         "infra"
-      ]
+      ],
+      "boards": []
     },
     {
-      "id": "idf-max",
+      "id": "gh-5",
+      "number": 5,
+      "url": "https://github.com/MrYoshii/cometmesh/issues/5",
       "column": "testing",
       "title": "ESP-IDF 5.5 base",
       "text": "Arduino 3.3 on a current ESP-IDF: much more free memory, downloads three to four times faster. Out as test build beta_1.",
@@ -74,25 +92,33 @@
       "shipped": "beta_1"
     },
     {
-      "id": "installer",
+      "id": "gh-6",
+      "number": 6,
+      "url": "https://github.com/MrYoshii/cometmesh/issues/6",
       "column": "testing",
       "title": "Releases and browser installer",
       "text": "Per-board releases from one script, installed from the browser, updated over Wi-Fi.",
       "tags": [
         "infra"
-      ]
+      ],
+      "boards": []
     },
     {
-      "id": "board-layer",
+      "id": "gh-7",
+      "number": 7,
+      "url": "https://github.com/MrYoshii/cometmesh/issues/7",
       "column": "doing",
       "title": "Board layer",
       "text": "Every board in one folder behind fixed interfaces, so a new device is a day of work instead of a week.",
       "tags": [
         "firmware"
-      ]
+      ],
+      "boards": []
     },
     {
-      "id": "pager-idf",
+      "id": "gh-8",
+      "number": 8,
+      "url": "https://github.com/MrYoshii/cometmesh/issues/8",
       "column": "next",
       "title": "T-LoRa Pager on the new base",
       "text": "The first board to come over through the board layer.",
@@ -105,7 +131,9 @@
       ]
     },
     {
-      "id": "epaper-ui",
+      "id": "gh-9",
+      "number": 9,
+      "url": "https://github.com/MrYoshii/cometmesh/issues/9",
       "column": "next",
       "title": "A UI made for e-paper",
       "text": "One picture per keypress: pages instead of scrolling, no animation, keyboard first. Concept is drawn.",
@@ -117,26 +145,34 @@
       ]
     },
     {
-      "id": "gps-fix",
+      "id": "gh-10",
+      "number": 10,
+      "url": "https://github.com/MrYoshii/cometmesh/issues/10",
       "column": "next",
       "title": "Faster first GPS fix",
       "text": "Keep position, time and satellite data across power-off, and fetch assistance data over Wi-Fi.",
       "tags": [
         "firmware"
-      ]
+      ],
+      "boards": []
     },
     {
-      "id": "multimesh",
+      "id": "gh-11",
+      "number": 11,
+      "url": "https://github.com/MrYoshii/cometmesh/issues/11",
       "column": "planned",
       "title": "Every mesh",
       "text": "Meshtastic next to MeshCore on the same radio, one inbox for both, one screen to pick the active mesh.",
       "tags": [
-        "radio",
-        "ui"
-      ]
+        "ui",
+        "radio"
+      ],
+      "boards": []
     },
     {
-      "id": "modem",
+      "id": "gh-12",
+      "number": 12,
+      "url": "https://github.com/MrYoshii/cometmesh/issues/12",
       "column": "planned",
       "title": "SMS and calls",
       "text": "The A7682E modem: text messages, voice calls and mobile data for when there is no mesh.",
@@ -148,13 +184,16 @@
       ]
     },
     {
-      "id": "more-boards",
+      "id": "gh-13",
+      "number": 13,
+      "url": "https://github.com/MrYoshii/cometmesh/issues/13",
       "column": "planned",
       "title": "More boards",
       "text": "Once the board layer has proven itself on the Pager.",
       "tags": [
         "firmware"
-      ]
+      ],
+      "boards": []
     }
   ]
 }

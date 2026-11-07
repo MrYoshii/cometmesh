@@ -24,6 +24,10 @@
 #                                                       pointing at that board's newest tag
 # Boards are released independently: a tag that leaves a board out is simply not in
 # that board's listing. Tags are beta_<N>; a dev build (dev-<sha>) is below all of them.
+#
+# The roadmap (GitHub issues labelled "roadmap"): give a card the milestone beta_<N>
+# and this script moves it to testing when beta_<N> is published, and closes it (done)
+# on --promote. That needs gh logged in on this machine; without it, it says so.
 set -euo pipefail
 
 TAG="${1:?usage: release.sh beta_<N> [--no-push | --promote]}"
@@ -170,29 +174,36 @@ else
   CHAN=beta
 fi
 
-# 3. The site's record of it: releases.json gets the release, roadmap.json moves the
-#    cards that were waiting for this tag ("target") to done and stamps the date.
-#    Commit the two files afterwards.
+# 3. The site's record of it: releases.json gets the release (commit it afterwards).
+#    The roadmap cards are GitHub issues: those with this tag as milestone are closed
+#    below, after publishing, which moves them to done.
 site_record() {   # <channel beta|stable> <board ids...>
   python3 - "$ROOT/deploy/site" "$TAG" "$@" <<'PY'
 import json, os, sys, datetime
 site, tag, chan, *ids = sys.argv[1:]
-today = datetime.date.today().isoformat()
 rp = os.path.join(site, "releases.json")
 rel = json.load(open(rp)) if os.path.exists(rp) else {"releases": []}
 rel["releases"] = [r for r in rel["releases"] if not (r["tag"] == tag and r["channel"] == chan)]
-rel["releases"].insert(0, {"tag": tag, "channel": chan, "date": today, "boards": ids})
+rel["releases"].insert(0, {"tag": tag, "channel": chan, "date": datetime.date.today().isoformat(), "boards": ids})
 json.dump(rel, open(rp, "w"), indent=2, ensure_ascii=False); open(rp, "a").write("\n")
-mp = os.path.join(site, "roadmap.json")
-rm = json.load(open(mp))
-moved = []
-for c in rm.get("cards", []):
-    if c.get("target") == tag and c.get("column") != "done":
-        c["column"] = "done"; c["shipped"] = tag; c.pop("target", None); moved.append(c["title"])
-rm["updated"] = today
-json.dump(rm, open(mp, "w"), indent=2, ensure_ascii=False); open(mp, "a").write("\n")
-print("site: releases.json +%s (%s)%s" % (tag, chan, "; done: " + ", ".join(moved) if moved else ""))
+print("site: releases.json +%s (%s)" % (tag, chan))
 PY
+}
+# A beta moves its milestone's cards to testing; promoting it to stable closes them (done).
+milestone_cards() {   # <testing|close>
+  command -v gh >/dev/null || { echo "note: no gh; update the roadmap issues of milestone $TAG on GitHub by hand"; return; }
+  local ms R=repos/MrYoshii/cometmesh
+  ms="$(gh api "$R/milestones?state=all" --jq ".[] | select(.title==\"$TAG\") | .number" 2>/dev/null || true)"
+  [ -n "$ms" ] || { echo "roadmap: no milestone $TAG"; return; }
+  gh api "$R/issues?milestone=$ms&state=open&labels=roadmap" --jq '.[].number' 2>/dev/null |
+  while read -r n; do
+    if [ "$1" = close ]; then
+      gh api -X PATCH "$R/issues/$n" -f state=closed -f state_reason=completed >/dev/null && echo "roadmap: #$n done ($TAG)"
+    else
+      gh api "$R/issues/$n" --jq '{labels: ([.labels[].name | select(startswith("status: ") | not)] + ["status: testing"])}' |
+        gh api -X PUT "$R/issues/$n/labels" --input - >/dev/null && echo "roadmap: #$n testing ($TAG)"
+    fi
+  done
 }
 if [ "$MODE" = "--promote" ]; then
   site_record stable $(ls "$OUT/releases/TOUCH/$TAG" | sed -n 's/^comet-\(.*\)-merged\.bin$/\1/p')
@@ -204,6 +215,7 @@ fi
 if [ "$PUSH" = 1 ]; then
   rsync -av --exclude 'apps/' "$OUT/" "$DEST:$DEST_PATH/"
   echo "published $TAG ($CHAN) -> $DEST:$DEST_PATH"
+  if [ "$MODE" = "--promote" ]; then milestone_cards close; else milestone_cards testing; fi
   COMET_VPS="$DEST" "$ROOT/scripts/deploy-site.sh"
   echo "now commit deploy/site/releases.json and deploy/site/roadmap.json"
 else

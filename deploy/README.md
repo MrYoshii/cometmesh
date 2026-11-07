@@ -121,14 +121,17 @@ listings and images, `apps/` (store and languages, `scripts/deploy-apps.sh`), ma
     `scripts/gen_comet_mark.py`) and what Comet does.
   - `boards.html`: every board by brand with a support matrix, from `boards.json`
     (`levels`, `statuses`, `features`, `brands`, `boards[].support`).
-  - `roadmap.html`: a board of lanes from `roadmap.json` (`columns`, `cards` with
-    `column`, `tags`, `boards`, `target`/`shipped`) and the latest release from
-    `releases.json`.
+  - `roadmap.html`: a board of lanes. The cards are the GitHub issues with the label
+    `roadmap`, read live from the GitHub API: lane = `status: planned|next|doing|testing`,
+    closed = done, `area: …` and `board: …` labels, milestone = the release. Only issues
+    by the `authors` in `roadmap.json` are shown; that file is the fallback copy,
+    refreshed by `scripts/deploy-site.sh`. The latest release comes from `releases.json`.
   - `install.html`: the browser installer; `?board=<id>` preselects a board.
-- **The roadmap keeps itself current on release**: `scripts/release.sh` adds the
-  release to `releases.json`, moves every card whose `"target"` is that tag to done,
-  stamps `updated`, and redeploys the site. Move other cards by editing `column` in
-  `roadmap.json`, then `scripts/deploy-site.sh`. Commit both files after a release.
+- **The roadmap is edited on GitHub**: a new card is an issue with the labels `roadmap`
+  and `status: …`; moving it is changing the `status:` label; done is closing it. Give it
+  a milestone `beta_<N>` and `scripts/release.sh` moves it to testing when that beta is
+  published and closes it on `--promote` (with `gh` logged in). The page shows changes
+  at once; no deploy needed. `releases.json` is written by `release.sh`; commit it.
 - **`flasher.cometmesh.org` 301-redirects to the apex** (see
   `deploy/nginx/flasher.cometmesh.org.conf`). A browser installer comes back with the
   first release.
