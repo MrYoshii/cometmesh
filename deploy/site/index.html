@@ -90,13 +90,23 @@
   <section class="paper" id="install" aria-labelledby="install-h">
     <div class="wrap">
       <h2 id="install-h">Install</h2>
-      <p class="aside">There are no releases yet: builds come from GitHub Actions. A browser installer follows with the first release.</p>
+      <p class="aside">Comet is in testing: the current build is a test build for the T-Deck Max. The installer runs in Chrome or Edge on a computer.</p>
       <ol class="steps">
-        <li><h3>Get the firmware</h3><p>Download the <code>comet.bin</code> for your board from the latest build on <a href="https://github.com/MrYoshii/cometmesh/actions">GitHub Actions</a>.</p></li>
-        <li><h3>Connect the device</h3><p>Plug it in over USB. Install <a href="https://docs.espressif.com/projects/esptool/">esptool</a> if you do not have it.</p></li>
-        <li><h3>Flash it</h3><p>Over an existing install this keeps your settings, contacts and chats:</p>
-          <pre><code>esptool --chip esp32s3 --port &lt;PORT&gt; write-flash 0x10000 comet.bin</code></pre></li>
+        <li><h3>Connect the T-Deck Max</h3><p>Plug it into your computer with a USB-C data cable. If it does not show up in the next step, hold the BOOT button while you plug it in.</p></li>
+        <li><h3>Install</h3>
+          <p>Choose the device from the list. An existing install keeps its settings, contacts and chats; a new one asks whether to erase the device first.</p>
+          <div class="installer">
+            <esp-web-install-button manifest="https://firmware.cometmesh.org/latest-beta/manifest-tdeck-max.json">
+              <button slot="activate" class="btn btn-ink">Install the test build</button>
+              <span slot="unsupported" class="installer-note">This browser cannot talk to USB devices. Open the page in Chrome or Edge on a computer, or use esptool below.</span>
+              <span slot="not-allowed" class="installer-note">The installer needs the page over HTTPS: open https://cometmesh.org.</span>
+            </esp-web-install-button>
+          </div>
+        </li>
+        <li><h3>Or with esptool</h3><p>Download <a href="https://firmware.cometmesh.org/latest-beta/comet-tdeck-max.bin">comet-tdeck-max.bin</a> and write it over an existing install; settings, contacts and chats stay:</p>
+          <pre><code>esptool --chip esp32s3 --port &lt;PORT&gt; --after watchdog-reset write-flash 0x10000 comet-tdeck-max.bin</code></pre></li>
       </ol>
+      <p class="aside after">Once Comet runs, it updates itself over Wi-Fi: About, then Install update. Test builds come with About, Get test builds.</p>
     </div>
   </section>
 </main>
@@ -108,6 +118,7 @@
   </div>
 </footer>
 
+<script type="module" src="https://unpkg.com/esp-web-tools@10.0.1/dist/web/install-button.js?module"></script>
 <script src="comet.js"></script>
 <script src="roadmap.js"></script>
 </body>

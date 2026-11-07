@@ -172,6 +172,12 @@ h3 { font: 700 1.25rem/1.25 var(--display); margin: 0 0 0.35rem; }
   background: var(--ink); color: var(--paper);
 }
 .steps p { margin: 0; color: #2c3331; }
+.installer { margin-top: 0.9rem; }
+.btn-ink { background: var(--ink); color: var(--paper); border: 0; font: 700 1rem/1 var(--text); cursor: pointer; }
+.btn-ink:hover { background: #000; box-shadow: 0 0 0 3px rgba(11, 107, 61, 0.25); }
+.btn-ink:focus-visible { outline: 2px solid var(--ink-green); outline-offset: 3px; }
+.installer-note { display: block; padding: 0.8rem 1rem; border-radius: 10px; box-shadow: inset 0 0 0 1.5px var(--paper-edge); color: var(--ink-soft); }
+.aside.after { margin: 2.4rem 0 0; }
 pre {
   margin: 0.7rem 0 0;
   padding: 0.9rem 1.1rem;
@@ -199,3 +205,7 @@ p code { background: var(--paper-edge); padding: 0.05em 0.35em; border-radius: 4
   .board-table td:nth-child(2) { display: none; }
   .board-table th:nth-child(2) { display: none; }
 }
+
+/* until esp-web-tools has loaded, its slotted fallbacks are plain children: show only the button */
+esp-web-install-button:not(:defined) [slot="unsupported"],
+esp-web-install-button:not(:defined) [slot="not-allowed"] { display: none; }
