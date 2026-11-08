@@ -69652,6 +69652,9 @@ static void setupWizardClose() {
   s_setup_ssid_ta = nullptr;
   s_setup_pwd_ta = nullptr;
   if (g_statusbar.root) lv_obj_clear_flag(g_statusbar.root, LV_OBJ_FLAG_HIDDEN);
+  // The boot skipped the drawer-as-Home under the wizard (it waits for it): open it
+  // now, so the first Home after setup is the launcher (the orbit on the Pager).
+  if (s_home_is_drawer && getActiveTab() == HOME_TAB_INDEX && !s_appdrawer_root) setHomeDrawer(true);
 }
 
 static void setupSkipCb(lv_event_t* e) {
