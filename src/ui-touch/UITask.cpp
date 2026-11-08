@@ -34770,44 +34770,53 @@ static void inboxPaneDeleteCb(lv_event_t*) {
   s_inbox_prev = s_inbox_prev_title = s_inbox_prev_sub = s_inbox_prev_body = nullptr;
   s_inbox_prev_thread = -1;
 }
-static void inboxPaneMake(lv_obj_t* tab, lv_coord_t x) {
+// The right-hand pane both two-pane lists use: a quiet card with a title, a line
+// under it, and a body (bottom-aligned) that the caller fills.
+static void sidePaneMake(lv_obj_t* tab, lv_coord_t x, lv_coord_t y, lv_coord_t h, lv_obj_t** root,
+                         lv_obj_t** title, lv_obj_t** sub, lv_obj_t** body, lv_event_cb_t del_cb, bool bottom) {
   const lv_coord_t gap = 6;
-  s_inbox_prev = lv_obj_create(tab);
-  lv_obj_remove_style_all(s_inbox_prev);
-  lv_obj_add_flag(s_inbox_prev, NAV_SKIP_FLAG);
-  lv_obj_clear_flag(s_inbox_prev, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_pos(s_inbox_prev, x + gap, 4);
-  lv_obj_set_size(s_inbox_prev, tabContentW() - x - 2 * gap, tabContentH() - 8);
-  lv_obj_set_style_radius(s_inbox_prev, 14, LV_PART_MAIN);
-  lv_obj_set_style_bg_color(s_inbox_prev, lv_color_hex(COLOR_PANEL), LV_PART_MAIN);
-  lv_obj_set_style_bg_opa(s_inbox_prev, s_theme_high_contrast ? LV_OPA_COVER : 215, LV_PART_MAIN);
-  lv_obj_set_style_border_color(s_inbox_prev, lv_color_hex(COLOR_BORDER), LV_PART_MAIN);
-  lv_obj_set_style_border_width(s_inbox_prev, s_theme_high_contrast ? 2 : 1, LV_PART_MAIN);
-  lv_obj_set_style_pad_hor(s_inbox_prev, 12, LV_PART_MAIN);
-  lv_obj_set_style_pad_ver(s_inbox_prev, 8, LV_PART_MAIN);
-  lv_obj_set_style_clip_corner(s_inbox_prev, true, LV_PART_MAIN);
-  lv_obj_set_flex_flow(s_inbox_prev, LV_FLEX_FLOW_COLUMN);
-  lv_obj_add_event_cb(s_inbox_prev, inboxPaneDeleteCb, LV_EVENT_DELETE, nullptr);
-  s_inbox_prev_title = lv_label_create(s_inbox_prev);
-  lv_label_set_long_mode(s_inbox_prev_title, LV_LABEL_LONG_DOT);
-  lv_obj_set_width(s_inbox_prev_title, lv_pct(100));
-  lv_obj_set_style_text_font(s_inbox_prev_title, &g_font_semi_16, LV_PART_MAIN);
-  lv_obj_set_style_text_color(s_inbox_prev_title, lv_color_hex(COLOR_TEXT), LV_PART_MAIN);
-  lv_label_set_text(s_inbox_prev_title, "");
-  s_inbox_prev_sub = lv_label_create(s_inbox_prev);
-  lv_obj_set_style_text_font(s_inbox_prev_sub, &g_font_12, LV_PART_MAIN);
-  lv_obj_set_style_text_color(s_inbox_prev_sub, lv_color_hex(COLOR_SUB), LV_PART_MAIN);
-  lv_obj_set_style_pad_bottom(s_inbox_prev_sub, 4, LV_PART_MAIN);
-  lv_label_set_text(s_inbox_prev_sub, "");
-  // The messages fill the rest from the bottom up: the newest is always in view.
-  s_inbox_prev_body = lv_obj_create(s_inbox_prev);
-  lv_obj_remove_style_all(s_inbox_prev_body);
-  lv_obj_clear_flag(s_inbox_prev_body, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_width(s_inbox_prev_body, lv_pct(100));
-  lv_obj_set_flex_grow(s_inbox_prev_body, 1);
-  lv_obj_set_flex_flow(s_inbox_prev_body, LV_FLEX_FLOW_COLUMN);
-  lv_obj_set_flex_align(s_inbox_prev_body, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-  lv_obj_set_style_pad_row(s_inbox_prev_body, 1, LV_PART_MAIN);
+  lv_obj_t* r = lv_obj_create(tab);
+  lv_obj_remove_style_all(r);
+  lv_obj_add_flag(r, NAV_SKIP_FLAG);
+  lv_obj_clear_flag(r, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_pos(r, x + gap, y + 4);
+  lv_obj_set_size(r, tabContentW() - x - 2 * gap, h - 8);
+  lv_obj_set_style_radius(r, 14, LV_PART_MAIN);
+  lv_obj_set_style_bg_color(r, lv_color_hex(COLOR_PANEL), LV_PART_MAIN);
+  lv_obj_set_style_bg_opa(r, s_theme_high_contrast ? LV_OPA_COVER : 215, LV_PART_MAIN);
+  lv_obj_set_style_border_color(r, lv_color_hex(COLOR_BORDER), LV_PART_MAIN);
+  lv_obj_set_style_border_width(r, s_theme_high_contrast ? 2 : 1, LV_PART_MAIN);
+  lv_obj_set_style_pad_hor(r, 12, LV_PART_MAIN);
+  lv_obj_set_style_pad_ver(r, 8, LV_PART_MAIN);
+  lv_obj_set_style_clip_corner(r, true, LV_PART_MAIN);
+  lv_obj_set_flex_flow(r, LV_FLEX_FLOW_COLUMN);
+  if (del_cb) lv_obj_add_event_cb(r, del_cb, LV_EVENT_DELETE, nullptr);
+  lv_obj_t* t = lv_label_create(r);
+  lv_label_set_long_mode(t, LV_LABEL_LONG_DOT);
+  lv_obj_set_width(t, lv_pct(100));
+  lv_obj_set_style_text_font(t, &g_font_semi_16, LV_PART_MAIN);
+  lv_obj_set_style_text_color(t, lv_color_hex(COLOR_TEXT), LV_PART_MAIN);
+  lv_label_set_text(t, "");
+  lv_obj_t* sb = lv_label_create(r);
+  lv_label_set_long_mode(sb, LV_LABEL_LONG_DOT);
+  lv_obj_set_width(sb, lv_pct(100));
+  lv_obj_set_style_text_font(sb, &g_font_12, LV_PART_MAIN);
+  lv_obj_set_style_text_color(sb, lv_color_hex(COLOR_SUB), LV_PART_MAIN);
+  lv_obj_set_style_pad_bottom(sb, 4, LV_PART_MAIN);
+  lv_label_set_text(sb, "");
+  lv_obj_t* b = lv_obj_create(r);
+  lv_obj_remove_style_all(b);
+  lv_obj_clear_flag(b, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_width(b, lv_pct(100));
+  lv_obj_set_flex_grow(b, 1);
+  lv_obj_set_flex_flow(b, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(b, bottom ? LV_FLEX_ALIGN_END : LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+  lv_obj_set_style_pad_row(b, 1, LV_PART_MAIN);
+  *root = r; *title = t; *sub = sb; *body = b;
+}
+static void inboxPaneMake(lv_obj_t* tab, lv_coord_t x) {
+  sidePaneMake(tab, x, 0, tabContentH(), &s_inbox_prev, &s_inbox_prev_title, &s_inbox_prev_sub,
+               &s_inbox_prev_body, inboxPaneDeleteCb, true);
 }
 #endif  // TLORA_PAGER (inbox pane)
 
@@ -35609,6 +35618,87 @@ static void contactsMoreCb(lv_event_t* e) {
   openActionList(TR("Contacts"), items, (int)(sizeof items / sizeof items[0]));
 }
 
+#if defined(TLORA_PAGER)
+// ---- Contacts, Pager: the list on the left, the focused node on the right --------------
+// As in the inbox: turning reads along. The pane says what the node is, how we reach
+// it, when it was last heard, how far away it is and where, and its key. Press still
+// opens the node's actions; select mode, sort, filter and search are unchanged.
+static lv_obj_t* s_ct_pane = nullptr;
+static lv_obj_t* s_ct_pane_title = nullptr;
+static lv_obj_t* s_ct_pane_sub = nullptr;
+static lv_obj_t* s_ct_pane_body = nullptr;
+static int       s_ct_pane_idx = -1;   // mesh index shown
+static void ctPaneLine(const char* what, const char* value) {
+  if (!value || !value[0]) return;
+  lv_obj_t* row = lv_obj_create(s_ct_pane_body);   // "Last heard        3m ago" on one line
+  lv_obj_remove_style_all(row);
+  lv_obj_clear_flag(row, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_size(row, lv_pct(100), LV_SIZE_CONTENT);
+  lv_obj_t* k = lv_label_create(row);
+  lv_label_set_text(k, what);
+  lv_obj_set_style_text_font(k, &g_font_12, LV_PART_MAIN);
+  lv_obj_set_style_text_color(k, lv_color_hex(COLOR_SUB), LV_PART_MAIN);
+  lv_obj_align(k, LV_ALIGN_LEFT_MID, 0, 0);
+  lv_obj_t* v = lv_label_create(row);
+  lv_label_set_text(v, value);
+  lv_obj_set_style_text_font(v, &g_font_14, LV_PART_MAIN);
+  lv_obj_set_style_text_color(v, lv_color_hex(COLOR_TEXT), LV_PART_MAIN);
+  lv_obj_align(v, LV_ALIGN_RIGHT_MID, 0, 0);
+}
+static void ctPaneShow(int mesh_idx) {
+  if (!s_ct_pane || !s_ct_pane_body || !g_lv.task) return;
+  s_ct_pane_idx = mesh_idx;
+  lv_obj_clean(s_ct_pane_body);
+  ContactInfo c;
+  if (mesh_idx < 0 || !the_mesh.getContactByIdx((uint32_t)mesh_idx, c) || !c.name[0]) {
+    lv_label_set_text(s_ct_pane_title, "");
+    lv_label_set_text(s_ct_pane_sub, "");
+    return;
+  }
+  char nm[40];
+  copyUtf8ReplacingMissingGlyphs(&g_font_semi_16, nm, sizeof nm, c.name);
+  lv_label_set_text(s_ct_pane_title, nm);
+  const char* kind = c.type == ADV_TYPE_REPEATER ? TR("Repeater") : c.type == ADV_TYPE_ROOM ? TR("Room")
+                   : c.type == ADV_TYPE_SENSOR ? TR("Sensor") : TR("Companion");
+  char sub[64];
+  if (c.out_path_len != OUT_PATH_UNKNOWN) {
+    const unsigned hops = c.out_path_len & 0x3F;
+    if (hops == 0) snprintf(sub, sizeof sub, "%s · %s", kind, TR("direct"));
+    else           snprintf(sub, sizeof sub, "%s · %u %s", kind, hops, hops == 1 ? TR("hop") : TR("hops"));
+  } else {
+    snprintf(sub, sizeof sub, "%s · %s", kind, TR("no route yet"));
+  }
+  lv_label_set_text(s_ct_pane_sub, sub);
+  const uint32_t now = the_mesh.getRTCClock()->getCurrentTime();
+  char age[12];
+  formatAgeBadge(age, sizeof age, (now > c.last_advert_timestamp && c.last_advert_timestamp) ? now - c.last_advert_timestamp : 0);
+  char heard[32];
+  snprintf(heard, sizeof heard, strcmp(age, "?") ? "%s %s" : "%s", age, TR("ago"));
+  ctPaneLine(TR("Last heard"), strcmp(age, "?") ? heard : TR("Not yet"));
+  if (c.gps_lat || c.gps_lon) {
+    char dist[16];
+    formatDistanceBadge(dist, sizeof dist, g_lv.task->getNodeLat(), g_lv.task->getNodeLon(), c.gps_lat, c.gps_lon);
+    char pos[40];
+    snprintf(pos, sizeof pos, "%.3f, %.3f", c.gps_lat / 1.0e6, c.gps_lon / 1.0e6);
+    if (dist[0]) ctPaneLine(TR("Distance"), dist);
+    ctPaneLine(TR("Position"), pos);
+  }
+  char key[20];
+  snprintf(key, sizeof key, "%02x%02x%02x%02x%02x%02x", c.id.pub_key[0], c.id.pub_key[1], c.id.pub_key[2],
+           c.id.pub_key[3], c.id.pub_key[4], c.id.pub_key[5]);
+  ctPaneLine(TR("Key"), key);
+}
+static void ctRowFocusCb(lv_event_t* e) {
+  if (lv_event_get_code(e) != LV_EVENT_FOCUSED) return;
+  const LvContactButtonCtx* ctx = (const LvContactButtonCtx*)lv_event_get_user_data(e);
+  if (ctx && (int)ctx->mesh_idx != s_ct_pane_idx) ctPaneShow((int)ctx->mesh_idx);
+}
+static void ctPaneDeleteCb(lv_event_t*) {
+  s_ct_pane = s_ct_pane_title = s_ct_pane_sub = s_ct_pane_body = nullptr;
+  s_ct_pane_idx = -1;
+}
+#endif  // TLORA_PAGER (contacts pane)
+
 static void makeContactsTab(lv_obj_t* tab) {
   g_lv.contacts_list   = nullptr;
   // Default to the "All" segment — show every contact, ordered by most
@@ -35718,6 +35808,11 @@ static void makeContactsTab(lv_obj_t* tab) {
   g_lv.contacts_list = lv_list_create(tab);
   lv_obj_set_size(g_lv.contacts_list, tabContentW(), tabContentH() - hdr_h);
   lv_obj_set_pos(g_lv.contacts_list, 0, hdr_h);
+#if defined(TLORA_PAGER)
+  lv_obj_set_width(g_lv.contacts_list, inboxListW());
+  sidePaneMake(tab, inboxListW(), hdr_h, tabContentH() - hdr_h, &s_ct_pane, &s_ct_pane_title, &s_ct_pane_sub,
+               &s_ct_pane_body, ctPaneDeleteCb, false);
+#endif
   styleSurface(g_lv.contacts_list, COLOR_BG, 0);
   lv_obj_set_style_border_width(g_lv.contacts_list, 0, LV_PART_MAIN);
   lv_obj_set_style_pad_all(g_lv.contacts_list, 0, LV_PART_MAIN);
@@ -49658,7 +49753,12 @@ static void refreshContactsList() {
   // were added inside it.
   // Rounded cards a little in from the edges, 2 px apart, no lines between them
   // (as on Chats); four fit under the header on a 320x240 board.
+#if defined(TLORA_PAGER)
+  const lv_coord_t row_w  = (s_ct_pane ? inboxListW() : tabContentW()) - 2 * kChatListInset;
+  bool ct_pane_listed = false;
+#else
   const lv_coord_t row_w  = tabContentW() - 2 * kChatListInset;
+#endif
   const bool sel_md       = s_ct_select_mode;
   // Bigger text grows the row to hold its two lines.
   const lv_coord_t ROW_H  = LV_MAX(SC(38), (lv_coord_t)(lv_font_get_line_height(&g_font_semi_14) +
@@ -49707,6 +49807,12 @@ static void refreshContactsList() {
     s_contacts_ctx[k].is_fav      = e.is_fav;
     memcpy(s_contacts_ctx[k].key6, e.key6, 6);
     lv_obj_add_event_cb(rb, contactRowTapCb, LV_EVENT_CLICKED, &s_contacts_ctx[k]);
+#if defined(TLORA_PAGER)
+    if (s_ct_pane) {
+      lv_obj_add_event_cb(rb, ctRowFocusCb, LV_EVENT_FOCUSED, &s_contacts_ctx[k]);
+      if (e.mesh_idx == s_ct_pane_idx) ct_pane_listed = true;
+    }
+#endif
 
     // Checkbox (select mode) — MUST be child 0 (ctUpdateRowCheck assumes it).
     if (sel_md) {
@@ -49838,6 +49944,13 @@ static void refreshContactsList() {
     lv_obj_set_style_text_color(l, lv_color_hex(COLOR_SUB), LV_PART_MAIN);
     lv_obj_set_style_pad_all(l, 20, LV_PART_MAIN);
   }
+#if defined(TLORA_PAGER)
+  // The pane keeps the node it showed (fresh), else the first one in the list.
+  if (s_ct_pane) {
+    lv_obj_update_layout(s_ct_pane);
+    ctPaneShow(ct_pane_listed ? s_ct_pane_idx : (n_entries > 0 ? (int)s_entries[0].mesh_idx : -1));
+  }
+#endif
 }
 
 static void refreshThreadLists() {
