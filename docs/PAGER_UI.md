@@ -86,3 +86,21 @@ New or changed on the Pager:
 7. Nodes, Map, then the remaining apps, one by one.
 
 The Pager builds with PlatformIO. Builds run only on Josh's go.
+
+## Done so far (Pager simulator; check on the device)
+
+- Night sky background, the default; no aurora on the Pager.
+- Comet colours: 6 named presets, a hue slider (wheel: click, turn, click), hex.
+- Focus ring in a bright tint of the comet colour instead of amber.
+- Home orbit (App layout: Orbit or Grid in the launcher options). Back from an
+  app returns to the orbit; Back on the orbit stays.
+- Inbox: the list and the focused chat's newest messages side by side.
+- Contacts: the list and the focused node's details side by side.
+- Mesh screen on the orbit: MeshCore (press: radio settings), Meshtastic and
+  Alternate marked "later".
+- Screen reader groundwork (`A11y.h`, `-DCOMET_A11Y_TRACE`).
+
+Still open: a hint line for the keys (it needs the tab bar's room, so it waits
+for a decision); the settings frame and value editor; the chat look; bringing
+the deep pages over to the new layout one at a time.
+

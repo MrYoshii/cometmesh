@@ -60834,6 +60834,7 @@ enum AppDrawerAction {
   APPACT_DISCOVER, APPACT_STORE,
   APPACT_USB_FILES,
   APPACT_BOOKS,
+  APPACT_MESH,             // Pager: which mesh the radio is on (MeshCore now; Meshtastic later)
   APPACT_LUA_BASE = 100,   // APPACT_LUA_BASE + i = installed Lua app s_lua_inst[i]
 };
 // The drawer's built-in tiles, which are also what an App widget on Home can open.
@@ -60846,6 +60847,9 @@ static const AppTileDef k_app_tiles[] = {
   { UI_ICON_USER,               "Contacts",  APPACT_CONTACTS,  HUE_PEOPLE },
   { UI_ICON_AT_SIGN,            "Mentions",  APPACT_MENTIONS,  HUE_MSG },
   { UI_ICON_MAP_PIN,            "Map",       APPACT_MAP,       HUE_PLACE },
+#if defined(TLORA_PAGER)
+  { UI_ICON_RADIO_TOWER,        "Mesh",      APPACT_MESH,      HUE_RADIO },   // which mesh the radio is on
+#endif
   { UI_ICON_RADIO,              "Advertise", APPACT_ADVERT,    HUE_RADIO },
 #if CAP_RADIO_TOOLS
   { UI_ICON_SIGNAL,             "Signal",    APPACT_SIGNAL,    HUE_RADIO },
@@ -61227,6 +61231,109 @@ static lv_obj_t* appDrawerReturnFocus(lv_obj_t* root) {
 }
 #endif
 
+#if defined(TLORA_PAGER)
+// ---- Mesh: which mesh the radio is on ---------------------------------------------------
+// One radio listens to one mesh at a time. Today that is MeshCore; the cards for
+// Meshtastic and for taking turns are here from the start (docs/PAGER_UI.md), so the
+// switch has its place before it works. Press MeshCore for its radio settings.
+static lv_obj_t* s_mesh_page = nullptr;
+static void hwFmtBw(char* buf, size_t cap, float bw);   // with the Home widgets, below
+static void closeMeshPage() {
+  appPageEnd(closeMeshPage);
+  if (s_mesh_page) { lv_obj_t* r = s_mesh_page; s_mesh_page = nullptr; lv_obj_del_async(r); }
+}
+static void meshCoreCardCb(lv_event_t* e) {
+  if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+  closeMeshPage();
+  openSettingsCategory(CAT_RADIO);
+}
+static void meshLaterCardCb(lv_event_t* e) {
+  if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+  showSubtleNotifyLvgl(TR("Comes in a later version"), 1800);
+}
+static lv_obj_t* meshCard(lv_obj_t* row, const char* title, const char* tag, bool on, lv_event_cb_t cb) {
+  lv_obj_t* c = lv_btn_create(row);
+  lv_obj_remove_style_all(c);
+  lv_obj_set_height(c, lv_pct(100));
+  lv_obj_set_flex_grow(c, 1);
+  lv_obj_clear_flag(c, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_radius(c, 16, LV_PART_MAIN);
+  lv_obj_set_style_bg_opa(c, LV_OPA_COVER, LV_PART_MAIN);
+  lv_obj_set_style_bg_color(c, lv_color_hex(on ? rgbMix(COLOR_PANEL, COLOR_GLOW, 22) : COLOR_PANEL), LV_PART_MAIN);
+  lv_obj_set_style_border_width(c, on ? 2 : 1, LV_PART_MAIN);
+  lv_obj_set_style_border_color(c, lv_color_hex(on ? COLOR_GLOW : COLOR_BORDER), LV_PART_MAIN);
+  lv_obj_set_style_pad_all(c, 10, LV_PART_MAIN);
+  lv_obj_set_flex_flow(c, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_style_pad_row(c, 3, LV_PART_MAIN);
+  lv_obj_add_event_cb(c, cb, LV_EVENT_CLICKED, nullptr);
+  lv_obj_t* t = lv_label_create(c);
+  lv_label_set_text(t, title);
+  lv_obj_set_style_text_font(t, &g_font_semi_16, LV_PART_MAIN);
+  lv_obj_set_style_text_color(t, lv_color_hex(on ? COLOR_TEXT : COLOR_SUB), LV_PART_MAIN);
+  lv_obj_t* g = lv_label_create(c);   // "on now" / "later", under the name
+  lv_label_set_text(g, tag);
+  lv_obj_set_style_text_font(g, &g_font_12, LV_PART_MAIN);
+  lv_obj_set_style_text_color(g, lv_color_hex(on ? COLOR_ON_GLOW : COLOR_SUB), LV_PART_MAIN);
+  if (on) {
+    lv_obj_set_style_bg_color(g, lv_color_hex(COLOR_GLOW), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(g, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_radius(g, 8, LV_PART_MAIN);
+    lv_obj_set_style_pad_hor(g, 6, LV_PART_MAIN);
+  }
+  lv_obj_set_style_pad_bottom(c, 10, LV_PART_MAIN);
+  return c;
+}
+static void meshCardLine(lv_obj_t* c, const char* text, bool strong) {
+  lv_obj_t* l = lv_label_create(c);
+  lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
+  lv_obj_set_width(l, lv_pct(100));
+  lv_label_set_text(l, text);
+  lv_obj_set_style_text_font(l, strong ? &g_font_14 : &g_font_12, LV_PART_MAIN);
+  lv_obj_set_style_text_color(l, lv_color_hex(strong ? COLOR_TEXT : COLOR_SUB), LV_PART_MAIN);
+}
+static void openMeshPage() {
+  if (s_mesh_page) return;
+  s_mesh_page = appPageCreateRoot(COLOR_BG);
+  appPageBegin(TR("Mesh"), closeMeshPage);
+  lv_obj_set_style_pad_all(s_mesh_page, 10, LV_PART_MAIN);
+  lv_obj_set_flex_flow(s_mesh_page, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_style_pad_row(s_mesh_page, 8, LV_PART_MAIN);
+  lv_obj_t* intro = lv_label_create(s_mesh_page);
+  lv_label_set_long_mode(intro, LV_LABEL_LONG_WRAP);
+  lv_obj_set_width(intro, lv_pct(100));
+  lv_label_set_text(intro, TR("One radio listens to one mesh at a time. Chats from every mesh stay in the inbox."));
+  lv_obj_set_style_text_font(intro, &g_font_12, LV_PART_MAIN);
+  lv_obj_set_style_text_color(intro, lv_color_hex(COLOR_SUB), LV_PART_MAIN);
+  lv_obj_t* row = lv_obj_create(s_mesh_page);
+  lv_obj_remove_style_all(row);
+  lv_obj_clear_flag(row, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_width(row, lv_pct(100));
+  lv_obj_set_flex_grow(row, 1);
+  lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+  lv_obj_set_style_pad_column(row, 8, LV_PART_MAIN);
+  // MeshCore, on now: its preset (or Custom), frequency and width, spreading factor,
+  // and how many nodes it knows.
+  lv_obj_t* mc = meshCard(row, "MeshCore", TR("on now"), true, meshCoreCardCb);
+  char a[48], b[48];
+  if (const NodePrefs* p = the_mesh.getNodePrefs()) {
+    const int pi = displayedMeshRadioPreset(p);
+    meshCardLine(mc, pi >= 0 ? k_mesh_radio_presets[pi].label : TR("Custom"), true);
+    char bw[12]; hwFmtBw(bw, sizeof bw, p->bw);
+    snprintf(a, sizeof a, "%.3f · %s kHz", (double)p->freq, bw);
+    meshCardLine(mc, a, false);
+    snprintf(b, sizeof b, "SF%u · %d %s", (unsigned)p->sf, the_mesh.getNumContacts(), TR("nodes"));
+    meshCardLine(mc, b, false);
+  }
+  lv_obj_t* mt = meshCard(row, "Meshtastic", TR("later"), false, meshLaterCardCb);
+  meshCardLine(mt, "LongFast", true);
+  meshCardLine(mt, TR("Not in this version yet"), false);
+  lv_obj_t* alt = meshCard(row, TR("Alternate"), TR("later"), false, meshLaterCardCb);
+  meshCardLine(alt, TR("Both, taking turns"), true);
+  meshCardLine(alt, TR("every few minutes"), false);
+  a11ySetHint(mc, TR("Press for its radio settings"));
+}
+#endif  // TLORA_PAGER (Mesh page)
+
 // Open an app by its drawer action, from a tile or an App widget on Home. `e` is the
 // tap that asked (the tool openers check it is a click).
 static void appLaunch(int act, lv_event_t* e) {
@@ -61255,6 +61362,9 @@ static void appLaunch(int act, lv_event_t* e) {
 #endif
     case APPACT_ADVERT:    openAdvertModalCb(e);  return;
     case APPACT_POWER:     openPowerMenu();      return;
+#if defined(TLORA_PAGER)
+    case APPACT_MESH:      openMeshPage();       return;
+#endif
 #if CAP_LUA_APPS
     case APPACT_STORE:     openLuaStorePage();   return;
     // Snake is store-only on Lua boards: install it from the catalog and it
@@ -61855,6 +61965,7 @@ static const char* orbitBlurb(int act) {
     case APPACT_SNAKE:         return "A quick game";
     case APPACT_CMDCENTER:     return "Battery, radio, GPS and more at a glance";
     case APPACT_POWER:         return "Turn off or restart";
+    case APPACT_MESH:          return "Which mesh the radio is on";
     case APPACT_TERMINAL:      return "The mesh command line";
     case APPACT_VNC:           return "Show this screen in a browser";
     case APPACT_REMOTE:        return "Use Comet from a browser";
